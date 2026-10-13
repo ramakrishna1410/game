@@ -124,6 +124,7 @@ namespace MadrasGethu
             dodgeCooldown -= dt;
             grabActionCooldown -= dt;
             ContextPrompt = null;
+            Visual.SetAnimatorBool("Holding", State == PlayerState.Grab);
 
             if (ComboTimer > 0f)
             {
@@ -710,8 +711,7 @@ namespace MadrasGethu
             lightIndex = 0;
             Motor.ClearImpulse();
             Motor.Teleport(position);
-            Visual.SetLying(false);
-            Visual.Play(FighterPose.Idle, 0f);
+            Visual.ResetPose();
             SetState(PlayerState.Free);
         }
     }

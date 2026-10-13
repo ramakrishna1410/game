@@ -1,50 +1,95 @@
-# Replacing the placeholder bodies with real animated characters
+# Real characters and animations (Mixamo)
 
-The prototype draws block-bodies and animates them in code. When you're ready for real fighters, you can use **Mixamo** (free, from Adobe) for characters and animations.
+The game ships with block-body placeholders. This guide replaces them with semi-realistic Mixamo characters and fighting animations.
+You download the files and **one menu click** does the rest: **Madras Gethu → Setup Characters (Mixamo)**.
 
-## 1. Download from Mixamo
-1. Go to <https://www.mixamo.com> and sign in with a free Adobe account.
-2. **Characters** tab: pick a character, or upload your own (e.g. a Chennai rowdy made in Blender or Character Creator).
-3. **Animations** tab: search for and download each of these (exact names vary, so pick the closest match). Use format **FBX for Unity**, and choose **With Skin** for the first one and **Without Skin** for the rest:
-   - `Boxing Idle` (Guard), `Idle`, `Running`
-   - `Jab`, `Cross Punch`, `Hook Punch`, `Body Jab Cross` (BodyBlow)
-   - `Punching` or a big swing (Haymaker), `Uppercut`, `Mma Kick` (Kick), `Spinning Backfist` (Backfist), `Stomping` (Stomp)
-   - `Block`, `Dodging` (Dodge), `Reaction`/`Hit To Body` (Flinch)
-   - `Knocked Down` (Knockdown), `Getting Up` (GetUp), `Dying` (Dead)
-   - `Grab`, `Knee`, `Throw`, `Counter` (any quick punch)
+## 1. Sign in to Mixamo
+<https://www.mixamo.com>: it's free, using an Adobe account (Google sign-in works).
 
-## 2. Import into Unity
-1. Drag the FBX files into `Assets/MadrasGethu/Art/Characters/`.
-2. Select each FBX → **Rig** tab → **Animation Type: Humanoid** → Apply.
-   (For the animation-only files, set **Avatar Definition: Copy From Other Avatar** and choose the character's avatar.)
-3. Select each animation → **Animation** tab → tick **Loop Time** for Idle, Boxing Idle and Running only.
+## 2. Download the characters ("With Skin")
+**Characters** tab → pick a character → **Download** with:
+- Format: **FBX for Unity (.fbx)**
+- Pose: **T-pose**
 
-## 3. Animator Controller
-Create **Assets → Create → Animator Controller** named `FighterAnimator`, then add these **parameters**:
-
-| Parameter | Type | Set by the code when… |
+| Save as | Who | Suggestion |
 |---|---|---|
-| `Speed` | Float (0–1) | moving |
-| `Guard` | Bool | enemies are close (fighting stance) |
-| `Jab`, `Cross`, `Hook`, `BodyBlow`, `Haymaker`, `Uppercut`, `Backfist`, `Kick`, `Stomp` | Trigger | attacking |
-| `Grab`, `Knee`, `Throw`, `Slam`, `Counter`, `Dodge`, `Block` | Trigger | the matching action |
-| `Flinch`, `Knockdown`, `GetUp`, `Dead`, `Windup` | Trigger | getting hit / enemy telegraph |
+| `Hero.fbx` | Maaran (the player) | a fit, realistic male in casual clothes |
+| `Rowdy.fbx` | the rowdies | a different realistic male (street clothes / thug) |
+| `Thadiyan.fbx` *(optional)* | the big bruiser | a heavy-built male. The game scales him up 25% |
+| `Boss.fbx` *(optional)* | Kumaran Anna | someone older or better dressed |
 
-The trigger names match the `FighterPose` enum in `Scripts/Combat/CombatTypes.cs` exactly. You only need to add the ones you have animations for; missing triggers are skipped.
+Put them in: `Assets/MadrasGethu/Art/Characters/`
+(The menu **Madras Gethu → Open Art Folder** creates and opens this folder for you.)
 
-Then set up the states:
-- A **Locomotion** blend tree on `Speed` (Idle → Running), with a **Guard** version that uses Boxing Idle.
-- From **Any State**, a transition to each attack/reaction state on its trigger (no exit time, ~0.05s blend), with each state returning to Locomotion when it finishes.
-- **Untick "Apply Root Motion"** on the Animator. The code moves the characters.
+## 3. Download the animations ("Without Skin")
+Keep the **Hero** character selected (top right), go to the **Animations** tab, search for each one, click it, then **Download** with:
+- Format: **FBX for Unity (.fbx)**
+- Skin: **Without Skin**
+- If an **"In Place"** checkbox appears (walking, running, some kicks), **tick it**
 
-## 4. Hook it up
-1. Drag the character FBX into a scene, add an **Animator** with `FighterAnimator`, and save it as a prefab (e.g. `Maaran.prefab`). Make sure its feet are at the prefab's origin and it faces +Z.
-2. Select the **Game Bootstrap** object in the Kasimedu Arena scene:
-   - **Player Model Prefab** → your hero prefab
-   - **Enemy Model Prefab** → a rowdy prefab
-3. Press Play. The placeholder blocks are replaced by your models, and every move fires its Animator trigger.
+Save each file with the name in the first column into `Assets/MadrasGethu/Art/Animations/`.
 
-Notes:
-- Combat timing is still controlled in code (`startup`/`recovery` in `AttackData`). If an animation's hit frame doesn't line up, either tweak `startup` or speed up the animation state.
-- The models should not have colliders. The CharacterController handles collisions.
-- The red attack-warning flash and the white hit flash only tint the placeholder bodies for now. With real models, the enemy's health bar still turns red during the wind-up. Adding a material tint or outline for models is a later task.
+### Must have (5)
+| Save as | Search Mixamo for |
+|---|---|
+| `Idle.fbx` | Idle |
+| `Walk.fbx` | Walking (In Place) |
+| `Run.fbx` | Running (In Place) |
+| `Guard.fbx` | Boxing Idle *(or "Fight Idle")* |
+| `Jab.fbx` | Jab *(or "Lead Jab")* |
+
+### Combat (recommended)
+| Save as | Search Mixamo for |
+|---|---|
+| `Cross.fbx` | Cross Punch |
+| `Hook.fbx` | Hook Punch |
+| `BodyBlow.fbx` | Body Jab Cross *(or any body punch)* |
+| `Haymaker.fbx` | Punching *(a big swinging punch)* |
+| `Uppercut.fbx` | Uppercut |
+| `Kick.fbx` | Mma Kick *(or Front Kick)* |
+| `Block.fbx` | Center Block *(or Body Block)* |
+| `Dodge.fbx` | Dodging *(or a side step)* |
+| `Flinch.fbx` | Head Hit *(or "Hit Reaction")* |
+| `Knockdown.fbx` | Knocked Down *(or "Falling Back")* |
+| `GetUp.fbx` | Getting Up *(or "Stand Up")* |
+| `Dead.fbx` | Dying |
+
+### Extras (optional; the tool uses stand-ins if missing)
+| Save as | Search Mixamo for | Stand-in if missing |
+|---|---|---|
+| `Backfist.fbx` | Spinning backfist / any spin attack | Hook |
+| `Stomp.fbx` | Stomping | Kick |
+| `Knee.fbx` | Knee strike | Kick |
+| `Counter.fbx` | any fast counter punch | Cross |
+| `Throw.fbx` | Throw | Haymaker |
+| `Slam.fbx` | Overhead slam / two-hand smash | Haymaker |
+| `Grab.fbx` | Grab / holding | Guard |
+| `Windup.fbx` | Taunt / charge-up (rowdy wind-up) | none |
+
+> Exact Mixamo names vary. Pick whatever looks closest. Only the **file name** matters.
+> The tool also recognises Mixamo's own names (e.g. `Boxing Idle.fbx`, `Hook Punch.fbx`), but renaming to the first column is safest.
+
+## 4. Run the tool
+1. Make sure the arena scene exists (**Madras Gethu → Create Kasimedu Arena Scene**, which you've already done).
+2. Click **Madras Gethu → Setup Characters (Mixamo)**.
+3. Wait for the progress bar. A report shows which animations were found, which use stand-ins, and which are missing.
+4. Press **Play**.
+
+What the tool does:
+- Sets every FBX to **Humanoid** (so all animations work on all characters), and makes the animations play in place.
+- Extracts the textures so skin and clothes show up.
+- Builds `Art/Generated/FighterAnimator.controller`: walk/run blend trees, a fight stance, every attack and reaction, block/hold/held states, and knockdown/get-up/death.
+- Creates `Hero.prefab`, `Rowdy.prefab`, … in `Art/Generated/` and plugs them into **Game Bootstrap** in the arena scene.
+
+You can run it again any time you add or replace files.
+
+## Tuning
+- **Animation too slow or fast?** Open `Art/Generated/FighterAnimator.controller`, click the state (e.g. *Jab*) and change **Speed**. Lights default to about 1.7x, because Mixamo punches are slower than game punches.
+  *(Re-running the tool rebuilds the controller and resets these values. Change the defaults in `CharacterSetupTool.cs` to keep them.)*
+- **Hit lands before the fist does?** Raise that move's `startup` in `PlayerFighter.BuildDefaultMoves()`.
+- **Character floating or sunk?** Select the prefab in `Art/Generated/` and adjust the child model's Y position.
+
+## Notes
+- The red "attack coming" flash and white hit flash tint the real models too.
+- Models get no colliders. The game's CharacterController handles collisions.
+- Mixamo characters are Western-looking. For a Tamil look (lungi, veshti, banian, moustache), the next step is customising them in **Blender**, or using **Character Creator** (paid) and exporting to Unity. The same tool works on those FBX files.

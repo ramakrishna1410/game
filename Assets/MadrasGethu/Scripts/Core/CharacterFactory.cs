@@ -8,6 +8,8 @@ namespace MadrasGethu
         /// <summary>Optional real character models (e.g. Mixamo). Leave null for the placeholder bodies.</summary>
         public static GameObject PlayerModelPrefab;
         public static GameObject EnemyModelPrefab;
+        public static GameObject ThadiyanModelPrefab;   // falls back to EnemyModelPrefab
+        public static GameObject BossModelPrefab;       // falls back to EnemyModelPrefab
 
         const int IgnoreRaycastLayer = 2;   // the camera's collision check skips fighters
 
@@ -16,6 +18,8 @@ namespace MadrasGethu
         {
             PlayerModelPrefab = null;
             EnemyModelPrefab = null;
+            ThadiyanModelPrefab = null;
+            BossModelPrefab = null;
         }
 
         static GameObject CreateBody(string name, Vector3 position, float scale)
@@ -80,7 +84,10 @@ namespace MadrasGethu
             cc.center = new Vector3(0f, 0.9f * profile.scale, 0f);
             enemy.height = 1.8f * profile.scale;
 
-            AddVisual(go, profile.scale, profile.shirt, profile.pants, profile.accent, EnemyModelPrefab);
+            GameObject model = EnemyModelPrefab;
+            if (kind == EnemyKind.Thadiyan && ThadiyanModelPrefab != null) model = ThadiyanModelPrefab;
+            if (kind == EnemyKind.Boss && BossModelPrefab != null) model = BossModelPrefab;
+            AddVisual(go, profile.scale, profile.shirt, profile.pants, profile.accent, model);
 
             var gm = GameManager.Instance;
             if (gm != null && gm.Player != null)

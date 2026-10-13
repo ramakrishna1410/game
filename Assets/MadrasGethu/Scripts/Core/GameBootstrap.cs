@@ -11,8 +11,12 @@ namespace MadrasGethu
     {
         [Tooltip("Optional: a rigged character with an Animator (e.g. from Mixamo). Leave empty for placeholder bodies.")]
         public GameObject playerModelPrefab;
-        [Tooltip("Optional: model used for all enemies.")]
+        [Tooltip("Optional: model used for rowdies (and for the others if they have no model of their own).")]
         public GameObject enemyModelPrefab;
+        [Tooltip("Optional: model for the Thadiyan bruiser.")]
+        public GameObject thadiyanModelPrefab;
+        [Tooltip("Optional: model for the boss, Kumaran Anna.")]
+        public GameObject bossModelPrefab;
 
         [Tooltip("Build the placeholder harbour. Turn off once you have your own level geometry in the scene.")]
         public bool buildArena = true;
@@ -24,6 +28,8 @@ namespace MadrasGethu
             Time.timeScale = 1f;
             CharacterFactory.PlayerModelPrefab = playerModelPrefab;
             CharacterFactory.EnemyModelPrefab = enemyModelPrefab;
+            CharacterFactory.ThadiyanModelPrefab = thadiyanModelPrefab;
+            CharacterFactory.BossModelPrefab = bossModelPrefab;
 
             if (buildArena)
             {

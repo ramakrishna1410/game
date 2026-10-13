@@ -30,6 +30,9 @@ namespace MadrasGethu
         Transform armL, armR, legL, legR;
         readonly List<Renderer> renderers = new List<Renderer>();
         Material[] originalMaterials;
+        Renderer[] modelRenderers;
+        MaterialPropertyBlock tintBlock;
+        Color currentTint = Color.white;
         HashSet<string> animatorParams;
 
         FighterPose pose = FighterPose.Idle;
@@ -65,6 +68,15 @@ namespace MadrasGethu
                 model.transform.localPosition = Vector3.zero;
                 model.transform.localRotation = Quaternion.identity;
                 if (animator == null) animator = model.GetComponentInChildren<Animator>();
+                if (animator != null)
+                {
+                    animator.applyRootMotion = false;   // the code moves the character, not the animation
+                    animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                }
+                foreach (var col in model.GetComponentsInChildren<Collider>())
+                    Destroy(col);
+                modelRenderers = model.GetComponentsInChildren<Renderer>();
+                tintBlock = new MaterialPropertyBlock();
                 CacheAnimatorParams();
                 SetLayerRecursively(model, gameObject.layer);
                 return;
@@ -135,6 +147,12 @@ namespace MadrasGethu
         /// <summary>Plays a pose for the given time, then returns to idle/guard.</summary>
         public void Play(FighterPose newPose, float duration)
         {
+            // Held poses (block, grab) are re-requested every frame: keep them running instead of restarting.
+            if (newPose == pose && poseTimer > 0.05f)
+            {
+                poseTimer = Mathf.Max(poseTimer, duration);
+                return;
+            }
             pose = newPose;
             poseTimer = duration;
             if (animator != null && animatorParams != null && animatorParams.Contains(newPose.ToString()))
@@ -153,6 +171,28 @@ namespace MadrasGethu
             speed01 = Mathf.Clamp01(normalizedSpeed);
             if (animator != null && animatorParams != null && animatorParams.Contains("Speed"))
                 animator.SetFloat("Speed", speed01);
+        }
+
+        /// <summary>Sets an Animator bool if the controller has it (e.g. "Holding" while grabbing, "Held" while grabbed).</summary>
+        public void SetAnimatorBool(string parameter, bool value)
+        {
+            if (animator != null && animatorParams != null && animatorParams.Contains(parameter))
+                animator.SetBool(parameter, value);
+        }
+
+        /// <summary>Back to a neutral standing pose (used on respawn, also resets the Animator).</summary>
+        public void ResetPose()
+        {
+            pose = FighterPose.Idle;
+            poseTimer = 0f;
+            lying = false;
+            lie = 0f;
+            telegraph = false;
+            if (animator != null)
+            {
+                animator.Rebind();
+                animator.Update(0f);
+            }
         }
 
         public void SetLying(bool value)
@@ -193,7 +233,11 @@ namespace MadrasGethu
 
             UpdateMaterials(dt);
 
-            if (animator != null) return;
+            if (animator != null)
+            {
+                SetAnimatorBool("Blocking", pose == FighterPose.Block && poseTimer > 0f);
+                return;
+            }
 
             float k = 1f - Mathf.Exp(-22f * dt);
 
@@ -285,10 +329,41 @@ namespace MadrasGethu
             }
         }
 
+        /// <summary>Real models keep their textures; flashes are done by tinting the base colour.</summary>
+        void UpdateModelTint()
+        {
+            Color tint = Color.white;
+            if (flashTimer > 0f)
+                tint = new Color(2.2f, 2.2f, 2.2f);
+            else if (telegraph && Mathf.Repeat(Time.time * 10f, 1f) < 0.6f)
+                tint = new Color(2.2f, 0.35f, 0.3f);
+            if (tint == currentTint) return;
+            currentTint = tint;
+
+            foreach (var r in modelRenderers)
+            {
+                if (r == null) continue;
+                if (tint == Color.white)
+                {
+                    r.SetPropertyBlock(null);
+                    continue;
+                }
+                r.GetPropertyBlock(tintBlock);
+                tintBlock.SetColor("_BaseColor", tint);   // URP Lit
+                tintBlock.SetColor("_Color", tint);       // Built-in Standard
+                r.SetPropertyBlock(tintBlock);
+            }
+        }
+
         void UpdateMaterials(float dt)
         {
-            if (originalMaterials == null) return;
             flashTimer -= dt;
+            if (modelRenderers != null)
+            {
+                UpdateModelTint();
+                return;
+            }
+            if (originalMaterials == null) return;
             Material overrideMat = null;
             if (flashTimer > 0f)
                 overrideMat = Palette.Get(Color.white, new Color(1f, 1f, 1f) * 1.5f);

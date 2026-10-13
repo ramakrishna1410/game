@@ -63,6 +63,7 @@ namespace MadrasGethu
 
         void Update()
         {
+            Visual.SetAnimatorBool("Held", state == AIState.Grabbed);
             if (state == AIState.Dead) return;
             float dt = Time.deltaTime;
             stateTimer -= dt;
