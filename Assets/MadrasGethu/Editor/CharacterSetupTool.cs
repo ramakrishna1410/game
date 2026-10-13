@@ -262,7 +262,7 @@ namespace MadrasGethu.EditorTools
             }
 
             Debug.Log("[Madras Gethu] Character setup check\n" + sb);
-            EditorUtility.DisplayDialog("Madras Gethu: character check", sb.ToString(), "OK");
+            ReportWindow.Show("Character check", sb.ToString());
         }
 
         static void PrefabLine(StringBuilder sb, string label, GameObject prefab)
@@ -722,7 +722,7 @@ namespace MadrasGethu.EditorTools
             sb.AppendLine("Press Play to fight!");
 
             Debug.Log("[Madras Gethu] Character setup\n" + sb);
-            EditorUtility.DisplayDialog("Madras Gethu: characters ready", sb.ToString(), "Semma!");
+            ReportWindow.Show("Characters ready. Semma!", sb.ToString());
         }
 
         // ------------------------------------------------------------------ helpers
