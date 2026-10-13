@@ -12,12 +12,15 @@ namespace MadrasGethu
     public class FighterMotor : MonoBehaviour
     {
         public float gravity = -22f;
-        public float turnSpeed = 900f;          // degrees per second
+        public float turnSpeed = 600f;          // degrees per second
+        public float acceleration = 14f;        // m/s² for walking/running (gives the body some weight)
         public float groundImpulseDecay = 18f;
         public float airImpulseDecay = 2f;
 
         CharacterController cc;
         Vector3 desired;
+        Vector3 smoothedDesired;
+        bool snapDesired;
         Vector3 impulse;
         float verticalVelocity;
 
@@ -25,6 +28,8 @@ namespace MadrasGethu
         public bool Frozen { get; private set; }
         public bool IsGrounded => cc.enabled && cc.isGrounded;
         public Vector3 Velocity { get; private set; }
+        /// <summary>Walking/running velocity only (no knockback), used to pick walk/strafe/run animations.</summary>
+        public Vector3 MoveVelocity => Frozen ? Vector3.zero : smoothedDesired;
         public CharacterController Controller => cc;
 
         void Awake()
@@ -32,9 +37,11 @@ namespace MadrasGethu
             cc = GetComponent<CharacterController>();
         }
 
-        public void SetDesiredVelocity(Vector3 velocity)
+        /// <summary>Walk/run velocity for this frame. instant = skip acceleration (used for attack lunges).</summary>
+        public void SetDesiredVelocity(Vector3 velocity, bool instant = false)
         {
             desired = new Vector3(velocity.x, 0f, velocity.z);
+            snapDesired = instant;
         }
 
         public void AddImpulse(Vector3 velocity)
@@ -72,6 +79,7 @@ namespace MadrasGethu
             Frozen = frozen;
             cc.enabled = !frozen;
             desired = Vector3.zero;
+            smoothedDesired = Vector3.zero;
             impulse = Vector3.zero;
             verticalVelocity = 0f;
         }
@@ -99,7 +107,12 @@ namespace MadrasGethu
                 verticalVelocity = -2f;   // keeps the controller snapped to the ground
             verticalVelocity += gravity * dt;
 
-            Vector3 v = desired + impulse;
+            smoothedDesired = snapDesired
+                ? desired
+                : Vector3.MoveTowards(smoothedDesired, desired, acceleration * dt);
+            snapDesired = false;
+
+            Vector3 v = smoothedDesired + impulse;
             v.y = verticalVelocity;
             cc.Move(v * dt);
             Velocity = v;

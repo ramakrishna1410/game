@@ -97,7 +97,7 @@ namespace MadrasGethu
             {
                 title = "KUMARAN ANNA",
                 subtitle = "The harbour boss. He runs Kasimedu. Tonight he answers to you.",
-                enemies = { EnemyKind.Boss, EnemyKind.Rowdy, EnemyKind.Thadiyan, EnemyKind.Rowdy },
+                enemies = { EnemyKind.Boss, EnemyKind.Rowdy, EnemyKind.Rowdy },
             });
         }
     }

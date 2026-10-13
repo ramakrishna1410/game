@@ -121,8 +121,8 @@ namespace MadrasGethu
                         stateTimer = 3f;
                         if (WaveIndex < waves.Count - 1)
                         {
-                            ShowBanner("ADUTHU YAARU?", "Next! (Wave cleared: +25% health)", 2.5f);
-                            if (Player != null) Player.Heal(Player.maxHealth * 0.25f);
+                            ShowBanner("ADUTHU YAARU?", "Next! (Wave cleared: +40% health)", 2.5f);
+                            if (Player != null) Player.Heal(Player.maxHealth * 0.4f);
                         }
                     }
                     break;

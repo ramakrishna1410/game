@@ -4,37 +4,121 @@ using UnityEngine;
 namespace MadrasGethu
 {
     /// <summary>
-    /// Limits how many rowdies attack at the same time, like Sleeping Dogs / Yakuza crowds:
-    /// most of the group circles and taunts while one or two step in to swing.
+    /// Decides who fights, Assassin's Creed / Sleeping Dogs style:
+    /// - only a few rowdies are "engaged" (close to the hero, allowed to attack),
+    /// - the rest wait in a wider ring in their fighting stance, pacing and watching,
+    /// - only one engaged rowdy attacks at a time, with a breather between attacks.
+    /// When an engaged rowdy goes down for good, the closest waiting one steps in.
     /// </summary>
     public static class EnemyDirector
     {
-        public static int MaxAttackers = 2;
+        /// <summary>How many rowdies can be close to the hero at once.</summary>
+        public static int MaxEngaged = 2;
+        /// <summary>How many can be mid-attack at the same moment.</summary>
+        public static int MaxAttackers = 1;
+        /// <summary>Breather (seconds) after any attack before the next one may start.</summary>
+        public static Vector2 AttackGap = new Vector2(0.9f, 1.7f);
+
+        static readonly HashSet<EnemyFighter> engaged = new HashSet<EnemyFighter>();
         static readonly HashSet<EnemyFighter> attackers = new HashSet<EnemyFighter>();
-        static float nextTokenTime;
+        static readonly List<EnemyFighter> waiting = new List<EnemyFighter>();
+        static float nextAttackTime;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         public static void Reset()
         {
+            engaged.Clear();
             attackers.Clear();
-            nextTokenTime = 0f;
+            waiting.Clear();
+            nextAttackTime = 0f;
         }
 
-        /// <summary>Asks for permission to attack. Returns true if granted.</summary>
-        public static bool RequestAttack(EnemyFighter enemy)
+        static void Clean()
         {
+            engaged.RemoveWhere(e => e == null || e.IsDead);
             attackers.RemoveWhere(e => e == null || e.IsDead);
-            if (attackers.Contains(enemy)) return true;
-            if (attackers.Count >= MaxAttackers || Time.time < nextTokenTime) return false;
-            attackers.Add(enemy);
-            // Small gap between attackers so hits arrive one after another and can be countered.
-            nextTokenTime = Time.time + Random.Range(0.35f, 0.7f);
+            waiting.RemoveAll(e => e == null || e.IsDead);
+        }
+
+        public static bool IsEngaged(EnemyFighter enemy) => engaged.Contains(enemy);
+
+        /// <summary>
+        /// A waiting rowdy asks to step in. Granted when a slot is free and it is the best candidate:
+        /// a waiting boss always goes first, otherwise the one closest to the hero.
+        /// </summary>
+        public static bool RequestEngage(EnemyFighter enemy, Vector3 heroPosition)
+        {
+            Clean();
+            if (engaged.Contains(enemy)) return true;
+            if (!waiting.Contains(enemy)) waiting.Add(enemy);
+            if (engaged.Count >= MaxEngaged) return false;
+
+            EnemyFighter best = null;
+            float bestScore = float.MaxValue;
+            foreach (var w in waiting)
+            {
+                if (w.IsDowned) continue;
+                float score = (w.transform.position - heroPosition).sqrMagnitude;
+                if (w.IsBoss) score -= 10000f;
+                if (score < bestScore) { bestScore = score; best = w; }
+            }
+            if (best != enemy) return false;
+
+            waiting.Remove(enemy);
+            engaged.Add(enemy);
             return true;
         }
 
+        /// <summary>
+        /// The hero picked a fight with a waiting rowdy: he joins the fight right away and, if the slots are
+        /// full, the engaged rowdy furthest from the hero (and not mid-attack) steps back to wait.
+        /// </summary>
+        public static void ForceEngage(EnemyFighter enemy, Vector3 heroPosition)
+        {
+            Clean();
+            if (engaged.Contains(enemy)) return;
+            if (engaged.Count >= MaxEngaged)
+            {
+                EnemyFighter furthest = null;
+                float furthestDist = -1f;
+                foreach (var e in engaged)
+                {
+                    if (attackers.Contains(e) || e.IsGrabbed) continue;
+                    float d = (e.transform.position - heroPosition).sqrMagnitude;
+                    if (d > furthestDist) { furthestDist = d; furthest = e; }
+                }
+                if (furthest == null) return;
+                engaged.Remove(furthest);
+                waiting.Add(furthest);
+            }
+            waiting.Remove(enemy);
+            engaged.Add(enemy);
+        }
+
+        /// <summary>Gives up the close-combat slot (death, or being sent back to wait).</summary>
+        public static void Disengage(EnemyFighter enemy)
+        {
+            engaged.Remove(enemy);
+            attackers.Remove(enemy);
+            waiting.Remove(enemy);
+        }
+
+        /// <summary>An engaged rowdy asks to throw a punch. Returns true if it may.</summary>
+        public static bool RequestAttack(EnemyFighter enemy)
+        {
+            Clean();
+            if (!engaged.Contains(enemy)) return false;
+            if (attackers.Contains(enemy)) return true;
+            if (attackers.Count >= MaxAttackers || Time.time < nextAttackTime) return false;
+            attackers.Add(enemy);
+            return true;
+        }
+
+        /// <summary>The attack is over (landed, missed or interrupted): start the breather.</summary>
         public static void Release(EnemyFighter enemy)
         {
-            attackers.Remove(enemy);
+            if (attackers.Remove(enemy))
+                nextAttackTime = Time.time + Random.Range(AttackGap.x, AttackGap.y);
         }
     }
 }

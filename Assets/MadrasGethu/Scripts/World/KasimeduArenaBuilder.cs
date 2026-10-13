@@ -49,16 +49,26 @@ namespace MadrasGethu
             var moon = moonGo.AddComponent<Light>();
             moon.type = LightType.Directional;
             moon.color = new Color(0.55f, 0.65f, 0.95f);
-            moon.intensity = 0.45f;
+            moon.intensity = 0.8f;
             moon.shadows = LightShadows.Soft;
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.14f, 0.15f, 0.22f);
+            RenderSettings.ambientLight = new Color(0.27f, 0.28f, 0.36f);
+
+            // Soft cool back light so fighters stand out from the road (rim light).
+            var rimGo = new GameObject("Rim Light");
+            rimGo.transform.SetParent(root, false);
+            rimGo.transform.rotation = Quaternion.Euler(25f, 150f, 0f);
+            var rim = rimGo.AddComponent<Light>();
+            rim.type = LightType.Directional;
+            rim.color = new Color(0.6f, 0.7f, 1f);
+            rim.intensity = 0.45f;
+            rim.shadows = LightShadows.None;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = new Color(0.05f, 0.06f, 0.1f);
-            RenderSettings.fogDensity = 0.025f;
+            RenderSettings.fogDensity = 0.018f;
         }
 
         // ------------------------------------------------------------------ ground
@@ -246,7 +256,7 @@ namespace MadrasGethu
             for (int sx = -1; sx <= 1; sx += 2)
                 for (int sz = -1; sz <= 1; sz += 2)
                     Palette.Primitive(PrimitiveType.Cylinder, v, new Vector3(sx * 0.65f, 1.2f, sz * 1.25f), new Vector3(0.06f, 1.2f, 0.06f), wood, collider: false, name: "Pole");
-            Palette.Primitive(PrimitiveType.Cube, v, new Vector3(0.2f, 2.4f, 0f), new Vector3(2f, 0.05f, 3f), new Color(0.15f, 0.35f, 0.75f), collider: false, name: "Tarp");
+            Palette.Primitive(PrimitiveType.Cube, v, new Vector3(0.2f, 2.4f, 0f), new Vector3(2f, 0.05f, 3f), new Color(0.15f, 0.35f, 0.75f), name: "Tarp");   // has collision so the camera stops at it
             // Brass tea kettle, glass jars of biscuits, a small tube light
             Palette.Primitive(PrimitiveType.Cylinder, v, new Vector3(0f, 1.3f, -0.6f), new Vector3(0.45f, 0.2f, 0.45f), new Color(0.8f, 0.6f, 0.2f), collider: false, name: "Tea Kettle");
             for (int i = 0; i < 4; i++)

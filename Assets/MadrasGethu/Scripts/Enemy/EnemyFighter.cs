@@ -4,13 +4,14 @@ using UnityEngine;
 namespace MadrasGethu
 {
     /// <summary>
-    /// Street rowdy AI. Walks in, circles the player with the rest of the gang, and takes turns
-    /// attacking (via EnemyDirector). Every attack is telegraphed with a red flash: that is the
-    /// player's window to counter.
+    /// Street rowdy AI, Assassin's Creed / Sleeping Dogs style.
+    /// Rowdies walk in, then either WAIT in a wide ring (fighting stance, pacing, watching, the odd taunt)
+    /// or are ENGAGED (close to the hero, allowed to attack). EnemyDirector decides who is engaged and
+    /// lets only one attack at a time. Every attack is telegraphed with a red flash: the counter window.
     /// </summary>
     public class EnemyFighter : Fighter
     {
-        enum AIState { Approach, Circle, CloseIn, Windup, Recover, Stagger, Down, GetUp, Grabbed, Dead }
+        enum AIState { Approach, Wait, Engage, CloseIn, Windup, Recover, Stagger, Down, GetUp, Grabbed, Dead }
 
         public EnemyKind kind;
         public EnemyProfile Profile { get; private set; }
@@ -19,9 +20,13 @@ namespace MadrasGethu
         float stateTimer;
         AttackData currentAttack;
         float strafeDirection = 1f;
-        float nextStrafeFlip;
         float nextAttackTime;
-        float circleRadius;
+        float waitRadius;
+        float engageRadius;
+        bool pacing;
+        float paceTimer;
+        float nextEngageCheck;
+        float nextTauntTime;
         int poiseHits;
         bool hasToken;
 
@@ -35,6 +40,7 @@ namespace MadrasGethu
         public override bool IsDowned => state == AIState.Down || state == AIState.GetUp;
         public override bool CanBeTargeted => !IsDead && state != AIState.Grabbed;
         public bool IsBoss => kind == EnemyKind.Boss;
+        bool Waiting => state == AIState.Wait || state == AIState.Approach;
 
         public bool CanBeGrabbed =>
             !IsDead && !IsDowned && state != AIState.Grabbed &&
@@ -48,9 +54,10 @@ namespace MadrasGethu
             team = Team.Enemy;
             ResetHealth(Profile.health);
             radius = 0.4f * Profile.scale;
-            circleRadius = Random.Range(2.8f, 4.2f);
+            waitRadius = Random.Range(5.5f, 7.5f);
+            engageRadius = Random.Range(2.3f, 3.0f);
             strafeDirection = Random.value < 0.5f ? -1f : 1f;
-            nextAttackTime = Time.time + Random.Range(1f, 2.5f);
+            nextTauntTime = Time.time + Random.Range(3f, 8f);
         }
 
         protected override void Awake()
@@ -79,11 +86,10 @@ namespace MadrasGethu
 
             if (!playerAlive && state != AIState.Down && state != AIState.GetUp && state != AIState.Grabbed)
             {
-                // Player is down for good: gloat in place.
+                // The hero is down for good: stand and gloat.
                 ReleaseToken();
                 Visual.SetTelegraph(false);
                 Visual.SetCombatStance(false);
-                Visual.SetLocomotion(0f);
                 return;
             }
 
@@ -94,14 +100,34 @@ namespace MadrasGethu
             switch (state)
             {
                 case AIState.Approach:
-                    Visual.SetCombatStance(dist < 6f);
+                    Visual.SetCombatStance(dist < 9f);
                     MoveTowards(dirToPlayer, Profile.runSpeed);
-                    if (dist <= circleRadius + 0.3f) state = AIState.Circle;
+                    if (dist <= waitRadius + 1f) state = AIState.Wait;
                     break;
 
-                case AIState.Circle:
-                    Circle(dirToPlayer, dist);
-                    if (Time.time >= nextAttackTime && EnemyDirector.RequestAttack(this))
+                case AIState.Wait:
+                    if (Time.time >= nextEngageCheck)
+                    {
+                        nextEngageCheck = Time.time + 0.4f;
+                        if (EnemyDirector.RequestEngage(this, player.transform.position))
+                        {
+                            state = AIState.Engage;
+                            nextAttackTime = Time.time + Random.Range(0.8f, 1.8f);
+                            break;
+                        }
+                    }
+                    HoldRing(dirToPlayer, dist, waitRadius, 1.0f, allowTaunt: true);
+                    break;
+
+                case AIState.Engage:
+                    if (!EnemyDirector.IsEngaged(this))
+                    {
+                        state = AIState.Wait;   // swapped out: step back and watch
+                        break;
+                    }
+                    HoldRing(dirToPlayer, dist, engageRadius, Profile.circleSpeed, allowTaunt: false);
+                    if (Time.time >= nextAttackTime && !player.IsDowned && dist < engageRadius + 1.5f
+                        && EnemyDirector.RequestAttack(this))
                     {
                         hasToken = true;
                         currentAttack = Profile.attacks[Random.Range(0, Profile.attacks.Count)];
@@ -111,52 +137,53 @@ namespace MadrasGethu
                     break;
 
                 case AIState.CloseIn:
-                    MoveTowards(dirToPlayer, Profile.runSpeed);
+                    MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.2f));
                     if (dist <= currentAttack.range * 0.85f + player.radius)
                         BeginWindup();
-                    else if (stateTimer <= 0f)
+                    else if (stateTimer <= 0f || player.IsDowned)
                         EndAttack();
                     break;
 
                 case AIState.Windup:
                     Motor.FaceDirection(dirToPlayer);
-                    Visual.SetLocomotion(0f);
                     if (stateTimer <= 0f) ReleaseAttack(dist);
                     break;
 
                 case AIState.Recover:
-                    Visual.SetLocomotion(0f);
                     if (stateTimer <= 0f) EndAttack();
                     break;
 
                 case AIState.Stagger:
-                    Visual.SetLocomotion(0f);
-                    if (stateTimer <= 0f) state = AIState.Circle;
+                    if (stateTimer <= 0f) ResumeStance();
                     break;
 
                 case AIState.Down:
-                    Visual.SetLocomotion(0f);
                     if (stateTimer <= 0f && Motor.IsGrounded)
                     {
                         state = AIState.GetUp;
-                        stateTimer = 0.6f;
+                        stateTimer = 0.8f;
                         Visual.SetLying(false);
-                        Visual.Play(FighterPose.GetUp, 0.6f);
+                        Visual.Play(FighterPose.GetUp, 0.8f);
                     }
                     break;
 
                 case AIState.GetUp:
                     if (stateTimer <= 0f)
                     {
-                        state = AIState.Circle;
-                        nextAttackTime = Time.time + Random.Range(0.5f, 1.5f);
+                        ResumeStance();
+                        nextAttackTime = Mathf.Max(nextAttackTime, Time.time + Random.Range(1f, 2f));
                     }
                     break;
 
                 case AIState.Grabbed:
-                    Visual.SetLocomotion(0f);
                     break;
             }
+        }
+
+        /// <summary>Back to fighting stance: close in if this rowdy holds a combat slot, otherwise wait.</summary>
+        void ResumeStance()
+        {
+            state = EnemyDirector.IsEngaged(this) ? AIState.Engage : AIState.Wait;
         }
 
         // ------------------------------------------------------------------ movement
@@ -166,26 +193,44 @@ namespace MadrasGethu
             Vector3 v = (direction + Separation() * 0.8f).normalized * speed;
             Motor.SetDesiredVelocity(v);
             Motor.FaceDirection(direction);
-            Visual.SetLocomotion(speed / 6f);
         }
 
-        void Circle(Vector3 dirToPlayer, float dist)
+        /// <summary>
+        /// Keep a distance from the hero in fighting stance, facing him, with stop-and-go side steps,
+        /// like a real street fighter sizing someone up.
+        /// </summary>
+        void HoldRing(Vector3 dirToPlayer, float dist, float ringRadius, float stepSpeed, bool allowTaunt)
         {
             Visual.SetCombatStance(true);
-            if (Time.time > nextStrafeFlip)
+
+            // Far behind (the hero ran off): jog to catch up.
+            if (dist > ringRadius + 3f)
             {
-                nextStrafeFlip = Time.time + Random.Range(1.5f, 4f);
-                if (Random.value < 0.4f) strafeDirection = -strafeDirection;
+                MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.5f));
+                return;
+            }
+
+            paceTimer -= Time.deltaTime;
+            if (paceTimer <= 0f)
+            {
+                pacing = !pacing;
+                paceTimer = pacing ? Random.Range(1.0f, 2.5f) : Random.Range(0.8f, 2.2f);
+                if (pacing && Random.value < 0.5f) strafeDirection = -strafeDirection;
+                if (!pacing && allowTaunt && Time.time > nextTauntTime && Random.value < 0.35f)
+                {
+                    Visual.Play(FighterPose.Taunt, 1.5f);
+                    nextTauntTime = Time.time + Random.Range(6f, 12f);
+                }
             }
 
             Vector3 tangent = Vector3.Cross(Vector3.up, dirToPlayer) * strafeDirection;
-            float radial = Mathf.Clamp(dist - circleRadius, -1f, 1f);
-            Vector3 v = tangent * 0.7f + dirToPlayer * radial + Separation() * 1.2f;
-            v = Vector3.ClampMagnitude(v, 1f) * Profile.circleSpeed;
+            float radial = Mathf.Clamp(dist - ringRadius, -1f, 1f);
+            if (Mathf.Abs(radial) < 0.25f) radial = 0f;   // close enough: don't shuffle back and forth
+            Vector3 v = dirToPlayer * radial * 0.8f + (pacing ? tangent * 0.7f : Vector3.zero) + Separation() * 1.2f;
+            v = Vector3.ClampMagnitude(v, 1f) * stepSpeed;
 
             Motor.SetDesiredVelocity(v);
             Motor.FaceDirection(dirToPlayer);
-            Visual.SetLocomotion(v.magnitude / 6f);
         }
 
         Vector3 Separation()
@@ -196,7 +241,7 @@ namespace MadrasGethu
                 if (f == this || f.team != team || f.IsDead) continue;
                 Vector3 away = Flat(transform.position - f.transform.position);
                 float d = away.magnitude;
-                if (d < 1.6f && d > 0.01f) push += away / d * (1.6f - d);
+                if (d < 1.8f && d > 0.01f) push += away / d * (1.8f - d);
             }
             return push;
         }
@@ -229,7 +274,7 @@ namespace MadrasGethu
         void EndAttack()
         {
             ReleaseToken();
-            state = AIState.Circle;
+            ResumeStance();
             nextAttackTime = Time.time + Random.Range(Profile.attackCooldown.x, Profile.attackCooldown.y);
         }
 
@@ -258,7 +303,7 @@ namespace MadrasGethu
             if (IsDowned && !hit.hitsDowned) return HitResult.Ignored;
 
             // Bigger rowdies sometimes put their guard up while circling.
-            bool canBlock = (state == AIState.Circle || state == AIState.Approach) && !hit.heavy && !hit.unblockable;
+            bool canBlock = (state == AIState.Engage || state == AIState.Wait || state == AIState.Approach) && !hit.heavy && !hit.unblockable;
             if (canBlock && Random.value < Profile.blockChance)
             {
                 Motor.FaceDirection(-hit.direction, true);
@@ -271,6 +316,8 @@ namespace MadrasGethu
 
             Visual.SetTelegraph(false);
             Visual.Flash();
+            if (hit.attacker != null && hit.attacker.team == Team.Player)
+                EnemyDirector.ForceEngage(this, hit.attacker.transform.position);
             ApplyDamage(hit.damage, hit, HitResult.Hit);
             if (IsDead) return HitResult.Hit;
 
@@ -328,12 +375,12 @@ namespace MadrasGethu
         protected override void OnDeath(HitInfo killingBlow)
         {
             ReleaseToken();
+            EnemyDirector.Disengage(this);   // frees the slot so a waiting rowdy steps in
             if (state == AIState.Grabbed) Motor.SetFrozen(false);
             state = AIState.Dead;
             Visual.SetTelegraph(false);
             Visual.SetCombatStance(false);
-            Visual.SetLocomotion(0f);
-            Visual.SetLying(true);
+                        Visual.SetLying(true);
             Visual.Play(FighterPose.Dead, 999f);
             Motor.AddImpulse(killingBlow.direction * Mathf.Max(killingBlow.knockback, 4f) + Vector3.up * 3f);
 

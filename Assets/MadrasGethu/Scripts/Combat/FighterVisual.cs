@@ -191,11 +191,54 @@ namespace MadrasGethu
                 animator.SetBool("Guard", on);
         }
 
-        public void SetLocomotion(float normalizedSpeed)
+        // Reference speeds (m/s) that match the walk and run animations.
+        const float WalkReference = 1.4f;
+        const float RunReference = 4.5f;
+        FighterMotor motor;
+
+        /// <summary>
+        /// Locomotion is driven automatically from the character's real movement (see UpdateLocomotion),
+        /// so animations always match what the body is doing. Kept for older calls; does nothing now.
+        /// </summary>
+        public void SetLocomotion(float normalizedSpeed) { }
+
+        /// <summary>Top of the character's head in world space (for health bars and popups).</summary>
+        public float HeadTopY
         {
-            speed01 = Mathf.Clamp01(normalizedSpeed);
-            if (animator != null && animatorParams != null && animatorParams.Contains("Speed"))
-                animator.SetFloat("Speed", speed01);
+            get
+            {
+                if (modelRenderers != null)
+                {
+                    float top = float.MinValue;
+                    foreach (var r in modelRenderers)
+                        if (r != null && r.enabled) top = Mathf.Max(top, r.bounds.max.y);
+                    if (top > float.MinValue) return top;
+                }
+                return transform.position.y + 1.95f * transform.lossyScale.y;
+            }
+        }
+
+        /// <summary>Feeds the Animator Speed (relaxed walk/run) and MoveX/MoveZ (fight-stance stepping), smoothed.</summary>
+        void UpdateLocomotion(float dt)
+        {
+            if (motor == null) motor = GetComponentInParent<FighterMotor>();
+            Vector3 v = motor != null ? motor.MoveVelocity : Vector3.zero;
+            v.y = 0f;
+            float m = v.magnitude;
+            speed01 = Mathf.Clamp01(m / 6f);
+            if (animator == null || animatorParams == null) return;
+
+            // 0..0.5 = standing to walking, 0.5..1 = walking to running
+            float norm = m <= WalkReference
+                ? 0.5f * m / WalkReference
+                : Mathf.Min(1f, 0.5f + 0.5f * (m - WalkReference) / (RunReference - WalkReference));
+            Vector3 local = m > 0.05f ? transform.InverseTransformDirection(v / m) * norm : Vector3.zero;
+
+            const float damp = 0.12f;
+            if (animatorParams.Contains("Speed"))
+                animator.SetFloat("Speed", m <= WalkReference ? 0.35f * m / WalkReference : Mathf.Min(1f, 0.35f + 0.45f * (m - WalkReference) / (RunReference - WalkReference)), damp, dt);
+            if (animatorParams.Contains("MoveX")) animator.SetFloat("MoveX", local.x, damp, dt);
+            if (animatorParams.Contains("MoveZ")) animator.SetFloat("MoveZ", local.z, damp, dt);
         }
 
         /// <summary>Sets an Animator bool if the controller has it (e.g. "Holding" while grabbing, "Held" while grabbed).</summary>
@@ -257,6 +300,7 @@ namespace MadrasGethu
             lie = Mathf.MoveTowards(lie, lying ? 1f : 0f, dt * (lying ? 6f : 2.5f));
 
             UpdateMaterials(dt);
+            UpdateLocomotion(dt);
 
             if (animator != null)
             {

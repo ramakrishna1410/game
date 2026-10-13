@@ -14,7 +14,7 @@ namespace MadrasGethu
         Grab, Knee, Throw, Slam,
         Counter, Dodge,
         Flinch, Knockdown, GetUp, Dead,
-        Windup
+        Windup, Taunt
     }
 
     public enum HitResult { Ignored, Hit, Blocked }

@@ -57,6 +57,9 @@ namespace MadrasGethu.EditorTools
                 L("Idle", "idle", "breathingidle", "standingidle", "happyidle"),
                 L("Walk", "walk", "walking"),
                 L("Run", "run", "running", "jog", "jogging", "fastrun"),
+                new Slot { name = "WalkBack", kind = SlotKind.Locomotion, aliases = new[] { "walkback", "walkingbackwards", "walkbackwards", "backwardwalk", "backwardswalk" }, fallbacks = new[] { "Walk" } },
+                new Slot { name = "StrafeLeft", kind = SlotKind.Locomotion, aliases = new[] { "strafeleft", "leftstrafe", "leftstrafewalking", "leftstrafewalk", "walkleft", "walkstrafeleft" }, fallbacks = new[] { "Walk" } },
+                new Slot { name = "StrafeRight", kind = SlotKind.Locomotion, aliases = new[] { "straferight", "rightstrafe", "rightstrafewalking", "rightstrafewalk", "walkright", "walkstraferight" }, fallbacks = new[] { "Walk" } },
                 new Slot { name = "Guard", kind = SlotKind.Locomotion, aliases = new[] { "guard", "boxingidle", "fightidle", "fightingidle", "bouncingfightidle" }, fallbacks = new[] { "Idle" } },
 
                 T("Jab", 1.7f, new[] { "jab", "leadjab", "jabpunch" }, "Cross", "Hook"),
@@ -74,7 +77,8 @@ namespace MadrasGethu.EditorTools
                 T("Counter", 1.6f, new[] { "counter", "counterpunch" }, "Cross", "Haymaker"),
                 T("Dodge", 1.4f, new[] { "dodge", "dodging", "sidestep", "roll" }),
                 T("Flinch", 1.3f, new[] { "flinch", "hitreaction", "reaction", "headhit", "hit", "takinghit" }),
-                T("Windup", 1f, new[] { "windup", "taunt", "chargeup" }),
+                T("Windup", 1f, new[] { "windup", "chargeup" }),
+                T("Taunt", 1f, new[] { "taunt", "taunting", "comeon", "challenge" }),
                 T("GetUp", 1.3f, new[] { "getup", "gettingup", "standup", "standingup" }),
 
                 new Slot { name = "Block", kind = SlotKind.HoldBool, boolParameter = "Blocking", aliases = new[] { "block", "blocking", "centerblock", "bodyblock" }, fallbacks = new[] { "Guard" } },
@@ -439,13 +443,14 @@ namespace MadrasGethu.EditorTools
             var clip = clips[0];
             clip.name = slot.name;
             clip.loopTime = slot.kind == SlotKind.Locomotion;
-            // Play in place: the game code moves the characters, the animation only moves the body.
+            // The game code moves the characters. Forward/sideways travel in the clip must NOT be baked into
+            // the pose (the body would drift ahead and snap back every loop); with root motion off it is
+            // simply discarded, so the clip plays in place. Rotation and height stay baked into the pose.
             clip.lockRootRotation = true;
             clip.keepOriginalOrientation = true;
             clip.lockRootHeightY = true;
             clip.keepOriginalPositionY = true;
-            clip.lockRootPositionXZ = true;
-            clip.keepOriginalPositionXZ = true;
+            clip.lockRootPositionXZ = false;
             importer.clipAnimations = new[] { clip };
             importer.SaveAndReimport();
 
@@ -482,6 +487,8 @@ namespace MadrasGethu.EditorTools
 
             var controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
+            controller.AddParameter("MoveX", AnimatorControllerParameterType.Float);
+            controller.AddParameter("MoveZ", AnimatorControllerParameterType.Float);
             controller.AddParameter("Guard", AnimatorControllerParameterType.Bool);
             foreach (var s in slots)
             {
@@ -496,7 +503,7 @@ namespace MadrasGethu.EditorTools
             var locomotion = controller.CreateBlendTreeInController("Locomotion", out var relaxedTree, 0);
             FillLocomotionTree(relaxedTree, ClipFor(slots, "Idle"), ClipFor(slots, "Walk"), ClipFor(slots, "Run"));
             var stance = controller.CreateBlendTreeInController("Fight Stance", out var stanceTree, 0);
-            FillLocomotionTree(stanceTree, ClipFor(slots, "Guard"), ClipFor(slots, "Walk"), ClipFor(slots, "Run"));
+            FillStanceTree(stanceTree, slots);
             sm.defaultState = locomotion;
 
             var toStance = locomotion.AddTransition(stance);
@@ -567,6 +574,28 @@ namespace MadrasGethu.EditorTools
         }
 
         static AnimationClip ClipFor(List<Slot> slots, string name) => slots.First(s => s.name == name).clip;
+
+        /// <summary>
+        /// Fighting stance: guard idle in the middle, stepping forward/back/sideways around it
+        /// (MoveX = right, MoveZ = forward, in the character's own space; 0.5 = walk, 1 = run).
+        /// </summary>
+        static void FillStanceTree(BlendTree tree, List<Slot> slots)
+        {
+            tree.blendType = BlendTreeType.FreeformDirectional2D;
+            tree.blendParameter = "MoveX";
+            tree.blendParameterY = "MoveZ";
+            tree.AddChild(ClipFor(slots, "Guard"), Vector2.zero);
+            var walk = ClipFor(slots, "Walk");
+            if (walk != null) tree.AddChild(walk, new Vector2(0f, 0.5f));
+            var back = ClipFor(slots, "WalkBack");
+            if (back != null) tree.AddChild(back, new Vector2(0f, -0.5f));
+            var left = ClipFor(slots, "StrafeLeft");
+            if (left != null) tree.AddChild(left, new Vector2(-0.5f, 0f));
+            var right = ClipFor(slots, "StrafeRight");
+            if (right != null) tree.AddChild(right, new Vector2(0.5f, 0f));
+            var run = ClipFor(slots, "Run");
+            if (run != null) tree.AddChild(run, new Vector2(0f, 1f));
+        }
 
         static void FillLocomotionTree(BlendTree tree, AnimationClip idle, AnimationClip walk, AnimationClip run)
         {

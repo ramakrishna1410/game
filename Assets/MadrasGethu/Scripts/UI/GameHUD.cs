@@ -108,7 +108,19 @@ namespace MadrasGethu
         void DrawPrompt()
         {
             var p = GM.Player;
-            if (p == null || string.IsNullOrEmpty(p.ContextPrompt)) return;
+            if (p == null) return;
+            if (string.IsNullOrEmpty(p.ContextPrompt))
+            {
+                // Big pulsing reminder when the Gethu meter is full and unused.
+                if (p.GethuFraction >= 1f && !p.MassMode && !p.IsDead)
+                {
+                    float pulse = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f);
+                    var style = new GUIStyle(big) { fontSize = Mathf.RoundToInt(big.fontSize * 0.8f * (0.95f + 0.1f * pulse)) };
+                    var rr = new Rect(0, Screen.height - 170 * S, Screen.width, 60 * S);
+                    Shadowed(rr, "Q / RT  —  GETHU MODE!", style, new Color(1f, 0.75f, 0.15f, pulse));
+                }
+                return;
+            }
             var r = new Rect(Screen.width * 0.5f - 400 * S, Screen.height - 120 * S, 800 * S, 40 * S);
             Bar(r, 1f, Panel);
             Shadowed(r, p.ContextPrompt, center, Gold);
@@ -129,7 +141,8 @@ namespace MadrasGethu
                     DrawBossBar(e);
                     continue;
                 }
-                Vector3 sp = cam.WorldToScreenPoint(e.transform.position + Vector3.up * (e.height + 0.35f));
+                float top = e.Visual != null ? e.Visual.HeadTopY : e.transform.position.y + e.height;
+                Vector3 sp = cam.WorldToScreenPoint(new Vector3(e.transform.position.x, top + 0.25f, e.transform.position.z));
                 if (sp.z <= 0f) continue;
                 float w = 90 * S, h = 8 * S;
                 var r = new Rect(sp.x - w / 2f, Screen.height - sp.y, w, h);

@@ -12,11 +12,14 @@ namespace MadrasGethu
         public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead }
 
         [Header("Movement")]
-        public float walkSpeed = 3.6f;
-        public float runSpeed = 5.6f;
-        public float sprintSpeed = 7.8f;
-        public float blockMoveSpeed = 1.4f;
-        public float dragSpeed = 2.0f;
+        public float walkSpeed = 1.6f;
+        public float runSpeed = 4.2f;
+        public float sprintSpeed = 6.2f;
+        public float blockMoveSpeed = 1.1f;
+        public float dragSpeed = 1.6f;
+        [Tooltip("In a fight (an enemy within this range) the hero faces him and steps around in his guard.")]
+        public float combatLockRange = 4.5f;
+        public float combatStepSpeed = 1.8f;
 
         [Header("Dodge")]
         public float dodgeDistance = 3.4f;
@@ -158,11 +161,9 @@ namespace MadrasGethu
                 case PlayerState.Grab: UpdateGrab(); break;
                 case PlayerState.Finisher: UpdateFinisher(); break;
                 case PlayerState.Stagger:
-                    Visual.SetLocomotion(0f);
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
                     break;
                 case PlayerState.Down:
-                    Visual.SetLocomotion(0f);
                     if (stateTimer >= 1.1f && Motor.IsGrounded)
                     {
                         Visual.SetLying(false);
@@ -192,11 +193,20 @@ namespace MadrasGethu
         void UpdateFree()
         {
             Vector3 move = MoveInputWorld();
-            float speed = GameInput.Sprint ? sprintSpeed : runSpeed;
-            if (move.magnitude < 0.5f) speed = walkSpeed;
-            Motor.SetDesiredVelocity(move * speed);
-            if (move.sqrMagnitude > 0.01f) Motor.FaceDirection(move);
-            Visual.SetLocomotion(move.magnitude * speed / sprintSpeed);
+            // Close to a rowdy: square up to him and step around in the guard (sprint breaks away).
+            var focus = GameInput.Sprint ? null : CombatUtil.FindTarget(this, Vector3.zero, combatLockRange);
+            if (focus != null)
+            {
+                Motor.SetDesiredVelocity(move * combatStepSpeed);
+                Motor.FaceDirection(focus.transform.position - transform.position);
+            }
+            else
+            {
+                float speed = GameInput.Sprint ? sprintSpeed : runSpeed;
+                if (move.magnitude < 0.5f) speed = walkSpeed;
+                Motor.SetDesiredVelocity(move * speed);
+                if (move.sqrMagnitude > 0.01f) Motor.FaceDirection(move);
+            }
 
             if (stateTimer > 0.6f) lightIndex = 0;   // pause too long and the combo string restarts
             if (TryCommonActions(allowAttacks: true)) return;
@@ -270,9 +280,8 @@ namespace MadrasGethu
                 lungeRemaining = Mathf.Clamp(gap - attack.range * 0.45f, 0f, attack.lunge + 1.2f);
             }
             lungeDirection = transform.forward;
-            lungeSpeed = Mathf.Min(22f, lungeRemaining / Mathf.Max(attack.startup, 0.05f));
+            lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(attack.startup, 0.05f));
             Visual.Play(attack.pose, attack.startup + 0.2f);
-            Visual.SetLocomotion(0f);
         }
 
         void UpdateAttack()
@@ -281,7 +290,7 @@ namespace MadrasGethu
             {
                 float step = Mathf.Min(lungeRemaining, lungeSpeed * Time.deltaTime);
                 lungeRemaining -= step;
-                if (Time.deltaTime > 0f) Motor.SetDesiredVelocity(lungeDirection * (step / Time.deltaTime));
+                if (Time.deltaTime > 0f) Motor.SetDesiredVelocity(lungeDirection * (step / Time.deltaTime), instant: true);
             }
 
             if (!struck && stateTimer >= currentAttack.startup)
@@ -364,9 +373,11 @@ namespace MadrasGethu
 
         void UpdateDodge()
         {
-            Visual.SetLocomotion(0f);
             if (stateTimer >= dodgeDuration) SetState(PlayerState.Free);
         }
+
+        /// <summary>Knocked to the ground: rowdies wait for the hero to get up instead of kicking him.</summary>
+        public override bool IsDowned => State == PlayerState.Down;
 
         bool Invulnerable =>
             (State == PlayerState.Dodge && stateTimer < dodgeInvulnerableUntil) ||
@@ -382,7 +393,6 @@ namespace MadrasGethu
             var target = CombatUtil.FindTarget(this, transform.forward, 6f);
             if (target != null) Motor.FaceDirection(target.transform.position - transform.position);
             Visual.Play(FighterPose.Block, 0.1f);
-            Visual.SetLocomotion(move.magnitude * 0.2f);
 
             if (TryCommonActions(allowAttacks: true)) return;
             if (!GameInput.BlockHeld) SetState(PlayerState.Free);
@@ -450,7 +460,6 @@ namespace MadrasGethu
             Vector3 move = MoveInputWorld();
             Motor.SetDesiredVelocity(move * dragSpeed);
             if (move.sqrMagnitude > 0.01f) Motor.FaceDirection(move);
-            Visual.SetLocomotion(move.magnitude * 0.3f);
             grabbed.HoldAt(transform.position + transform.forward * (0.75f + grabbed.radius),
                 Quaternion.LookRotation(-transform.forward));
 
@@ -572,7 +581,6 @@ namespace MadrasGethu
         void UpdateFinisher()
         {
             const float impactTime = 0.32f;
-            Visual.SetLocomotion(0f);
 
             if (!finisherImpactDone && finisherVictim != null)
             {

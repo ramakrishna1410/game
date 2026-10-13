@@ -44,11 +44,11 @@ namespace MadrasGethu
             {
                 displayName = RowdyNames[Random.Range(0, RowdyNames.Length)],
                 health = 60f,
-                runSpeed = 5f,
-                circleSpeed = 1.8f,
+                runSpeed = 4.2f,
+                circleSpeed = 1.2f,
                 poise = 0,
                 blockChance = 0.1f,
-                attackCooldown = new Vector2(1.2f, 2.6f),
+                attackCooldown = new Vector2(2.2f, 4.0f),
                 gethuReward = 8f,
                 shirt = RowdyShirts[Random.Range(0, RowdyShirts.Length)],
                 pants = new Color(0.9f, 0.88f, 0.82f),           // white veshti / lungi
@@ -67,13 +67,13 @@ namespace MadrasGethu
             {
                 displayName = "Thadiyan",
                 health = 150f,
-                runSpeed = 4f,
-                circleSpeed = 1.3f,
+                runSpeed = 3.4f,
+                circleSpeed = 0.9f,
                 scale = 1.25f,
                 poise = 3,
                 blockChance = 0.25f,
                 grabbable = false,
-                attackCooldown = new Vector2(1.8f, 3.2f),
+                attackCooldown = new Vector2(2.8f, 4.5f),
                 gethuReward = 20f,
                 shirt = new Color(0.12f, 0.12f, 0.14f),
                 pants = new Color(0.35f, 0.25f, 0.5f),
@@ -93,24 +93,24 @@ namespace MadrasGethu
             {
                 displayName = "Kumaran Anna",
                 health = 320f,
-                runSpeed = 5.5f,
-                circleSpeed = 2.2f,
+                runSpeed = 4.6f,
+                circleSpeed = 1.4f,
                 scale = 1.12f,
                 poise = 4,
                 blockChance = 0.4f,
                 grabbable = false,
-                attackCooldown = new Vector2(0.9f, 1.8f),
+                attackCooldown = new Vector2(1.4f, 2.6f),
                 gethuReward = 40f,
                 shirt = new Color(0.95f, 0.95f, 0.95f),          // spotless white politician shirt
                 pants = new Color(0.95f, 0.95f, 0.95f),
                 accent = new Color(0.1f, 0.5f, 0.2f),            // party-colour veshti border
             };
             p.attacks.Add(new AttackData("Jab", FighterPose.Jab, 10f)
-                { startup = 0.35f, recovery = 0.35f, range = 1.6f, lunge = 1.4f, knockback = 3f });
+                { startup = 0.45f, recovery = 0.4f, range = 1.6f, lunge = 1.4f, knockback = 3f });
             p.attacks.Add(new AttackData("Hook", FighterPose.Hook, 16f)
-                { startup = 0.5f, recovery = 0.5f, range = 1.7f, lunge = 1.4f, knockback = 5f, arc = 140f, heavy = true });
+                { startup = 0.6f, recovery = 0.55f, range = 1.7f, lunge = 1.4f, knockback = 5f, arc = 140f, heavy = true });
             p.attacks.Add(new AttackData("Rush Kick", FighterPose.Kick, 22f)
-                { startup = 0.7f, recovery = 0.8f, range = 2.4f, lunge = 3f, knockback = 7f, launch = 4f,
+                { startup = 0.8f, recovery = 0.8f, range = 2.4f, lunge = 3f, knockback = 7f, launch = 4f,
                   heavy = true, unblockable = true });
             return p;
         }

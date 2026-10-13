@@ -38,6 +38,14 @@ Save each file with the name in the first column into `Assets/MadrasGethu/Art/An
 | `Guard.fbx` | Boxing Idle *(or "Fight Idle")* |
 | `Jab.fbx` | Jab *(or "Lead Jab")* |
 
+### Fight-stance footwork (recommended: makes circling and waiting look real)
+| Save as | Search Mixamo for |
+|---|---|
+| `WalkBack.fbx` | Walking Backwards *(or "Boxing Step Backward")* |
+| `StrafeLeft.fbx` | Left Strafe Walking *(or "Boxing Step Left")* |
+| `StrafeRight.fbx` | Right Strafe Walking *(or "Boxing Step Right")* |
+| `Taunt.fbx` | Taunt *(waiting rowdies use it now and then)* |
+
 ### Combat (recommended)
 | Save as | Search Mixamo for |
 |---|---|
