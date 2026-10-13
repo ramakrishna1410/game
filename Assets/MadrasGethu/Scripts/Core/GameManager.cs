@@ -177,11 +177,12 @@ namespace MadrasGethu
             foreach (var e in AliveEnemies)
                 if (e != null) Destroy(e.gameObject);
             AliveEnemies.Clear();
-            foreach (var e in FindObjectsByType<EnemyFighter>(FindObjectsSortMode.None))
-                Destroy(e.gameObject);
+            // Dead bodies are no longer in AliveEnemies but stay registered until destroyed.
+            foreach (var f in Fighter.All)
+                if (f is EnemyFighter) Destroy(f.gameObject);
             pendingSpawns.Clear();
             EnemyDirector.Reset();
-            foreach (var spot in FindObjectsByType<FinisherSpot>(FindObjectsSortMode.None))
+            foreach (var spot in FinisherSpot.All)
                 spot.Repair();
             if (Player != null) Player.Respawn(playerStart);
             hitStopUntil = slowMoUntil = 0f;
