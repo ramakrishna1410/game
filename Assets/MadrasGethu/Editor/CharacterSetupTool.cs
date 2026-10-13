@@ -80,6 +80,10 @@ namespace MadrasGethu.EditorTools
                 T("DodgeRight", 1f, new[] { "dodgeright", "rightdodge", "dodgingright", "sidestepright", "stepright" }, "Dodge"),
                 T("DodgeBack", 1f, new[] { "dodgeback", "backdodge", "dodgingback", "backstep", "stepback", "hopback" }, "Dodge"),
                 T("Roll", 1f, new[] { "roll", "forwardroll", "quickroll", "standtoroll", "diveroll" }, "Dodge"),
+                T("Parry", 1f, new[] { "parry", "outwardblock", "deflect", "blockdeflect" }, "Block", "Guard"),
+                T("StaggerBack", 1f, new[] { "staggerback", "stumblebackwards", "stumbleback", "stumble", "stagger", "hitreactionback" }, "Flinch"),
+                T("Push", 1f, new[] { "push", "shove", "pushing", "twohandpush" }, "Haymaker", "Cross"),
+                T("Headbutt", 1f, new[] { "headbutt", "headbutting" }, "Cross", "Jab"),
                 T("Jump", 1f, new[] { "jump", "jumping", "standingjump", "jumpinplace" }),
                 T("FlyingKick", 1f, new[] { "flyingkick", "jumpkick", "dropkick", "jumpattack", "flyingknee" }, "Kick"),
                 T("Flinch", 1.3f, new[] { "flinch", "hitreaction", "reaction", "headhit", "hit", "takinghit" }),
@@ -89,7 +93,7 @@ namespace MadrasGethu.EditorTools
 
                 new Slot { name = "Block", kind = SlotKind.HoldBool, boolParameter = "Blocking", aliases = new[] { "block", "blocking", "centerblock", "bodyblock" }, fallbacks = new[] { "Guard" } },
                 new Slot { name = "Grab", kind = SlotKind.HoldBool, boolParameter = "Holding", aliases = new[] { "grab", "grabbing", "hold", "holding" }, fallbacks = new[] { "Guard" } },
-                new Slot { name = "Held", kind = SlotKind.HoldBool, boolParameter = "Held", aliases = new[] { "held", "beingheld", "choked", "struggle" }, fallbacks = new[] { "Flinch" } },
+                new Slot { name = "Held", kind = SlotKind.HoldBool, boolParameter = "Held", aliases = new[] { "held", "beingheld", "choked", "struggle", "struggling", "grabbedreaction" }, fallbacks = new[] { "Flinch" } },
 
                 new Slot { name = "Knockdown", kind = SlotKind.Final, aliases = new[] { "knockdown", "knockeddown", "fallingback", "falldown" }, fallbacks = new[] { "Dead" } },
                 new Slot { name = "Dead", kind = SlotKind.Final, aliases = new[] { "dead", "dying", "death", "fallingbackdeath" }, fallbacks = new[] { "Knockdown" } },
@@ -580,6 +584,11 @@ namespace MadrasGethu.EditorTools
                 up2.AddCondition(AnimatorConditionMode.IfNot, 0f, "Guard");
                 SetQuick(up2, 0.25f);
             }
+
+            // Hand IK (collar grip) only runs on layers with IK Pass enabled.
+            var layers = controller.layers;
+            layers[0].iKPass = true;
+            controller.layers = layers;
 
             LayoutStates(sm);
             EditorUtility.SetDirty(controller);

@@ -15,7 +15,8 @@ namespace MadrasGethu
         Counter, Dodge,
         Flinch, Knockdown, GetUp, Dead,
         Windup, Taunt,
-        Jump, FlyingKick, DodgeLeft, DodgeRight, DodgeBack, Roll
+        Jump, FlyingKick, DodgeLeft, DodgeRight, DodgeBack, Roll,
+        Headbutt, Push, Parry, StaggerBack
     }
 
     public enum HitResult { Ignored, Hit, Blocked }

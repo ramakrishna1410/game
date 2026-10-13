@@ -158,6 +158,11 @@ namespace MadrasGethu
                     break;
 
                 case AIState.Down:
+                    if (thrownTimer <= 0f && thrower != null && Motor.IsGrounded)
+                    {
+                        FX.Dust(transform.position, 10);   // thud on landing
+                        thrower = null;
+                    }
                     if (stateTimer <= 0f && Motor.IsGrounded)
                     {
                         state = AIState.GetUp;
@@ -286,14 +291,7 @@ namespace MadrasGethu
         }
 
         /// <summary>Called when the player counters this enemy's telegraphed attack.</summary>
-        public void Countered()
-        {
-            Visual.SetTelegraph(false);
-            ReleaseToken();
-            state = AIState.Stagger;
-            stateTimer = 0.8f;
-            Visual.Play(FighterPose.Flinch, 0.8f);
-        }
+        public void Countered() => Parried(true, -transform.forward);
 
         // ------------------------------------------------------------------ taking hits
 
@@ -370,6 +368,8 @@ namespace MadrasGethu
             Visual.Play(FighterPose.Knockdown, duration);
             Visual.SetLying(true);
             Motor.AddImpulse(impulse);
+            Vector3 flat = new Vector3(impulse.x, 0f, impulse.z);
+            if (flat.magnitude >= 9f) Visual.Tumble(flat, 0.65f);   // hit hard enough to roll over
         }
 
         protected override void OnDeath(HitInfo killingBlow)
@@ -397,24 +397,30 @@ namespace MadrasGethu
             Motor.SetFrozen(true);
         }
 
-        // ------------------------------------------------------------------ grabs and throws
+        // ------------------------------------------------------------------ grabs, throws and shoves
 
-        public void EnterGrabbed()
+        public enum LaunchKind { Throw, Shove }
+
+        /// <summary>Held by the collar (front) or from behind. He struggles in the hero's grip.</summary>
+        public void EnterGrabbed(bool fromBehind)
         {
             ReleaseToken();
             Visual.SetTelegraph(false);
             Visual.SetCombatStance(false);
-            Visual.Play(FighterPose.Flinch, 999f);
+            Visual.Play(FighterPose.Flinch, 0.4f);
             state = AIState.Grabbed;
+            GrabbedFromBehind = fromBehind;
             Motor.SetFrozen(true);
         }
+
+        public bool GrabbedFromBehind { get; private set; }
 
         public void HoldAt(Vector3 position, Quaternion rotation)
         {
             transform.SetPositionAndRotation(position, rotation);
         }
 
-        /// <summary>Lets go of the enemy, optionally knocking it down (throws, finishers).</summary>
+        /// <summary>Lets go of the enemy, optionally knocking it down (finishers).</summary>
         public void ReleaseFromGrab(Vector3 push, bool knockDown)
         {
             if (state != AIState.Grabbed) return;
@@ -427,32 +433,101 @@ namespace MadrasGethu
             {
                 state = AIState.Stagger;
                 stateTimer = 0.5f;
-                Visual.Play(FighterPose.Flinch, 0.5f);
+                Visual.Play(FighterPose.StaggerBack, 0.5f, 0.6f);
                 Motor.AddImpulse(push);
             }
         }
 
-        public void Throw(Fighter by, Vector3 direction)
+        /// <summary>
+        /// Thrown (flies, tumbles head over heels, knocks others down) or shoved (stumbles backwards;
+        /// a hard shove takes him off his feet). Either way he smashes props he crashes into.
+        /// </summary>
+        public void Launch(Fighter by, Vector3 direction, LaunchKind kind)
         {
-            ReleaseFromGrab(direction * 13f + Vector3.up * 5f, true);
+            direction.y = 0f;
+            direction.Normalize();
+            if (state == AIState.Grabbed) Motor.SetFrozen(false);
+            Motor.FaceDirection(-direction, true);
             thrower = by;
-            thrownTimer = 0.9f;
+            launchKind = kind;
             thrownHits.Clear();
+
+            if (kind == LaunchKind.Throw)
+            {
+                KnockDown(direction * 12f + Vector3.up * 5.5f, 2.0f);
+                Visual.Tumble(direction, 0.75f);
+                thrownTimer = 1.0f;
+            }
+            else
+            {
+                // Shove: stagger backwards fast; he loses his footing and falls after a few steps.
+                ReleaseToken();
+                state = AIState.Stagger;
+                stateTimer = 0.9f;
+                Visual.Play(FighterPose.StaggerBack, 0.9f, 0.9f);
+                Motor.AddLunge(direction, 3.2f);
+                thrownTimer = 0.7f;
+                fallAfterShove = 0.55f;
+            }
         }
+
+        LaunchKind launchKind;
+        float fallAfterShove;
+
+        /// <summary>The hero deflected this rowdy's attack. Perfect parry: knocked well off balance.</summary>
+        public void Parried(bool perfect, Vector3 pushDirection)
+        {
+            Visual.SetTelegraph(false);
+            ReleaseToken();
+            state = AIState.Stagger;
+            stateTimer = perfect ? 1.0f : 0.75f;
+            Visual.Play(FighterPose.StaggerBack, stateTimer, stateTimer);
+            Motor.ClearImpulse();
+            Motor.AddLunge(pushDirection, perfect ? 1.4f : 0.8f);
+            Motor.FaceDirection(-pushDirection, true);
+        }
+
+        /// <summary>His punch bounced off the hero's guard: arm knocked back, half a step back.</summary>
+        public void Recoil(Vector3 pushDirection)
+        {
+            if (IsDead || IsDowned || state == AIState.Grabbed) return;
+            ReleaseToken();
+            Visual.SetTelegraph(false);
+            state = AIState.Stagger;
+            stateTimer = 0.45f;
+            Visual.Play(FighterPose.StaggerBack, 0.45f, 0.5f);
+            Motor.AddLunge(pushDirection, 0.5f);
+        }
+
+        /// <summary>Seconds until this rowdy's telegraphed hit lands (huge when not attacking).</summary>
+        public float TimeToImpact => state == AIState.Windup ? Mathf.Max(0f, stateTimer) : float.MaxValue;
 
         void HitOthersWhileThrown()
         {
             if (thrower == null) return;
+            bool shove = launchKind == LaunchKind.Shove;
 
-            // Thrown into a tea kadai / crates / auto: smash it, no Gethu needed.
+            if (shove && fallAfterShove > 0f)
+            {
+                fallAfterShove -= Time.deltaTime;
+                if (fallAfterShove <= 0f && state == AIState.Stagger && Motor.Velocity.magnitude > 2.5f)
+                {
+                    // Too fast to keep his feet: goes down and rolls backwards.
+                    Vector3 v = Flat(Motor.Velocity);
+                    KnockDown(v * 0.6f + Vector3.up * 2f, 1.6f);
+                    Visual.Tumble(v, 0.6f);
+                }
+            }
+
+            // Crashing into a tea kadai / crates / auto: smash it, no Gethu needed.
             var spot = FinisherSpot.FindHit(transform.position, radius + 0.6f);
-            Vector3 flyDir = Motor.Velocity.sqrMagnitude > 0.1f ? Flat(Motor.Velocity).normalized : transform.forward;
+            Vector3 flyDir = Motor.Velocity.sqrMagnitude > 0.1f ? Flat(Motor.Velocity).normalized : -transform.forward;
             if (spot != null && Vector3.Dot(flyDir, Flat(spot.transform.position - transform.position)) > 0f)
             {
-                Vector3 dir = flyDir;
-                spot.Break(dir);
+                spot.Break(flyDir);
                 thrownTimer = 0f;
-                ReceiveHit(new HitInfo { attacker = thrower, damage = spot.damage * 0.5f, direction = dir, knockback = 2f, launch = 2f, heavy = true, unblockable = true, hitsDowned = true });
+                ReceiveHit(new HitInfo { attacker = thrower, damage = spot.damage * 0.5f, direction = flyDir, knockback = 2f, launch = 2.5f, heavy = true, unblockable = true, hitsDowned = true });
+                Visual.Tumble(flyDir, 0.6f);
                 if (GameManager.Instance != null)
                 {
                     GameManager.Instance.AddPopup(spot.finisherName, Center + Vector3.up, new Color(1f, 0.75f, 0.15f), 1.3f);
@@ -464,6 +539,7 @@ namespace MadrasGethu
                 return;
             }
 
+            // Bowling into other rowdies.
             foreach (var f in All.ToArray())
             {
                 if (f == this || f.team != team || f.IsDead || thrownHits.Contains(f)) continue;
@@ -474,17 +550,18 @@ namespace MadrasGethu
                 f.ReceiveHit(new HitInfo
                 {
                     attacker = thrower,
-                    damage = 15f,
+                    damage = shove ? 6f : 15f,
                     direction = dir,
-                    knockback = 7f,
-                    launch = 4f,
+                    knockback = shove ? 4f : 9f,
+                    launch = shove ? 0f : 4f,
                     heavy = true,
                     unblockable = true,
                 });
+                if (!shove && f is EnemyFighter other && !other.IsDead) other.Visual.Tumble(dir, 0.7f);
                 FX.HitSpark(f.Center, true);
                 if (GameManager.Instance != null)
                 {
-                    GameManager.Instance.AddPopup("STRIKE!", f.Center + Vector3.up, new Color(1f, 0.8f, 0.2f));
+                    GameManager.Instance.AddPopup(shove ? "KNOCKED INTO!" : "STRIKE!", f.Center + Vector3.up, new Color(1f, 0.8f, 0.2f));
                     GameManager.Instance.Shake(0.25f);
                 }
             }

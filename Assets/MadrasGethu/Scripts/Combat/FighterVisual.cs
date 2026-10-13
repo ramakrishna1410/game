@@ -38,6 +38,10 @@ namespace MadrasGethu
         readonly List<Renderer> renderers = new List<Renderer>();
         Material[] originalMaterials;
         Renderer[] modelRenderers;
+        HandIK handIK;
+        float tumbleTimer;
+        float tumbleDuration;
+        Vector3 tumbleAxis;
         MaterialPropertyBlock tintBlock;
         Color currentTint = Color.white;
         HashSet<string> animatorParams;
@@ -88,6 +92,8 @@ namespace MadrasGethu
                 foreach (var col in model.GetComponentsInChildren<Collider>())
                     Destroy(col);
                 modelRenderers = model.GetComponentsInChildren<Renderer>();
+                if (animator != null && animator.isHuman)
+                    handIK = animator.gameObject.AddComponent<HandIK>();
                 tintBlock = new MaterialPropertyBlock();
                 CacheAnimatorParams();
                 SetLayerRecursively(model, gameObject.layer);
@@ -271,6 +277,44 @@ namespace MadrasGethu
             if (animatorParams.Contains("MoveZ")) animator.SetFloat("MoveZ", local.z, damp, dt);
         }
 
+        /// <summary>Hands on someone's collar (front) or shoulders (behind); null lets go.</summary>
+        public void SetGrip(Fighter target, bool fromBehind)
+        {
+            if (handIK != null) handIK.SetGrip(target, fromBehind);
+        }
+
+        /// <summary>Head-over-heels roll in the travel direction (thrown, shoved hard, launched).</summary>
+        public void Tumble(Vector3 worldDirection, float duration)
+        {
+            worldDirection.y = 0f;
+            if (worldDirection.sqrMagnitude < 0.01f) return;
+            tumbleAxis = Vector3.Cross(Vector3.up, worldDirection.normalized);
+            tumbleDuration = duration;
+            tumbleTimer = duration;
+        }
+
+        /// <summary>Rotates the whole body around its hips for a tumble; returns true while tumbling.</summary>
+        bool UpdateTumble(float dt)
+        {
+            if (tumbleTimer <= 0f) return false;
+            tumbleTimer -= dt;
+            const float hip = 0.9f;
+            if (tumbleTimer <= 0f)
+            {
+                body.localRotation = Quaternion.identity;
+                body.localPosition = Vector3.zero;
+                return false;
+            }
+            float t = 1f - tumbleTimer / tumbleDuration;
+            float angle = 360f * Mathf.SmoothStep(0f, 1f, t);
+            Vector3 localAxis = transform.InverseTransformDirection(tumbleAxis);
+            Quaternion rot = Quaternion.AngleAxis(angle, localAxis);
+            Vector3 hipPoint = Vector3.up * hip;
+            body.localRotation = rot;
+            body.localPosition = hipPoint - rot * hipPoint;
+            return true;
+        }
+
         /// <summary>Sets an Animator bool if the controller has it (e.g. "Holding" while grabbing, "Held" while grabbed).</summary>
         public void SetAnimatorBool(string parameter, bool value)
         {
@@ -332,11 +376,14 @@ namespace MadrasGethu
             UpdateMaterials(dt);
             UpdateLocomotion(dt);
 
+            bool tumbling = UpdateTumble(dt);
+
             if (animator != null)
             {
                 SetAnimatorBool("Blocking", pose == FighterPose.Block && poseTimer > 0f);
                 return;
             }
+            if (tumbling) return;
 
             float k = 1f - Mathf.Exp(-22f * dt);
 
@@ -344,6 +391,7 @@ namespace MadrasGethu
             float lean = speed01 * 8f - flinch * 22f;
             if (pose == FighterPose.Dodge || pose == FighterPose.Roll) lean = 25f;
             if (pose == FighterPose.DodgeBack) lean = -15f;
+            if (pose == FighterPose.StaggerBack) lean = -22f;
             var bodyTarget = Quaternion.Euler(-90f * lie + lean * (1f - lie), 0f, 0f);
             body.localRotation = Quaternion.Slerp(body.localRotation, bodyTarget, k);
 
@@ -428,6 +476,13 @@ namespace MadrasGethu
                     aL = new Vector3(-60f, 20f, 0f); aR = new Vector3(-60f, -20f, 0f); break;
                 case FighterPose.Windup:
                     aR = new Vector3(-140f, -50f, 0f); aL = guardL; reachR = -0.15f; twist = 35f; break;
+                case FighterPose.Headbutt:
+                    aL = new Vector3(-90f, 15f, 0f); aR = new Vector3(-90f, -15f, 0f); twist = 0f; break;
+                case FighterPose.Push:
+                    aL = new Vector3(-90f, 10f, 0f); aR = new Vector3(-90f, -10f, 0f); reachL = reachR = 0.35f; break;
+                case FighterPose.Parry:
+                    aL = new Vector3(-120f, 70f, 0f); aR = guardR; reachL = 0.15f; twist = 25f; break;
+                case FighterPose.StaggerBack:
                 case FighterPose.Flinch:
                     aL = new Vector3(-30f, 0f, -35f); aR = new Vector3(-30f, 0f, 35f); break;
                 case FighterPose.Knockdown:

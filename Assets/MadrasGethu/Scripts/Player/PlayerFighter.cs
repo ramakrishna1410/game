@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry }
 
         [Header("Movement")]
         public float walkSpeed = 1.6f;
@@ -85,6 +85,24 @@ namespace MadrasGethu
         float grabActionCooldown;
 
         EnemyFighter grabbed;
+        bool grabFromBehind;
+        Vector3 grabPullStart;
+        int grabStrikeIndex;
+        const float GrabPullTime = 0.18f;
+
+        // Parry
+        [Header("Parry")]
+        [Tooltip("Press block this close (seconds) to the enemy's hit landing for a PERFECT parry.")]
+        public float perfectParryWindow = 0.25f;
+        EnemyFighter parryTarget;
+        bool parryPerfect;
+        bool parryCounterStarted;
+
+        // Wall slam / finisher target point
+        Vector3 finisherEndPoint;
+        float finisherDamage;
+        string finisherTitle;
+        bool finisherIsWallSlam;
 
         // Finisher sequence
         FinisherSpot finisherSpot;
@@ -194,6 +212,7 @@ namespace MadrasGethu
                 case PlayerState.Jump: UpdateJump(); break;
                 case PlayerState.Block: UpdateBlock(); break;
                 case PlayerState.Grab: UpdateGrab(); break;
+                case PlayerState.Parry: UpdateParry(); break;
                 case PlayerState.Finisher: UpdateFinisher(); break;
                 case PlayerState.Stagger:
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
@@ -540,10 +559,11 @@ namespace MadrasGethu
         bool Invulnerable =>
             (State == PlayerState.Dodge && stateTimer < dodgeInvulnerableUntil) ||
             State == PlayerState.Finisher ||
+            State == PlayerState.Parry ||
             (State == PlayerState.Attack && !struck &&
              (currentAttack == counter || currentAttack == counterUppercut || currentAttack == counterThrow));
 
-        // ------------------------------------------------------------------ block & counter
+        // ------------------------------------------------------------------ block & parry
 
         void UpdateBlock()
         {
@@ -557,7 +577,11 @@ namespace MadrasGethu
             if (!GameInput.BlockHeld) SetState(PlayerState.Free);
         }
 
-        /// <summary>Counter: tap block while an enemy flashes red (Sleeping Dogs style).</summary>
+        /// <summary>
+        /// Parry: tap block while a rowdy flashes red.
+        /// PERFECT (pressed just before his hit lands): his arm is knocked aside, he stumbles well back and
+        /// the hero follows with an automatic counter. EARLY: deflect only, he staggers and you get an opening.
+        /// </summary>
         bool TryCounter()
         {
             EnemyFighter best = null;
@@ -572,18 +596,59 @@ namespace MadrasGethu
             }
             if (best == null) return false;
 
-            best.Countered();
-            // Mix it up: counter punch, counter uppercut (launch) or counter throw (send him flying).
-            float roll = Random.value;
-            var move = MassMode || roll < 0.34f ? counterUppercut : roll < 0.67f ? counter : counterThrow;
-            StartAttack(move, best);
+            parryTarget = best;
+            parryPerfect = best.TimeToImpact <= perfectParryWindow;
+            parryCounterStarted = false;
+
+            Vector3 toEnemy = Flat(best.transform.position - transform.position).normalized;
+            Motor.FaceDirection(toEnemy, instant: true);
+            best.Parried(parryPerfect, toEnemy);
+            SetState(PlayerState.Parry);
+            Visual.Play(FighterPose.Parry, 0.35f, 0.35f);
+            Motor.AddLunge(-toEnemy, 0.2f);   // brace
+
+            Vector3 contact = Vector3.Lerp(Center, best.Center, 0.5f) + Vector3.up * 0.3f;
+            FX.Burst(contact, parryPerfect ? 22 : 10, parryPerfect ? 7f : 4f, 0.06f,
+                new Color(0.7f, 0.9f, 1f), new Color(2.5f, 3f, 4f), 0.3f, 0f);
+            AddGethu(parryPerfect ? 10f : 4f);
+
             if (GM != null)
             {
-                GM.SlowMo(0.25f, 0.45f);
-                GM.Shake(0.15f);
+                if (parryPerfect)
+                {
+                    GM.SlowMo(0.2f, 0.55f);
+                    GM.HitStop(0.06f);
+                    GM.AddPopup("PERFECT PARRY!", best.Center + Vector3.up * 0.9f, new Color(0.4f, 0.9f, 1f), 1.2f);
+                }
+                else
+                {
+                    GM.SlowMo(0.55f, 0.2f);
+                    GM.AddPopup("PARRY — OPENING!", best.Center + Vector3.up * 0.9f, new Color(0.7f, 0.85f, 1f), 0.9f);
+                }
+                GM.Shake(parryPerfect ? 0.2f : 0.1f);
             }
-            if (cam != null) cam.FovKick(5f);
+            if (cam != null) cam.FovKick(parryPerfect ? 6f : 3f);
             return true;
+        }
+
+        void UpdateParry()
+        {
+            // Another rowdy swinging at the same time? Parry him too (Batman-style chains).
+            if (stateTimer > 0.1f && GameInput.BlockPressed && TryCounter()) return;
+
+            if (parryPerfect && !parryCounterStarted && stateTimer >= 0.2f)
+            {
+                parryCounterStarted = true;
+                if (parryTarget != null && !parryTarget.IsDead)
+                {
+                    float roll = Random.value;
+                    var move = MassMode || roll < 0.34f ? counterUppercut : roll < 0.67f ? counter : counterThrow;
+                    StartAttack(move, parryTarget);
+                    return;
+                }
+            }
+            if (stateTimer >= (parryPerfect ? 0.3f : 0.32f))
+                SetState(PlayerState.Free);
         }
 
         // ------------------------------------------------------------------ grabs
@@ -594,13 +659,21 @@ namespace MadrasGethu
                 as EnemyFighter;
             if (target != null && target.CanBeGrabbed)
             {
+                Vector3 toEnemy = Flat(target.transform.position - transform.position).normalized;
+                // He's facing away from us: grab him from behind.
+                grabFromBehind = Vector3.Dot(target.transform.forward, toEnemy) > 0.35f;
                 grabbed = target;
-                grabbed.EnterGrabbed();
-                Motor.FaceDirection(target.transform.position - transform.position, instant: true);
+                grabbed.EnterGrabbed(grabFromBehind);
+                grabPullStart = target.transform.position;
+                grabStrikeIndex = 0;
+                Motor.FaceDirection(toEnemy, instant: true);
                 SetState(PlayerState.Grab);
-                grabActionCooldown = 0.2f;
+                grabActionCooldown = GrabPullTime + 0.05f;
                 Visual.Play(FighterPose.Grab, 999f);
+                Visual.SetGrip(target, grabFromBehind);
                 lightIndex = 0;
+                if (grabFromBehind && GM != null)
+                    GM.AddPopup("FROM BEHIND!", target.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.7f);
                 return;
             }
 
@@ -611,6 +684,8 @@ namespace MadrasGethu
             StartAttack(grabMiss, null);
         }
 
+        Vector3 HoldPosition => transform.position + transform.forward * (grabFromBehind ? 0.5f : 0.6f);
+
         void UpdateGrab()
         {
             if (grabbed == null || grabbed.IsDead)
@@ -619,28 +694,38 @@ namespace MadrasGethu
                 return;
             }
 
-            // Drag the enemy around (towards a tea kadai, for instance).
+            // Drag him around (towards a tea kadai or a wall, for instance).
             Vector3 move = MoveInputWorld();
             Motor.SetDesiredVelocity(move * dragSpeed);
             if (move.sqrMagnitude > 0.01f) Motor.FaceDirection(move);
-            grabbed.HoldAt(transform.position + transform.forward * (0.75f + grabbed.radius),
-                Quaternion.LookRotation(-transform.forward));
+
+            // Reach and yank him in, then keep him at arm's length by the collar.
+            float pull = Mathf.Clamp01(stateTimer / GrabPullTime);
+            Vector3 hold = HoldPosition;
+            Vector3 pos = Vector3.Lerp(grabPullStart, hold, pull * pull * (3f - 2f * pull));
+            Quaternion facing = Quaternion.LookRotation(grabFromBehind ? transform.forward : -transform.forward);
+            // A little struggle so he never looks frozen.
+            pos += transform.right * Mathf.Sin(Time.time * 7f) * 0.03f;
+            grabbed.HoldAt(pos, facing);
 
             var spot = FinisherSpot.FindUsable(transform.position);
             if (spot != null && Gethu >= spot.gethuCost)
                 ContextPrompt = $"Q / RT  —  {spot.finisherName}";
             else if (spot != null)
-                ContextPrompt = $"Need {spot.gethuCost:0} Gethu for the {spot.promptName} finisher";
+                ContextPrompt = $"Throw him in (E) · Q needs {spot.gethuCost:0} Gethu";
             else if (Gethu >= maxGethu)
                 ContextPrompt = "Q / RT  —  GETHU SLAM!";
             else
-                ContextPrompt = "LMB / X  knee   ·   E / B or RMB / Y  throw";
+                ContextPrompt = "Click: strike · E / RMB: throw · F: shove · aim at a wall to slam";
 
             if (stateTimer > 4.5f)
             {
-                // He wriggles free
+                // He breaks free and shoves you off.
+                var e = grabbed;
                 ReleaseGrab(transform.forward * 3f, false);
-                SetState(PlayerState.Free);
+                Motor.AddLunge(-transform.forward, 0.6f);
+                SetState(PlayerState.Stagger);
+                if (GM != null) GM.AddPopup("BROKE FREE", e.Center + Vector3.up, Color.gray, 0.7f);
                 return;
             }
 
@@ -652,35 +737,90 @@ namespace MadrasGethu
                 if (spot == null && Gethu >= maxGethu) { StartFinisher(null); return; }
             }
 
-            if (GameInput.GrabPressed || Time.time < heavyBufferedUntil)
+            Vector3 aim = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
+
+            // Shove: both hands into his chest, he stumbles back (and falls if he can't keep up).
+            if (GameInput.BlockPressed)
             {
-                heavyBufferedUntil = 0f;
                 var victim = grabbed;
-                grabbed = null;
-                Vector3 throwDir = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
-                Motor.FaceDirection(throwDir, instant: true);
-                victim.Throw(this, throwDir);
-                victim.ReceiveHit(new HitInfo { attacker = this, damage = 10f, direction = throwDir, hitsDowned = true });
-                RegisterHits(1, 8f);
-                Visual.Play(FighterPose.Throw, 0.4f, 0.7f);
-                if (GM != null) GM.Shake(0.2f);
-                SetState(PlayerState.Stagger);   // brief recovery
+                LetGo();
+                Motor.FaceDirection(aim, instant: true);
+                Visual.Play(FighterPose.Push, 0.4f, 0.55f);
+                victim.Launch(this, aim, EnemyFighter.LaunchKind.Shove);
+                victim.ReceiveHit(new HitInfo { attacker = this, damage = 5f, direction = aim, hitsDowned = true });
+                RegisterHits(1, 5f);
+                if (GM != null) { GM.Shake(0.15f); GM.AddPopup("SHOVE!", victim.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.7f); }
+                SetState(PlayerState.Stagger);
                 stateTimer = 0.1f;
                 return;
             }
 
+            // Throw, or a wall slam if there's a wall right where you're aiming.
+            if (GameInput.GrabPressed || Time.time < heavyBufferedUntil)
+            {
+                heavyBufferedUntil = 0f;
+                if (TryWallSlam(aim)) return;
+
+                var victim = grabbed;
+                LetGo();
+                Motor.FaceDirection(aim, instant: true);
+                Visual.Play(FighterPose.Throw, 0.4f, 0.7f);
+                victim.Launch(this, aim, EnemyFighter.LaunchKind.Throw);
+                victim.ReceiveHit(new HitInfo { attacker = this, damage = grabFromBehind ? 16f : 10f, direction = aim, hitsDowned = true });
+                RegisterHits(1, 8f);
+                if (GM != null) { GM.Shake(0.2f); GM.AddPopup(grabFromBehind ? "SUPLEX THROW!" : "THROW!", victim.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.8f); }
+                SetState(PlayerState.Stagger);
+                stateTimer = 0.1f;
+                return;
+            }
+
+            // Strike cycle while holding: knee -> headbutt -> punch to the face.
             if (Time.time < lightBufferedUntil)
             {
                 lightBufferedUntil = 0f;
-                grabActionCooldown = knee.recovery;
-                Visual.Play(FighterPose.Knee, 0.25f, 0.4f);
+                FighterPose strike = grabStrikeIndex % 3 == 0 ? FighterPose.Knee
+                                   : grabStrikeIndex % 3 == 1 ? FighterPose.Headbutt : FighterPose.Cross;
+                float damage = strike == FighterPose.Headbutt ? 9f : strike == FighterPose.Cross ? 8f : 7f;
+                grabStrikeIndex++;
+                grabActionCooldown = 0.38f;
+                Visual.Play(strike, 0.3f, 0.42f);
                 float mult = MassMode ? massModeDamageMultiplier : 1f;
-                grabbed.ReceiveHit(knee.ToHit(this, transform.forward, mult));
-                FX.HitSpark(grabbed.Center, false);
+                var hit = knee.ToHit(this, transform.forward, mult);
+                hit.damage = damage * mult;
+                grabbed.ReceiveHit(hit);
+                grabbed.Visual.Play(FighterPose.Flinch, 0.3f, 0.35f);
+                FX.HitSpark(grabbed.Center + Vector3.up * (strike == FighterPose.Knee ? -0.2f : 0.35f), false);
                 RegisterHits(1, knee.gethuGain);
                 if (GM != null) { GM.HitStop(knee.hitStop); GM.Shake(knee.shake); }
                 if (grabbed != null && grabbed.IsDead) ReleaseGrab(Vector3.zero, false);
             }
+        }
+
+        /// <summary>Wall right in the throw direction: run him into it head first.</summary>
+        bool TryWallSlam(Vector3 aim)
+        {
+            Vector3 from = grabbed.Center;
+            if (!Physics.SphereCast(from, 0.25f, aim, out var hit, 2.2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return false;
+            if (hit.collider.GetComponentInParent<FinisherSpot>() != null) return false;   // props: throw into them instead
+            if (Vector3.Dot(hit.normal, Vector3.up) > 0.5f) return false;                  // that's the floor
+            if (hit.collider.bounds.size.y < 1.2f) return false;                             // debris, boxes, bollards
+
+            Motor.FaceDirection(aim, instant: true);
+            finisherEndPoint = hit.point + hit.normal * (grabbed.radius + 0.15f);
+            finisherEndPoint.y = transform.position.y;
+            finisherDamage = grabFromBehind ? 32f : 26f;
+            finisherTitle = "WALL SLAM!";
+            finisherIsWallSlam = true;
+            BeginFinisherSequence(null);
+            return true;
+        }
+
+        /// <summary>Lets go of the grabbed rowdy without touching his state (he is being launched).</summary>
+        void LetGo()
+        {
+            grabbed = null;
+            Visual.SetGrip(null, false);
         }
 
         void ReleaseGrab(Vector3 push, bool knockDown)
@@ -690,6 +830,7 @@ namespace MadrasGethu
                 grabbed.ReleaseFromGrab(push, knockDown);
                 grabbed = null;
             }
+            Visual.SetGrip(null, false);
             if (State == PlayerState.Grab) SetState(PlayerState.Free);
             Visual.Play(FighterPose.Idle, 0f);
         }
@@ -719,25 +860,36 @@ namespace MadrasGethu
 
         void StartFinisher(FinisherSpot spot)
         {
+            finisherIsWallSlam = false;
+            if (spot != null)
+            {
+                Gethu -= spot.gethuCost;
+                Motor.FaceDirection(spot.transform.position - transform.position, instant: true);
+                finisherEndPoint = new Vector3(spot.transform.position.x, transform.position.y, spot.transform.position.z);
+                finisherDamage = spot.damage;
+                finisherTitle = spot.finisherName;
+            }
+            else
+            {
+                Gethu = 0f;
+                finisherEndPoint = transform.position + transform.forward * 0.9f;
+                finisherDamage = 45f;
+                finisherTitle = "GETHU SLAM!";
+            }
+            BeginFinisherSequence(spot);
+        }
+
+        void BeginFinisherSequence(FinisherSpot spot)
+        {
             finisherSpot = spot;
             finisherVictim = grabbed;
             finisherVictimStart = grabbed.transform.position;
             finisherImpactDone = false;
             grabbed = null;
+            Visual.SetGrip(null, false);
             SetState(PlayerState.Finisher);
-
-            if (spot != null)
-            {
-                Gethu -= spot.gethuCost;
-                Motor.FaceDirection(spot.transform.position - transform.position, instant: true);
-            }
-            else
-            {
-                Gethu = 0f;
-            }
-
-            Visual.Play(FighterPose.Slam, 0.6f, 0.9f);
-            if (GM != null) GM.SlowMo(0.3f, 1.0f);
+            Visual.Play(finisherIsWallSlam ? FighterPose.Push : FighterPose.Slam, 0.6f, 0.9f);
+            if (GM != null) GM.SlowMo(0.3f, finisherIsWallSlam ? 0.7f : 1.0f);
             if (cam != null) cam.FovKick(6f);
         }
 
@@ -748,10 +900,8 @@ namespace MadrasGethu
             if (!finisherImpactDone && finisherVictim != null)
             {
                 float t = Mathf.Clamp01(stateTimer / impactTime);
-                Vector3 end = finisherSpot != null
-                    ? new Vector3(finisherSpot.transform.position.x, transform.position.y, finisherSpot.transform.position.z)
-                    : transform.position + transform.forward * 0.9f;
-                Vector3 arc = Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.2f;
+                Vector3 end = finisherEndPoint;
+                Vector3 arc = Vector3.up * Mathf.Sin(t * Mathf.PI) * (finisherIsWallSlam ? 0.2f : 1.2f);
                 finisherVictim.HoldAt(Vector3.Lerp(finisherVictimStart, end, t) + arc,
                     Quaternion.LookRotation(-transform.forward));
             }
@@ -771,8 +921,8 @@ namespace MadrasGethu
             var victim = finisherVictim;
             finisherVictim = null;
             Vector3 dir = transform.forward;
-            float damage = finisherSpot != null ? finisherSpot.damage : 45f;
-            string title = finisherSpot != null ? finisherSpot.finisherName : "GETHU SLAM!";
+            float damage = finisherDamage;
+            string title = finisherTitle;
 
             if (victim != null && !victim.IsDead)
             {
@@ -788,6 +938,12 @@ namespace MadrasGethu
             if (finisherSpot != null)
             {
                 finisherSpot.Break(dir);
+            }
+            else if (finisherIsWallSlam)
+            {
+                FX.Dust(finisherEndPoint + dir * 0.3f + Vector3.up * 1.2f, 18);
+                FX.Burst(finisherEndPoint + dir * 0.3f + Vector3.up * 1.4f, 12, 4f, 0.08f,
+                    new Color(0.6f, 0.6f, 0.55f), Color.black, 0.5f, -8f);
             }
             else
             {
@@ -817,10 +973,13 @@ namespace MadrasGethu
             bool facing = Vector3.Dot(transform.forward, -hit.direction) > 0.2f;
             if (State == PlayerState.Block && facing && !hit.unblockable)
             {
-                Motor.AddImpulse(hit.direction * hit.knockback * 0.6f);
+                // Guard holds: slide back a little, his arm bounces off.
+                Motor.AddLunge(hit.direction, hit.heavy ? 0.6f : 0.35f);
                 AddGethu(2f);
-                Visual.Flinch(0.3f);
-                if (GM != null) GM.HitStop(0.04f);
+                Visual.Flinch(0.4f);
+                if (hit.attacker is EnemyFighter attacker) attacker.Recoil(hit.direction * -1f);
+                FX.BlockSpark(Center + Vector3.up * 0.35f + transform.forward * 0.4f);
+                if (GM != null) { GM.HitStop(0.05f); GM.Shake(0.08f); }
                 return HitResult.Blocked;
             }
 

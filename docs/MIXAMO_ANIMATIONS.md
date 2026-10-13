@@ -62,6 +62,18 @@ Save each file with the name in the first column into `Assets/MadrasGethu/Art/An
 | `GetUp.fbx` | Getting Up *(or "Stand Up")* |
 | `Dead.fbx` | Dying |
 
+### Grab, shove and parry (recommended)
+| Save as | Search Mixamo for | Stand-in if missing |
+|---|---|---|
+| `Grab.fbx` | Grab / Holding (hero holding someone) | Guard |
+| `Held.fbx` | Struggling (rowdy being held) | Flinch |
+| `Push.fbx` | Push / Shove | Haymaker |
+| `Headbutt.fbx` | Headbutt | Cross |
+| `Parry.fbx` | Outward Block / Center Block | Block |
+| `StaggerBack.fbx` | Stumble Backwards | Flinch |
+
+The hero's hands are placed on the rowdy's collar by IK whatever the Grab animation does, so any calm holding pose works.
+
 ### Jump and dodges (recommended)
 | Save as | Search Mixamo for | Stand-in if missing |
 |---|---|---|
