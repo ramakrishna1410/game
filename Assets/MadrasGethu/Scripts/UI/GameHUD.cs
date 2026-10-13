@@ -51,6 +51,7 @@ namespace MadrasGethu
             if (GM == null) return;
             EnsureStyles();
 
+            DrawFinisherMarkers();
             DrawEnemyBars();
             DrawPopups();
             DrawPlayerPanel();
@@ -136,18 +137,64 @@ namespace MadrasGethu
             foreach (var e in GM.AliveEnemies)
             {
                 if (e == null || e.IsDead) continue;
+                float top = e.Visual != null ? e.Visual.HeadTopY : e.transform.position.y + e.height;
+                Vector3 sp = cam.WorldToScreenPoint(new Vector3(e.transform.position.x, top + 0.25f, e.transform.position.z));
+                if (sp.z <= 0f) continue;
+
+                // Counter prompt: this rowdy is about to swing.
+                if (e.IsTelegraphing)
+                {
+                    float pulse = 0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 18f);
+                    float size = 46 * S * pulse;
+                    var box = new Rect(sp.x - size / 2f, Screen.height - sp.y - size - 14 * S, size, size);
+                    Bar(box, 1f, new Color(0.1f, 0.7f, 1f, 0.9f));
+                    var keyStyle = new GUIStyle(center) { fontSize = Mathf.RoundToInt(20 * S * pulse) };
+                    Shadowed(box, "F", keyStyle, Color.white);
+                    Shadowed(new Rect(sp.x - 60 * S, box.yMax, 120 * S, 20 * S), "COUNTER", new GUIStyle(small) { alignment = TextAnchor.MiddleCenter }, new Color(0.6f, 0.9f, 1f));
+                }
+
                 if (e.IsBoss)
                 {
                     DrawBossBar(e);
                     continue;
                 }
-                float top = e.Visual != null ? e.Visual.HeadTopY : e.transform.position.y + e.height;
-                Vector3 sp = cam.WorldToScreenPoint(new Vector3(e.transform.position.x, top + 0.25f, e.transform.position.z));
-                if (sp.z <= 0f) continue;
                 float w = 90 * S, h = 8 * S;
                 var r = new Rect(sp.x - w / 2f, Screen.height - sp.y, w, h);
                 Bar(r, 1f, Panel);
                 Bar(r, e.HealthFraction, e.IsTelegraphing ? new Color(1f, 0.3f, 0.2f) : new Color(0.9f, 0.85f, 0.8f));
+            }
+        }
+
+        /// <summary>Labels over props that can be used for environment attacks.</summary>
+        void DrawFinisherMarkers()
+        {
+            var cam = Camera.main;
+            var p = GM.Player;
+            if (cam == null || p == null || p.IsDead) return;
+            var style = new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+
+            foreach (var spot in FinisherSpot.All)
+            {
+                if (spot == null || spot.IsBroken) continue;
+                Vector3 flat = spot.transform.position - p.transform.position;
+                flat.y = 0f;
+                float dist = flat.magnitude;
+                if (dist > 12f) continue;
+                Vector3 sp = cam.WorldToScreenPoint(spot.SlamPoint + Vector3.up * 1.6f);
+                if (sp.z <= 0f) continue;
+
+                bool enough = p.Gethu >= spot.gethuCost;
+                bool ready = p.Grabbed != null && dist <= spot.useRadius && enough;
+                string text;
+                Color color;
+                if (ready) { text = "Q  —  " + spot.finisherName; color = new Color(1f, 0.8f, 0.2f); }
+                else if (p.Grabbed != null) { text = enough ? "▼ drag him here" : $"▼ {spot.promptName}: throw him in (E)"; color = new Color(1f, 0.85f, 0.4f); }
+                else { text = $"▼ {spot.promptName.ToUpper()}"; color = enough ? new Color(1f, 0.85f, 0.4f) : new Color(0.85f, 0.85f, 0.85f, 0.8f); }
+
+                float alpha = Mathf.Clamp01((12f - dist) / 4f);
+                color.a *= alpha;
+                var st = ready ? new GUIStyle(style) { fontSize = Mathf.RoundToInt(24 * S) } : style;
+                Shadowed(new Rect(sp.x - 220 * S, Screen.height - sp.y - 14 * S, 440 * S, 28 * S), text, st, color);
             }
         }
 
@@ -201,20 +248,27 @@ namespace MadrasGethu
         {
             string[] lines =
             {
-                "CONTROLS                      (H to hide)",
-                "WASD / Left stick ........ move    (Shift / LB sprint)",
-                "Mouse / Right stick ...... camera",
-                "Left click / X ........... jab-cross-hook-body combo",
-                "Right click / Y .......... heavy ender (changes with combo step)",
-                "Right click near downed .. stomp",
-                "F / RB (hold) ............ block",
-                "F / RB when enemy flashes RED ... COUNTER",
-                "Space / A ................ dodge",
-                "E / B .................... grab  →  click: knee · E/RMB: throw",
-                "Q / RT ................... Gethu: finisher while grabbing near",
-                "                           tea kadai / crates / auto, or Gethu Mode",
+                "CONTROLS                                  (H to hide)",
+                "WASD / L-stick ....... move      Shift / LB ... sprint",
+                "Space / A ............ jump      C, Ctrl / LT . dodge (+direction)",
+                "Left click / X ....... punch     Right click / Y ... heavy",
+                "F / RB ............... block (hold) · COUNTER when 'F' shows",
+                "E / B ................ grab → click: knee · E / RMB: throw",
+                "Q / RT ............... Gethu Mode, or finisher near a marked prop",
+                "",
+                "COMBOS",
+                "L ▸ H .................. Haymaker",
+                "L L ▸ H ................ Kasimedu Kick",
+                "L L L ▸ H .............. Uppercut (launches)",
+                "L L L L ▸ H ............ Royapuram Rush Finisher",
+                "any heavy ▸ H .......... Double Hammer",
+                "Jump ▸ L/H ............. Flying Kick",
+                "Sprint ▸ L ............. Running Knee",
+                "Dodge ▸ L/H ............ Pivot Backfist",
+                "H on a downed rowdy .... Stomp",
+                "Grab ▸ throw into a marked prop = free smash",
             };
-            float w = 640 * S, lh = 24 * S;
+            float w = 700 * S, lh = 22 * S;
             var r = new Rect(30 * S, Screen.height - (lines.Length * lh + 40 * S), w, lines.Length * lh + 20 * S);
             Bar(r, 1f, Panel);
             for (int i = 0; i < lines.Length; i++)

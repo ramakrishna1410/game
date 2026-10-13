@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump }
 
         [Header("Movement")]
         public float walkSpeed = 1.6f;
@@ -21,9 +21,17 @@ namespace MadrasGethu
         public float combatLockRange = 4.5f;
         public float combatStepSpeed = 1.8f;
 
+        [Header("Jump")]
+        public float jumpSpeed = 6.2f;
+        public float airSpeed = 3.5f;
+
         [Header("Dodge")]
-        public float dodgeDistance = 3.4f;
-        public float dodgeDuration = 0.38f;
+        [Tooltip("Sidestep / backstep distance while squared up to a rowdy.")]
+        public float stepDistance = 1.9f;
+        public float stepDuration = 0.4f;
+        [Tooltip("Roll distance when not locked onto anyone.")]
+        public float rollDistance = 3.2f;
+        public float rollDuration = 0.6f;
         public float dodgeInvulnerableUntil = 0.3f;
 
         [Header("Gethu (heat) meter")]
@@ -36,8 +44,15 @@ namespace MadrasGethu
         public List<AttackData> heavyEnders = new List<AttackData>();
         public AttackData stomp;
         public AttackData counter;
+        public AttackData counterUppercut;
+        public AttackData counterThrow;
         public AttackData knee;
         public AttackData grabMiss;
+        [Header("Special moves")]
+        public AttackData heavyFollowUp;   // heavy ender -> heavy again
+        public AttackData flyingKick;      // jump -> attack
+        public AttackData runningAttack;   // sprint -> light
+        public AttackData dodgeStrike;     // dodge -> attack
 
         public PlayerState State { get; private set; } = PlayerState.Free;
         public float Gethu { get; private set; }
@@ -61,6 +76,11 @@ namespace MadrasGethu
         float lightBufferedUntil;
         float heavyBufferedUntil;
         float dodgeCooldown;
+        Vector3 dodgeDirection;
+        float dodgeDistanceNow;
+        float dodgeDurationNow;
+        float lastDodgeEnd = -10f;
+        bool followUpUsed;
         float massModeTimer;
         float grabActionCooldown;
 
@@ -98,20 +118,34 @@ namespace MadrasGethu
 
             // Heavy ender depends on how many lights came before it (like Yakuza's rush + finisher strings).
             heavyEnders.Add(new AttackData("Haymaker", FighterPose.Haymaker, 16f)
-                { startup = 0.28f, recovery = 0.55f, range = 1.7f, lunge = 1.2f, knockback = 7f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
+                { announce = true, startup = 0.28f, recovery = 0.55f, range = 1.7f, lunge = 1.2f, knockback = 7f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
             heavyEnders.Add(new AttackData("Kasimedu Kick", FighterPose.Kick, 15f)
-                { startup = 0.26f, recovery = 0.55f, range = 1.95f, lunge = 1.0f, knockback = 9f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
+                { announce = true, startup = 0.26f, recovery = 0.55f, range = 1.95f, lunge = 1.0f, knockback = 9f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
             heavyEnders.Add(new AttackData("Uppercut", FighterPose.Uppercut, 18f)
-                { startup = 0.24f, recovery = 0.55f, range = 1.6f, lunge = 1.0f, knockback = 2f, launch = 7f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
+                { announce = true, startup = 0.24f, recovery = 0.55f, range = 1.6f, lunge = 1.0f, knockback = 2f, launch = 7f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
             heavyEnders.Add(new AttackData("Spinning Backfist", FighterPose.Backfist, 18f)
-                { startup = 0.26f, recovery = 0.55f, range = 1.9f, arc = 360f, lunge = 0.5f, knockback = 8f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
+                { announce = true, startup = 0.26f, recovery = 0.55f, range = 1.9f, arc = 360f, lunge = 0.5f, knockback = 8f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
             heavyEnders.Add(new AttackData("Royapuram Rush Finisher", FighterPose.Haymaker, 26f)
-                { startup = 0.28f, recovery = 0.65f, range = 1.8f, lunge = 1.2f, knockback = 10f, launch = 4f, heavy = true, gethuGain = 14f, hitStop = 0.13f, shake = 0.4f });
+                { announce = true, startup = 0.28f, recovery = 0.65f, range = 1.8f, lunge = 1.2f, knockback = 10f, launch = 4f, heavy = true, gethuGain = 14f, hitStop = 0.13f, shake = 0.4f });
 
             stomp = new AttackData("Stomp", FighterPose.Stomp, 14f)
                 { startup = 0.2f, recovery = 0.4f, range = 1.4f, arc = 140f, lunge = 1.0f, knockback = 1f, heavy = true, hitsDowned = true, gethuGain = 6f, hitStop = 0.08f, shake = 0.2f };
-            counter = new AttackData("Counter", FighterPose.Counter, 22f)
-                { startup = 0.12f, recovery = 0.35f, range = 2.2f, arc = 120f, lunge = 2.5f, knockback = 8f, launch = 3f, heavy = true, gethuGain = 15f, hitStop = 0.12f, shake = 0.3f };
+            counter = new AttackData("Counter Punch", FighterPose.Counter, 22f)
+                { announce = true, startup = 0.12f, recovery = 0.35f, range = 2.2f, arc = 120f, lunge = 2.5f, knockback = 8f, launch = 3f, heavy = true, gethuGain = 15f, hitStop = 0.12f, shake = 0.3f };
+            counterUppercut = new AttackData("Counter Uppercut", FighterPose.Uppercut, 24f)
+                { announce = true, startup = 0.14f, recovery = 0.45f, range = 2.2f, arc = 120f, lunge = 2.5f, knockback = 3f, launch = 8f, heavy = true, gethuGain = 15f, hitStop = 0.14f, shake = 0.35f };
+            counterThrow = new AttackData("Counter Throw", FighterPose.Throw, 20f)
+                { announce = true, startup = 0.16f, recovery = 0.5f, range = 2.2f, arc = 120f, lunge = 2.5f, knockback = 13f, launch = 4f, heavy = true, gethuGain = 15f, hitStop = 0.12f, shake = 0.35f };
+
+            heavyFollowUp = new AttackData("Double Hammer", FighterPose.Slam, 20f)
+                { announce = true, startup = 0.3f, recovery = 0.6f, range = 1.8f, arc = 120f, lunge = 1.0f, knockback = 4f, launch = 6f, heavy = true, hitsDowned = true, gethuGain = 12f, hitStop = 0.12f, shake = 0.4f };
+            flyingKick = new AttackData("Flying Kick", FighterPose.FlyingKick, 20f)
+                { announce = true, startup = 0.18f, recovery = 0.5f, range = 2.0f, arc = 100f, lunge = 2.5f, knockback = 11f, launch = 3f, heavy = true, gethuGain = 12f, hitStop = 0.12f, shake = 0.35f };
+            runningAttack = new AttackData("Running Knee", FighterPose.FlyingKick, 16f)
+                { announce = true, startup = 0.16f, recovery = 0.45f, range = 1.9f, arc = 100f, lunge = 2.2f, knockback = 9f, launch = 2f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f };
+            dodgeStrike = new AttackData("Pivot Backfist", FighterPose.Backfist, 15f)
+                { announce = true, startup = 0.14f, recovery = 0.4f, range = 1.9f, arc = 360f, lunge = 0.8f, knockback = 7f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.25f };
+
             knee = new AttackData("Knee", FighterPose.Knee, 7f)
                 { startup = 0f, recovery = 0.3f, gethuGain = 5f, hitStop = 0.05f, shake = 0.12f };
             grabMiss = new AttackData("Grab Miss", FighterPose.Grab, 0f)
@@ -157,6 +191,7 @@ namespace MadrasGethu
                 case PlayerState.Free: UpdateFree(); break;
                 case PlayerState.Attack: UpdateAttack(); break;
                 case PlayerState.Dodge: UpdateDodge(); break;
+                case PlayerState.Jump: UpdateJump(); break;
                 case PlayerState.Block: UpdateBlock(); break;
                 case PlayerState.Grab: UpdateGrab(); break;
                 case PlayerState.Finisher: UpdateFinisher(); break;
@@ -224,6 +259,12 @@ namespace MadrasGethu
                 return true;
             }
 
+            if (GameInput.JumpPressed && Motor.IsGrounded && State != PlayerState.Attack)
+            {
+                StartJump();
+                return true;
+            }
+
             if (GameInput.GethuPressed && TryActivateGethu()) return true;
 
             if (GameInput.GrabPressed)
@@ -234,27 +275,54 @@ namespace MadrasGethu
 
             if (!allowAttacks) return false;
 
-            if (Time.time < heavyBufferedUntil)
+            bool heavy = Time.time < heavyBufferedUntil;
+            bool light = Time.time < lightBufferedUntil;
+            if (!heavy && !light) return false;
+            heavyBufferedUntil = 0f;
+            lightBufferedUntil = 0f;
+
+            // Dodge -> attack: spin out of the dodge with a backfist.
+            if (Time.time - lastDodgeEnd < 0.4f)
             {
-                heavyBufferedUntil = 0f;
-                var downed = CombatUtil.FindTarget(this, MoveInputWorld(), 2.2f, includeDowned: true);
-                if (downed != null && downed.IsDowned)
-                    StartAttack(stomp, downed);
-                else
-                    StartAttack(heavyEnders[Mathf.Min(lightIndex, heavyEnders.Count - 1)], null);
+                StartAttack(dodgeStrike, null);
                 lightIndex = 0;
                 return true;
             }
 
-            if (Time.time < lightBufferedUntil)
+            // Sprint -> light: running knee into whoever is ahead.
+            if (light && GameInput.Sprint && Motor.MoveVelocity.magnitude > runSpeed * 0.8f)
             {
-                lightBufferedUntil = 0f;
-                if (lightIndex >= lightChain.Count) lightIndex = 0;
-                StartAttack(lightChain[lightIndex], null);
-                lightIndex++;
+                StartAttack(runningAttack, null);
+                lightIndex = 0;
                 return true;
             }
-            return false;
+
+            if (heavy)
+            {
+                var downed = CombatUtil.FindTarget(this, MoveInputWorld(), 2.2f, includeDowned: true);
+                if (downed != null && downed.IsDowned)
+                {
+                    StartAttack(stomp, downed);
+                }
+                else if (State == PlayerState.Attack && heavyEnders.Contains(currentAttack) && !followUpUsed)
+                {
+                    // Heavy ender -> heavy again: Double Hammer.
+                    followUpUsed = true;
+                    StartAttack(heavyFollowUp, null);
+                }
+                else
+                {
+                    followUpUsed = false;
+                    StartAttack(heavyEnders[Mathf.Min(lightIndex, heavyEnders.Count - 1)], null);
+                }
+                lightIndex = 0;
+                return true;
+            }
+
+            if (lightIndex >= lightChain.Count) lightIndex = 0;
+            StartAttack(lightChain[lightIndex], null);
+            lightIndex++;
+            return true;
         }
 
         // ------------------------------------------------------------------ attacks
@@ -282,10 +350,17 @@ namespace MadrasGethu
             lungeDirection = transform.forward;
             lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(attack.startup, 0.05f));
             Visual.Play(attack.pose, attack.startup + 0.2f, attack.startup + attack.recovery);
+            if (attack.announce && GM != null)
+                GM.AddPopup(attack.name.ToUpper(), Center + Vector3.up * 1.1f, new Color(1f, 0.85f, 0.35f), 0.75f);
         }
 
         void UpdateAttack()
         {
+            // A counter is always available, even in the middle of your own punch.
+            if (currentAttack != counter && currentAttack != counterUppercut && currentAttack != counterThrow
+                && GameInput.BlockPressed && TryCounter())
+                return;
+
             if (!struck && lungeRemaining > 0f)
             {
                 float step = Mathf.Min(lungeRemaining, lungeSpeed * Time.deltaTime);
@@ -361,22 +436,102 @@ namespace MadrasGethu
 
         // ------------------------------------------------------------------ dodge
 
+        /// <summary>
+        /// Squared up to a rowdy: a quick sidestep / backstep that keeps facing him.
+        /// Otherwise: a roll in the stick direction. Speed eases out, so it reads as a step, not a skate.
+        /// </summary>
         void StartDodge()
         {
             SetState(PlayerState.Dodge);
-            dodgeCooldown = dodgeDuration + 0.15f;
-            Vector3 dir = MoveInputWorld();
-            if (dir.sqrMagnitude < 0.01f) dir = -transform.forward;   // backstep
-            else Motor.FaceDirection(dir, instant: true);
-            Motor.ClearImpulse();
-            Motor.AddLunge(dir, dodgeDistance);
-            Visual.Play(FighterPose.Dodge, dodgeDuration, dodgeDuration + 0.1f);
             lightIndex = 0;
+            Motor.ClearImpulse();
+
+            Vector3 input = MoveInputWorld();
+            var focus = CombatUtil.FindTarget(this, Vector3.zero, combatLockRange);
+            FighterPose pose;
+
+            if (focus != null && input.sqrMagnitude > 0.01f && Vector3.Dot(input.normalized, Flat(focus.transform.position - transform.position).normalized) > 0.5f)
+                focus = null;   // pushing towards him: roll past instead of stepping
+
+            if (focus != null)
+            {
+                Motor.FaceDirection(focus.transform.position - transform.position, instant: true);
+                Vector3 local = input.sqrMagnitude > 0.01f ? transform.InverseTransformDirection(input.normalized) : Vector3.back;
+                if (Mathf.Abs(local.x) > Mathf.Abs(local.z))
+                    pose = local.x > 0f ? FighterPose.DodgeRight : FighterPose.DodgeLeft;
+                else
+                    pose = FighterPose.DodgeBack;
+                dodgeDirection = input.sqrMagnitude > 0.01f ? input.normalized : -transform.forward;
+                dodgeDistanceNow = stepDistance;
+                dodgeDurationNow = stepDuration;
+            }
+            else
+            {
+                if (input.sqrMagnitude > 0.01f)
+                {
+                    dodgeDirection = input.normalized;
+                    Motor.FaceDirection(dodgeDirection, instant: true);
+                    pose = FighterPose.Roll;
+                    dodgeDistanceNow = rollDistance;
+                    dodgeDurationNow = rollDuration;
+                }
+                else
+                {
+                    dodgeDirection = -transform.forward;
+                    pose = FighterPose.DodgeBack;
+                    dodgeDistanceNow = stepDistance;
+                    dodgeDurationNow = stepDuration;
+                }
+            }
+
+            dodgeCooldown = dodgeDurationNow + 0.12f;
+            Visual.Play(pose, dodgeDurationNow, dodgeDurationNow);
         }
 
         void UpdateDodge()
         {
-            if (stateTimer >= dodgeDuration) SetState(PlayerState.Free);
+            float t = stateTimer / dodgeDurationNow;
+            if (t >= 1f)
+            {
+                lastDodgeEnd = Time.time;
+                SetState(PlayerState.Free);
+                return;
+            }
+            // Ease-out: fast push off, then settle (covers exactly dodgeDistanceNow).
+            float speed = Mathf.PI * 0.5f * dodgeDistanceNow / dodgeDurationNow * Mathf.Cos(t * Mathf.PI * 0.5f);
+            Motor.SetDesiredVelocity(dodgeDirection * speed, instant: true);
+            if (GameInput.BlockPressed && TryCounter()) return;
+        }
+
+        // ------------------------------------------------------------------ jump
+
+        void StartJump()
+        {
+            SetState(PlayerState.Jump);
+            Motor.AddImpulse(Vector3.up * jumpSpeed);
+            Visual.Play(FighterPose.Jump, 0.9f);
+            lightIndex = 0;
+        }
+
+        void UpdateJump()
+        {
+            Vector3 move = MoveInputWorld();
+            Motor.SetDesiredVelocity(move * airSpeed);
+            if (move.sqrMagnitude > 0.01f) Motor.FaceDirection(move);
+
+            // Jump -> attack: flying kick at whoever is ahead.
+            if (Time.time < lightBufferedUntil || Time.time < heavyBufferedUntil)
+            {
+                lightBufferedUntil = heavyBufferedUntil = 0f;
+                StartAttack(flyingKick, null);
+                return;
+            }
+
+            if (stateTimer > 0.2f && Motor.IsGrounded)
+            {
+                FX.Dust(transform.position, 6);
+                SetState(PlayerState.Free);
+            }
         }
 
         /// <summary>Knocked to the ground: rowdies wait for the hero to get up instead of kicking him.</summary>
@@ -385,7 +540,8 @@ namespace MadrasGethu
         bool Invulnerable =>
             (State == PlayerState.Dodge && stateTimer < dodgeInvulnerableUntil) ||
             State == PlayerState.Finisher ||
-            (State == PlayerState.Attack && currentAttack == counter && !struck);
+            (State == PlayerState.Attack && !struck &&
+             (currentAttack == counter || currentAttack == counterUppercut || currentAttack == counterThrow));
 
         // ------------------------------------------------------------------ block & counter
 
@@ -417,12 +573,16 @@ namespace MadrasGethu
             if (best == null) return false;
 
             best.Countered();
-            StartAttack(counter, best);
+            // Mix it up: counter punch, counter uppercut (launch) or counter throw (send him flying).
+            float roll = Random.value;
+            var move = MassMode || roll < 0.34f ? counterUppercut : roll < 0.67f ? counter : counterThrow;
+            StartAttack(move, best);
             if (GM != null)
             {
-                GM.SlowMo(0.3f, 0.3f);
-                GM.AddPopup("COUNTER!", best.Center + Vector3.up * 0.9f, new Color(0.4f, 0.9f, 1f), 1.2f);
+                GM.SlowMo(0.25f, 0.45f);
+                GM.Shake(0.15f);
             }
+            if (cam != null) cam.FovKick(5f);
             return true;
         }
 
@@ -577,7 +737,7 @@ namespace MadrasGethu
             }
 
             Visual.Play(FighterPose.Slam, 0.6f, 0.9f);
-            if (GM != null) GM.SlowMo(0.35f, 0.7f);
+            if (GM != null) GM.SlowMo(0.3f, 1.0f);
             if (cam != null) cam.FovKick(6f);
         }
 

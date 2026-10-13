@@ -342,7 +342,8 @@ namespace MadrasGethu
 
             // Whole-body tilt: lying down, flinching back, leaning into a run
             float lean = speed01 * 8f - flinch * 22f;
-            if (pose == FighterPose.Dodge) lean = 25f;
+            if (pose == FighterPose.Dodge || pose == FighterPose.Roll) lean = 25f;
+            if (pose == FighterPose.DodgeBack) lean = -15f;
             var bodyTarget = Quaternion.Euler(-90f * lie + lean * (1f - lie), 0f, 0f);
             body.localRotation = Quaternion.Slerp(body.localRotation, bodyTarget, k);
 
@@ -404,7 +405,11 @@ namespace MadrasGethu
                 case FighterPose.Backfist:
                     aL = new Vector3(-90f, -80f, 0f); aR = guardR; reachL = 0.1f; twist = 70f; break;
                 case FighterPose.Kick:
+                case FighterPose.FlyingKick:
                     lR = new Vector3(-88f, 0f, 0f); twist = -10f; break;
+                case FighterPose.Jump:
+                    lL = new Vector3(-50f, 0f, 0f); lR = new Vector3(-20f, 0f, 0f);
+                    aL = new Vector3(-150f, 0f, -20f); aR = new Vector3(-150f, 0f, 20f); break;
                 case FighterPose.Stomp:
                     lR = new Vector3(-35f, 0f, 0f); aL = new Vector3(-30f, 0f, -40f); aR = new Vector3(-30f, 0f, 40f); break;
                 case FighterPose.Grab:
@@ -416,6 +421,10 @@ namespace MadrasGethu
                 case FighterPose.Slam:
                     aL = new Vector3(-165f, 10f, 0f); aR = new Vector3(-165f, -10f, 0f); reachL = reachR = 0.2f; break;
                 case FighterPose.Dodge:
+                case FighterPose.DodgeLeft:
+                case FighterPose.DodgeRight:
+                case FighterPose.DodgeBack:
+                case FighterPose.Roll:
                     aL = new Vector3(-60f, 20f, 0f); aR = new Vector3(-60f, -20f, 0f); break;
                 case FighterPose.Windup:
                     aR = new Vector3(-140f, -50f, 0f); aL = guardL; reachR = -0.15f; twist = 35f; break;

@@ -52,7 +52,8 @@ The prototype is light. It runs fine on integrated Intel Arc graphics with 16 GB
 | Heavy attack (combo ender, or **stomp** a downed enemy) | Right click | Y |
 | Block (hold) | F | RB |
 | **Counter** (when an enemy flashes red) | F (tap) | RB (tap) |
-| Dodge | Space | A |
+| Jump (then click for a **flying kick**) | Space | A |
+| Dodge: sidestep / backstep when squared up, roll otherwise (direction + key) | C or Ctrl | LT |
 | Grab → knee / throw | E → Left click / E or Right click | B → X / B or Y |
 | **Gethu**: finisher while grabbing near a prop, or Gethu Mode when full | Q | RT |
 | Show/hide controls | H | View/Back |

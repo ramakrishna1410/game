@@ -443,6 +443,27 @@ namespace MadrasGethu
         void HitOthersWhileThrown()
         {
             if (thrower == null) return;
+
+            // Thrown into a tea kadai / crates / auto: smash it, no Gethu needed.
+            var spot = FinisherSpot.FindHit(transform.position, radius + 0.6f);
+            Vector3 flyDir = Motor.Velocity.sqrMagnitude > 0.1f ? Flat(Motor.Velocity).normalized : transform.forward;
+            if (spot != null && Vector3.Dot(flyDir, Flat(spot.transform.position - transform.position)) > 0f)
+            {
+                Vector3 dir = flyDir;
+                spot.Break(dir);
+                thrownTimer = 0f;
+                ReceiveHit(new HitInfo { attacker = thrower, damage = spot.damage * 0.5f, direction = dir, knockback = 2f, launch = 2f, heavy = true, unblockable = true, hitsDowned = true });
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.AddPopup(spot.finisherName, Center + Vector3.up, new Color(1f, 0.75f, 0.15f), 1.3f);
+                    GameManager.Instance.Shake(0.45f, 0.3f);
+                    GameManager.Instance.HitStop(0.1f);
+                    GameManager.Instance.SlowMo(0.35f, 0.5f);
+                }
+                if (thrower is PlayerFighter p) p.AddGethu(12f);
+                return;
+            }
+
             foreach (var f in All.ToArray())
             {
                 if (f == this || f.team != team || f.IsDead || thrownHits.Contains(f)) continue;

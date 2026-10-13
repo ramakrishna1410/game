@@ -211,8 +211,8 @@ namespace MadrasGethu
         {
             BuildTeaKadai(root, new Vector3(-6.2f, 0f, 6f));
             BuildFishCrates(root, new Vector3(5.8f, 0f, -8f), finisher: true);
-            BuildFishCrates(root, new Vector3(6f, 0f, 14f), finisher: false);
-            BuildFishCrates(root, new Vector3(-6.4f, 0f, -18f), finisher: false);
+            BuildFishCrates(root, new Vector3(6f, 0f, 14f), finisher: true);
+            BuildFishCrates(root, new Vector3(-6.4f, 0f, -18f), finisher: true);
             BuildAuto(root, new Vector3(-3.2f, 0f, -2f), 20f);
 
             // Ice boxes and nets
@@ -245,6 +245,7 @@ namespace MadrasGethu
         {
             var spot = MakeSpot(root, "Tea Kadai", position, out var v);
             spot.finisherName = "TEA KADAI SMASH!";
+            spot.bodyRadius = 1.2f;
             spot.promptName = "tea kadai";
             spot.damage = 60f;
             spot.debrisColor = new Color(0.55f, 0.35f, 0.2f);
@@ -313,6 +314,7 @@ namespace MadrasGethu
             spot.damage = 70f;
             spot.gethuCost = 40f;
             spot.useRadius = 2.8f;
+            spot.bodyRadius = 1.3f;
             spot.debrisColor = new Color(0.95f, 0.8f, 0.1f);
             v.localRotation = Quaternion.Euler(0f, yaw, 0f);
 

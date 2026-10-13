@@ -62,6 +62,16 @@ Save each file with the name in the first column into `Assets/MadrasGethu/Art/An
 | `GetUp.fbx` | Getting Up *(or "Stand Up")* |
 | `Dead.fbx` | Dying |
 
+### Jump and dodges (recommended)
+| Save as | Search Mixamo for | Stand-in if missing |
+|---|---|---|
+| `Jump.fbx` | Jump *(tick In Place)* | none |
+| `FlyingKick.fbx` | Flying Kick / Drop Kick | Kick |
+| `DodgeLeft.fbx` | Dodging Left / side step left | Dodge |
+| `DodgeRight.fbx` | Dodging Right / side step right | Dodge |
+| `DodgeBack.fbx` | Dodging Back / back step / hop back | Dodge |
+| `Roll.fbx` | Stand To Roll / Quick Roll | Dodge |
+
 ### Extras (optional; the tool uses stand-ins if missing)
 | Save as | Search Mixamo for | Stand-in if missing |
 |---|---|---|

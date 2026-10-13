@@ -14,7 +14,8 @@ namespace MadrasGethu
         Grab, Knee, Throw, Slam,
         Counter, Dodge,
         Flinch, Knockdown, GetUp, Dead,
-        Windup, Taunt
+        Windup, Taunt,
+        Jump, FlyingKick, DodgeLeft, DodgeRight, DodgeBack, Roll
     }
 
     public enum HitResult { Ignored, Hit, Blocked }
@@ -50,6 +51,7 @@ namespace MadrasGethu
         public bool heavy;
         public bool unblockable;
         public bool hitsDowned;
+        public bool announce;             // show the move's name on screen (specials and finishers)
         public float hitStop = 0.05f;
         public float shake = 0.1f;
 

@@ -20,6 +20,8 @@ namespace MadrasGethu
         public float damage = 60f;
         public float gethuCost = 30f;
         public float useRadius = 2.6f;
+        [Tooltip("Rough size of the prop itself, for thrown enemies crashing into it.")]
+        public float bodyRadius = 0.9f;
         public Color debrisColor = new Color(0.6f, 0.4f, 0.2f);
 
         /// <summary>Visual pieces that are hidden when the prop breaks.</summary>
@@ -54,13 +56,26 @@ namespace MadrasGethu
             return best;
         }
 
+        /// <summary>An unbroken prop whose body is within reach of a flying (thrown) fighter.</summary>
+        public static FinisherSpot FindHit(Vector3 position, float reach)
+        {
+            foreach (var s in All)
+            {
+                if (s.IsBroken) continue;
+                Vector3 d = s.transform.position - position;
+                d.y = 0f;
+                if (d.magnitude <= s.bodyRadius + reach) return s;
+            }
+            return null;
+        }
+
         public void Break(Vector3 fromDirection)
         {
             if (IsBroken) return;
             IsBroken = true;
             if (intactVisual != null) intactVisual.SetActive(false);
 
-            for (int i = 0; i < 14; i++)
+            for (int i = 0; i < 24; i++)
             {
                 var piece = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 piece.name = "Debris";

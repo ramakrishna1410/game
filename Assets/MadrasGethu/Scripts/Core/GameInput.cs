@@ -15,7 +15,8 @@ namespace MadrasGethu
     ///   WASD      move                   Left stick   move
     ///   Mouse     camera                 Right stick  camera
     ///   Shift     sprint                 LB           sprint
-    ///   Space     dodge                  A            dodge
+    ///   Space     jump                   A            jump
+    ///   C / Ctrl  dodge (direction+C)    LT           dodge
     ///   LMB       light attack           X            light attack
     ///   RMB       heavy attack           Y            heavy attack
     ///   F         block / counter        RB           block / counter
@@ -105,7 +106,8 @@ namespace MadrasGethu
         static bool PadDown(GamepadButton button) => Gamepad.current != null && Gamepad.current[button].wasPressedThisFrame;
 
         public static bool BlockPressed => KeyDown(Key.F) || PadDown(GamepadButton.RightShoulder);
-        public static bool DodgePressed => KeyDown(Key.Space) || PadDown(GamepadButton.South);
+        public static bool JumpPressed => KeyDown(Key.Space) || PadDown(GamepadButton.South);
+        public static bool DodgePressed => KeyDown(Key.C) || KeyDown(Key.LeftCtrl) || PadDown(GamepadButton.LeftTrigger);
         public static bool GrabPressed => KeyDown(Key.E) || PadDown(GamepadButton.East);
         public static bool GethuPressed => KeyDown(Key.Q) || PadDown(GamepadButton.RightTrigger);
         public static bool RestartPressed => KeyDown(Key.Enter) || PadDown(GamepadButton.Start);
@@ -123,7 +125,8 @@ namespace MadrasGethu
         public static bool ClickPressed => Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
 #else
         public static bool BlockPressed => Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.JoystickButton5);
-        public static bool DodgePressed => Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.JoystickButton0);
+        public static bool JumpPressed => Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.JoystickButton0);
+        public static bool DodgePressed => Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl);
         public static bool GrabPressed => Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.JoystickButton1);
         public static bool GethuPressed => Input.GetKeyDown(KeyCode.Q);
         public static bool RestartPressed => Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.JoystickButton7);
