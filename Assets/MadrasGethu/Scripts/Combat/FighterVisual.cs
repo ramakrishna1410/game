@@ -24,6 +24,13 @@ namespace MadrasGethu
         [Header("Optional real model")]
         public GameObject modelPrefab;
         public Animator animator;
+        [Tooltip("Used when the model's Animator has no controller (e.g. an FBX dragged in directly).")]
+        public RuntimeAnimatorController fallbackController;
+
+        static readonly HashSet<string> warnedModels = new HashSet<string>();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => warnedModels.Clear();
 
         Transform body;       // pivot at the feet; tilted for leaning and knockdowns
         Transform torso;
@@ -68,11 +75,16 @@ namespace MadrasGethu
                 model.transform.localPosition = Vector3.zero;
                 model.transform.localRotation = Quaternion.identity;
                 if (animator == null) animator = model.GetComponentInChildren<Animator>();
+                if (animator == null && model.GetComponentInChildren<SkinnedMeshRenderer>() != null)
+                    animator = model.AddComponent<Animator>();
                 if (animator != null)
                 {
+                    if (animator.runtimeAnimatorController == null && fallbackController != null)
+                        animator.runtimeAnimatorController = fallbackController;
                     animator.applyRootMotion = false;   // the code moves the character, not the animation
                     animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
                 }
+                WarnAboutModelProblems(modelPrefab.name);
                 foreach (var col in model.GetComponentsInChildren<Collider>())
                     Destroy(col);
                 modelRenderers = model.GetComponentsInChildren<Renderer>();
@@ -125,6 +137,19 @@ namespace MadrasGethu
             var go = Palette.Primitive(type, parent, pos, scale, color, collider: false);
             go.layer = gameObject.layer;
             renderers.Add(go.GetComponent<Renderer>());
+        }
+
+        /// <summary>Explains in the Console why a model would stand in a T-pose.</summary>
+        void WarnAboutModelProblems(string modelName)
+        {
+            if (!warnedModels.Add(modelName)) return;
+            const string fix = " Fix: put the FBX in Assets/MadrasGethu/Art/Characters and run 'Madras Gethu > Setup Characters (Mixamo)'.";
+            if (animator == null)
+                Debug.LogWarning($"[Madras Gethu] Model '{modelName}' has no Animator and no skinned mesh, so it cannot animate." + fix);
+            else if (animator.runtimeAnimatorController == null)
+                Debug.LogWarning($"[Madras Gethu] Model '{modelName}' has no Animator Controller, so it will stay in a T-pose." + fix);
+            else if (animator.avatar == null || !animator.avatar.isHuman)
+                Debug.LogWarning($"[Madras Gethu] Model '{modelName}' is not set up as a Humanoid, so the shared animations cannot play on it." + fix);
         }
 
         static void SetLayerRecursively(GameObject go, int layer)

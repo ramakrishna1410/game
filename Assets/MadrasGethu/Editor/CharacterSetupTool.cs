@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace MadrasGethu.EditorTools
 {
@@ -175,10 +176,17 @@ namespace MadrasGethu.EditorTools
 
                 // 5. Plug into the arena scene
                 EditorUtility.DisplayProgressBar("Madras Gethu", "Updating the arena scene...", 0.95f);
-                string sceneResult = AssignToBootstrap(prefabs, heroPath);
+                string sceneResult = AssignToBootstrap(prefabs, heroPath, controller);
 
                 EditorUtility.ClearProgressBar();
                 ShowReport(slots, unmatched, characterFiles, sceneResult);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogException(e);
+                EditorUtility.ClearProgressBar();
+                EditorUtility.DisplayDialog("Madras Gethu: setup failed",
+                    "Something went wrong:\n\n" + e.Message + "\n\nThe full error is in the Console. Send a screenshot of it.", "OK");
             }
             finally
             {
@@ -195,6 +203,76 @@ namespace MadrasGethu.EditorTools
             EditorUtility.RevealInFinder(CharactersFolder);
         }
 
+        [MenuItem("Madras Gethu/Check Character Setup", priority = 22)]
+        public static void CheckSetup()
+        {
+            var sb = new StringBuilder();
+            var characters = FindFbx(CharactersFolder);
+            sb.AppendLine("CHARACTERS (" + CharactersFolder + ")");
+            if (characters.Count == 0) sb.AppendLine("  ✗ none found");
+            foreach (var path in characters)
+            {
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+                var avatar = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Avatar>().FirstOrDefault();
+                var model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                var mats = model != null
+                    ? model.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null).Distinct().ToList()
+                    : new List<Material>();
+                int textured = mats.Count(m => GetTex(m, "_BaseMap") != null || GetTex(m, "_MainTex") != null);
+                bool human = avatar != null && avatar.isValid && avatar.isHuman;
+                sb.AppendLine($"  {(human ? "✓" : "✗")} {Path.GetFileName(path)}: rig={importer?.animationType}, humanoid avatar={(human ? "yes" : "NO")}, " +
+                              $"materials with texture={textured}/{mats.Count}");
+            }
+
+            var slots = CreateSlots();
+            var anims = FindFbx(AnimationsFolder);
+            sb.AppendLine();
+            sb.AppendLine("ANIMATIONS (" + AnimationsFolder + "): " + anims.Count + " files");
+            foreach (var path in anims)
+            {
+                var slot = MatchSlot(slots, Path.GetFileNameWithoutExtension(path));
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+                bool hasClip = AssetDatabase.LoadAllAssetsAtPath(path).OfType<AnimationClip>().Any(c => !c.name.StartsWith("__preview__"));
+                sb.AppendLine($"  {(slot != null && hasClip ? "✓" : "✗")} {Path.GetFileName(path)} → {(slot != null ? slot.name : "NOT RECOGNISED (rename it)")}, rig={importer?.animationType}");
+            }
+
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            sb.AppendLine();
+            sb.AppendLine($"ANIMATOR CONTROLLER: {(controller != null ? "✓ " + ControllerPath : "✗ missing (run Setup Characters)")}");
+
+            sb.AppendLine();
+            sb.AppendLine("ARENA SCENE");
+            GameBootstrap bootstrap = null;
+            foreach (var root in EditorSceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                bootstrap = root.GetComponentInChildren<GameBootstrap>(true);
+                if (bootstrap != null) break;
+            }
+            if (bootstrap == null)
+            {
+                sb.AppendLine("  ✗ Game Bootstrap not found in the open scene (open " + ArenaScenePath + ")");
+            }
+            else
+            {
+                PrefabLine(sb, "Player model", bootstrap.playerModelPrefab);
+                PrefabLine(sb, "Enemy model", bootstrap.enemyModelPrefab);
+                PrefabLine(sb, "Thadiyan model", bootstrap.thadiyanModelPrefab);
+                PrefabLine(sb, "Boss model", bootstrap.bossModelPrefab);
+                sb.AppendLine($"  {(bootstrap.fighterAnimator != null ? "✓" : "✗")} Fighter Animator: {(bootstrap.fighterAnimator != null ? bootstrap.fighterAnimator.name : "(empty)")}");
+            }
+
+            Debug.Log("[Madras Gethu] Character setup check\n" + sb);
+            EditorUtility.DisplayDialog("Madras Gethu: character check", sb.ToString(), "OK");
+        }
+
+        static void PrefabLine(StringBuilder sb, string label, GameObject prefab)
+        {
+            if (prefab == null) { sb.AppendLine($"  - {label}: (empty)"); return; }
+            var anim = prefab.GetComponentInChildren<Animator>(true);
+            bool ok = anim != null && anim.runtimeAnimatorController != null;
+            sb.AppendLine($"  {(ok ? "✓" : "✗")} {label}: {prefab.name}{(ok ? "" : " (no Animator Controller on this prefab)")}");
+        }
+
         // ------------------------------------------------------------------ import settings
 
         static Avatar SetupCharacterModel(string path)
@@ -207,21 +285,141 @@ namespace MadrasGethu.EditorTools
             importer.importAnimation = false;
             importer.SaveAndReimport();
 
-            // Mixamo embeds textures in the FBX; extract them so the materials show skin and clothes.
-            string textureFolder = GeneratedFolder + "/Textures/" + Path.GetFileNameWithoutExtension(path);
-            if (!AssetDatabase.IsValidFolder(textureFolder))
-            {
-                EnsureFolder(GeneratedFolder + "/Textures");
-                EnsureFolder(textureFolder);
-                if (importer.ExtractTextures(textureFolder))
-                {
-                    AssetDatabase.Refresh();
-                    importer.SaveAndReimport();
-                }
-            }
+            SetupMaterials(path, importer);
 
             var avatar = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Avatar>().FirstOrDefault();
             return avatar != null && avatar.isValid && avatar.isHuman ? avatar : null;
+        }
+
+        // ------------------------------------------------------------------ materials (colours)
+
+        /// <summary>
+        /// Makes skin and clothes show up: extracts textures and materials from the FBX into editable files,
+        /// switches them to the project's lit shader (URP) and plugs in colour/normal textures that are missing.
+        /// </summary>
+        static void SetupMaterials(string modelPath, ModelImporter importer)
+        {
+            string modelName = Path.GetFileNameWithoutExtension(modelPath);
+            string textureFolder = GeneratedFolder + "/Textures/" + modelName;
+            string materialFolder = GeneratedFolder + "/Materials/" + modelName;
+            EnsureFolder(textureFolder);
+            EnsureFolder(materialFolder);
+
+            // 1. Textures embedded in the FBX (Mixamo, Tripo) -> real texture files.
+            if (AssetDatabase.FindAssets("t:Texture2D", new[] { textureFolder }).Length == 0)
+            {
+                importer.ExtractTextures(textureFolder);
+                AssetDatabase.Refresh();
+            }
+
+            // 2. Materials embedded in the FBX -> editable .mat files.
+            bool extracted = false;
+            foreach (var mat in AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Material>())
+            {
+                string matPath = materialFolder + "/" + SafeFileName(mat.name) + ".mat";
+                if (File.Exists(matPath)) continue;
+                if (string.IsNullOrEmpty(AssetDatabase.ExtractAsset(mat, matPath)))
+                    extracted = true;
+            }
+            if (extracted)
+            {
+                AssetDatabase.WriteImportSettingsIfDirty(modelPath);
+                AssetDatabase.ImportAsset(modelPath, ImportAssetOptions.ForceUpdate);
+            }
+
+            // 3. Make every material the model uses render with its textures.
+            var textures = new List<Texture2D>();
+            foreach (var folder in new[] { textureFolder, Path.GetDirectoryName(modelPath).Replace('\\', '/') })
+                foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
+                {
+                    var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(guid));
+                    if (tex != null && !textures.Contains(tex)) textures.Add(tex);
+                }
+
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            if (model == null) return;
+            var materials = model.GetComponentsInChildren<Renderer>(true)
+                .SelectMany(r => r.sharedMaterials)
+                .Where(m => m != null)
+                .Distinct()
+                .ToList();
+            foreach (var mat in materials)
+                FixMaterial(mat, textures);
+            AssetDatabase.SaveAssets();
+        }
+
+        static void FixMaterial(Material mat, List<Texture2D> textures)
+        {
+            // Only materials saved as their own files can be edited (embedded ones are read-only).
+            if (!AssetDatabase.GetAssetPath(mat).EndsWith(".mat")) return;
+
+            Texture main = GetTex(mat, "_BaseMap") ?? GetTex(mat, "_MainTex");
+            Texture normal = GetTex(mat, "_BumpMap");
+
+            bool urp = GraphicsSettings.currentRenderPipeline != null;
+            var lit = Shader.Find(urp ? "Universal Render Pipeline/Lit" : "Standard");
+            if (lit != null && mat.shader != lit) mat.shader = lit;
+
+            if (main == null) main = BestTexture(textures, mat.name, new[] { "basecolor", "diffuse", "albedo", "color", "diff", "col" }, new[] { "normal", "rough", "metal", "spec", "occlusion", "_ao", "gloss", "height" });
+            if (main == null && textures.Count == 1) main = textures[0];
+            if (normal == null) normal = BestTexture(textures, mat.name, new[] { "normal", "nrm", "_nor" }, new string[0]);
+
+            if (main != null)
+            {
+                SetTex(mat, "_BaseMap", main);
+                SetTex(mat, "_MainTex", main);
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", Color.white);
+                if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
+            }
+            if (normal != null)
+            {
+                var ti = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(normal)) as TextureImporter;
+                if (ti != null && ti.textureType != TextureImporterType.NormalMap)
+                {
+                    ti.textureType = TextureImporterType.NormalMap;
+                    ti.SaveAndReimport();
+                }
+                SetTex(mat, "_BumpMap", normal);
+                mat.EnableKeyword("_NORMALMAP");
+            }
+            // Skin and cloth are not shiny; imported FBX materials often are.
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.25f);
+            if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.25f);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0f);
+            EditorUtility.SetDirty(mat);
+        }
+
+        static Texture GetTex(Material mat, string property) =>
+            mat.HasProperty(property) ? mat.GetTexture(property) : null;
+
+        static void SetTex(Material mat, string property, Texture tex)
+        {
+            if (mat.HasProperty(property)) mat.SetTexture(property, tex);
+        }
+
+        /// <summary>Picks the texture whose name best matches the material name and the wanted map type.</summary>
+        static Texture2D BestTexture(List<Texture2D> textures, string materialName, string[] wanted, string[] unwanted)
+        {
+            string mat = Normalize(materialName);
+            Texture2D best = null;
+            int bestScore = 0;
+            foreach (var tex in textures)
+            {
+                string n = Normalize(tex.name);
+                if (unwanted.Any(u => n.Contains(Normalize(u)))) continue;
+                int score = 0;
+                if (wanted.Any(w => n.Contains(Normalize(w)))) score += 10;
+                else continue;
+                if (mat.Length > 0 && (n.Contains(mat) || mat.Contains(n))) score += 5;
+                if (score > bestScore) { bestScore = score; best = tex; }
+            }
+            return best;
+        }
+
+        static string SafeFileName(string name)
+        {
+            foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
+            return name.Replace(':', '_');
         }
 
         static AnimationClip SetupAnimation(string path, Slot slot, Avatar sourceAvatar)
@@ -462,7 +660,7 @@ namespace MadrasGethu.EditorTools
             }
         }
 
-        static string AssignToBootstrap(Dictionary<string, GameObject> prefabs, string heroPath)
+        static string AssignToBootstrap(Dictionary<string, GameObject> prefabs, string heroPath, AnimatorController controller)
         {
             if (!File.Exists(ArenaScenePath))
                 return "The arena scene does not exist yet. Run 'Madras Gethu > Create Kasimedu Arena Scene', then run this tool again.";
@@ -490,6 +688,7 @@ namespace MadrasGethu.EditorTools
             bootstrap.enemyModelPrefab = rowdy != null ? rowdy : hero;
             bootstrap.thadiyanModelPrefab = Lookup(prefabs, "thadiyan");
             bootstrap.bossModelPrefab = Lookup(prefabs, "boss");
+            bootstrap.fighterAnimator = controller;
             EditorUtility.SetDirty(bootstrap);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);

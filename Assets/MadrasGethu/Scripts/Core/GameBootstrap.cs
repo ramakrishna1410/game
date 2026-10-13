@@ -17,6 +17,8 @@ namespace MadrasGethu
         public GameObject thadiyanModelPrefab;
         [Tooltip("Optional: model for the boss, Kumaran Anna.")]
         public GameObject bossModelPrefab;
+        [Tooltip("Animator Controller for all real characters (Art/Generated/FighterAnimator). Set by the Setup Characters tool.")]
+        public RuntimeAnimatorController fighterAnimator;
 
         [Tooltip("Build the placeholder harbour. Turn off once you have your own level geometry in the scene.")]
         public bool buildArena = true;
@@ -30,6 +32,7 @@ namespace MadrasGethu
             CharacterFactory.EnemyModelPrefab = enemyModelPrefab;
             CharacterFactory.ThadiyanModelPrefab = thadiyanModelPrefab;
             CharacterFactory.BossModelPrefab = bossModelPrefab;
+            CharacterFactory.FighterAnimator = fighterAnimator;
 
             if (buildArena)
             {
