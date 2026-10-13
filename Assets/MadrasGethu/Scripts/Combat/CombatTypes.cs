@@ -16,8 +16,25 @@ namespace MadrasGethu
         Flinch, Knockdown, GetUp, Dead,
         Windup, Taunt,
         Jump, FlyingKick, DodgeLeft, DodgeRight, DodgeBack, Roll,
-        Headbutt, Push, Parry, StaggerBack
+        Headbutt, Push, Parry, StaggerBack,
+        // Enemy-only moves
+        RowdySwing, RowdyKick, RowdyShove, RowdyGrab, BearHug, Charge, GroundPound, Roar,
+        // Weapons and objects (hero and enemies)
+        PickUp, WeaponSwing, WeaponSmash, ThrowObject,
+        Beg
     }
+
+    /// <summary>What kind of threat an enemy attack is, which decides how the hero must answer it.</summary>
+    public enum AttackKind
+    {
+        Strike,        // red: parry or block
+        Unblockable,   // orange: dodge
+        Grab,          // yellow: dodge, or break free once caught
+        Charge,        // orange: running shoulder charge, dodge sideways
+        GroundPound,   // orange: area slam around the attacker, get out of range
+    }
+
+    public enum TelegraphColor { None, Red, Orange, Yellow }
 
     public enum HitResult { Ignored, Hit, Blocked }
 
@@ -53,6 +70,9 @@ namespace MadrasGethu
         public bool unblockable;
         public bool hitsDowned;
         public bool announce;             // show the move's name on screen (specials and finishers)
+        public AttackKind kind;           // enemies: how the hero has to respond
+        public bool feint;                // enemies: fake attack that punishes an early parry
+        public float weight = 1f;         // enemies: how often this move is picked
         public float hitStop = 0.05f;
         public float shake = 0.1f;
 
@@ -62,6 +82,13 @@ namespace MadrasGethu
             this.pose = pose;
             this.damage = damage;
         }
+
+        public TelegraphColor Telegraph =>
+            kind == AttackKind.Grab ? TelegraphColor.Yellow
+            : kind == AttackKind.Strike && !unblockable ? TelegraphColor.Red
+            : TelegraphColor.Orange;
+
+        public AttackData Clone() => (AttackData)MemberwiseClone();
 
         public HitInfo ToHit(Fighter attacker, Vector3 direction, float damageMultiplier = 1f)
         {

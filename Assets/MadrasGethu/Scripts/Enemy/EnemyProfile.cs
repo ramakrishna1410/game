@@ -21,6 +21,29 @@ namespace MadrasGethu
         public Color shirt, pants, accent;
         public List<AttackData> attacks = new List<AttackData>();
 
+        // Enemy-only behaviour
+        public List<AttackData[]> combos = new List<AttackData[]>();   // chained strings (boss)
+        public float comboChance;
+        public float feintChance;
+        public bool throwsObjects;          // waiting rowdies lob bottles / bricks
+        public bool picksUpWeapons;         // walks over to a lathi / pipe on the street
+        public bool countersBlocks;         // blocks a flurry and hits back (boss)
+        public bool hasPhaseTwo;            // boss rage at half health
+        public string grabOutcome = "headbutt";   // headbutt, bearhug, throw
+
+        public AttackData PickAttack()
+        {
+            float total = 0f;
+            foreach (var a in attacks) total += a.weight;
+            float r = Random.value * total;
+            foreach (var a in attacks)
+            {
+                r -= a.weight;
+                if (r <= 0f) return a;
+            }
+            return attacks[attacks.Count - 1];
+        }
+
         public static EnemyProfile Get(EnemyKind kind)
         {
             switch (kind)
@@ -38,6 +61,7 @@ namespace MadrasGethu
             new Color(0.3f, 0.55f, 0.3f), new Color(0.55f, 0.25f, 0.55f),
         };
 
+        /// <summary>Untrained street thug: wild swings, dirty kicks, shoves, grabs and thrown bottles.</summary>
         static EnemyProfile Rowdy()
         {
             var p = new EnemyProfile
@@ -53,14 +77,22 @@ namespace MadrasGethu
                 shirt = RowdyShirts[Random.Range(0, RowdyShirts.Length)],
                 pants = new Color(0.9f, 0.88f, 0.82f),           // white veshti / lungi
                 accent = new Color(0.25f, 0.15f, 0.1f),
+                throwsObjects = true,
+                picksUpWeapons = true,
+                grabOutcome = "headbutt",
             };
-            p.attacks.Add(new AttackData("Punch", FighterPose.Cross, 8f)
-                { startup = 0.5f, recovery = 0.5f, range = 1.5f, lunge = 1.2f, knockback = 3f });
-            p.attacks.Add(new AttackData("Kick", FighterPose.Kick, 10f)
-                { startup = 0.6f, recovery = 0.6f, range = 1.8f, lunge = 1.2f, knockback = 4f });
+            p.attacks.Add(new AttackData("Wild Swing", FighterPose.RowdySwing, 9f)
+                { weight = 3.5f, startup = 0.55f, recovery = 0.6f, range = 1.6f, lunge = 1.3f, knockback = 3f });
+            p.attacks.Add(new AttackData("Stomach Kick", FighterPose.RowdyKick, 10f)
+                { weight = 2.5f, startup = 0.6f, recovery = 0.6f, range = 1.8f, lunge = 1.2f, knockback = 4f });
+            p.attacks.Add(new AttackData("Shove", FighterPose.RowdyShove, 4f)
+                { weight = 2f, startup = 0.5f, recovery = 0.5f, range = 1.4f, lunge = 1.2f, knockback = 7f });
+            p.attacks.Add(new AttackData("Grab", FighterPose.RowdyGrab, 0f)
+                { weight = 2f, kind = AttackKind.Grab, startup = 0.6f, recovery = 0.6f, range = 1.4f, lunge = 1.4f });
             return p;
         }
 
+        /// <summary>Slow heavy bruiser: shoulder charge, ground pound, bear hug. Doesn't flinch from light hits.</summary>
         static EnemyProfile Thadiyan()
         {
             var p = new EnemyProfile
@@ -78,15 +110,22 @@ namespace MadrasGethu
                 shirt = new Color(0.12f, 0.12f, 0.14f),
                 pants = new Color(0.35f, 0.25f, 0.5f),
                 accent = new Color(0.9f, 0.75f, 0.2f),          // gold chain-belt
+                grabOutcome = "bearhug",
             };
-            p.attacks.Add(new AttackData("Haymaker", FighterPose.Haymaker, 18f)
-                { startup = 0.75f, recovery = 0.7f, range = 1.9f, lunge = 1.5f, knockback = 6f, heavy = true });
-            p.attacks.Add(new AttackData("Overhead Slam", FighterPose.Slam, 24f)
-                { startup = 0.95f, recovery = 0.9f, range = 2.1f, lunge = 1.0f, knockback = 5f, launch = 5f,
-                  heavy = true, unblockable = true, arc = 120f });
+            p.attacks.Add(new AttackData("Haymaker", FighterPose.RowdySwing, 18f)
+                { weight = 2f, startup = 0.75f, recovery = 0.7f, range = 1.9f, lunge = 1.5f, knockback = 6f, heavy = true });
+            p.attacks.Add(new AttackData("Ground Pound", FighterPose.GroundPound, 20f)
+                { weight = 1.5f, kind = AttackKind.GroundPound, startup = 0.95f, recovery = 1.0f, range = 2.8f, arc = 360f,
+                  lunge = 0.5f, knockback = 6f, launch = 4f, heavy = true, unblockable = true });
+            p.attacks.Add(new AttackData("Shoulder Charge", FighterPose.Charge, 22f)
+                { weight = 1.5f, kind = AttackKind.Charge, startup = 0.75f, recovery = 0.8f, range = 6f,
+                  knockback = 10f, launch = 4f, heavy = true, unblockable = true });
+            p.attacks.Add(new AttackData("Bear Hug", FighterPose.BearHug, 0f)
+                { weight = 1.2f, kind = AttackKind.Grab, startup = 0.75f, recovery = 0.8f, range = 1.6f, lunge = 1.5f });
             return p;
         }
 
+        /// <summary>Experienced fighter: combos, feints, counters a flurry, grabs and throws; rages at half health.</summary>
         static EnemyProfile Boss()
         {
             var p = new EnemyProfile
@@ -99,19 +138,33 @@ namespace MadrasGethu
                 poise = 4,
                 blockChance = 0.4f,
                 grabbable = false,
-                attackCooldown = new Vector2(1.4f, 2.6f),
+                attackCooldown = new Vector2(1.6f, 2.8f),
                 gethuReward = 40f,
                 shirt = new Color(0.95f, 0.95f, 0.95f),          // spotless white politician shirt
                 pants = new Color(0.95f, 0.95f, 0.95f),
                 accent = new Color(0.1f, 0.5f, 0.2f),            // party-colour veshti border
+                comboChance = 0.55f,
+                feintChance = 0.2f,
+                countersBlocks = true,
+                hasPhaseTwo = true,
+                grabOutcome = "throw",
             };
-            p.attacks.Add(new AttackData("Jab", FighterPose.Jab, 10f)
-                { startup = 0.45f, recovery = 0.4f, range = 1.6f, lunge = 1.4f, knockback = 3f });
-            p.attacks.Add(new AttackData("Hook", FighterPose.Hook, 16f)
-                { startup = 0.6f, recovery = 0.55f, range = 1.7f, lunge = 1.4f, knockback = 5f, arc = 140f, heavy = true });
-            p.attacks.Add(new AttackData("Rush Kick", FighterPose.Kick, 22f)
-                { startup = 0.8f, recovery = 0.8f, range = 2.4f, lunge = 3f, knockback = 7f, launch = 4f,
-                  heavy = true, unblockable = true });
+            var jab = new AttackData("Jab", FighterPose.Jab, 10f)
+                { startup = 0.42f, recovery = 0.4f, range = 1.6f, lunge = 1.4f, knockback = 3f };
+            var hook = new AttackData("Hook", FighterPose.Hook, 15f)
+                { startup = 0.55f, recovery = 0.55f, range = 1.7f, lunge = 1.4f, knockback = 5f, arc = 140f, heavy = true };
+            var rushKick = new AttackData("Rush Kick", FighterPose.Kick, 20f)
+                { startup = 0.75f, recovery = 0.8f, range = 2.4f, lunge = 3f, knockback = 7f, launch = 4f,
+                  heavy = true, unblockable = true };
+            var grab = new AttackData("Grab Throw", FighterPose.RowdyGrab, 0f)
+                { kind = AttackKind.Grab, startup = 0.55f, recovery = 0.7f, range = 1.5f, lunge = 1.5f };
+            p.attacks.Add(jab);
+            p.attacks.Add(hook);
+            p.attacks.Add(rushKick);
+            p.attacks.Add(grab);
+            p.combos.Add(new[] { jab, jab, hook });
+            p.combos.Add(new[] { jab, hook, rushKick });
+            p.combos.Add(new[] { hook, jab });
             return p;
         }
     }

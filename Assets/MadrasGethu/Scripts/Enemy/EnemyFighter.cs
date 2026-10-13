@@ -4,14 +4,25 @@ using UnityEngine;
 namespace MadrasGethu
 {
     /// <summary>
-    /// Street rowdy AI, Assassin's Creed / Sleeping Dogs style.
-    /// Rowdies walk in, then either WAIT in a wide ring (fighting stance, pacing, watching, the odd taunt)
-    /// or are ENGAGED (close to the hero, allowed to attack). EnemyDirector decides who is engaged and
-    /// lets only one attack at a time. Every attack is telegraphed with a red flash: the counter window.
+    /// Street enemy AI, Assassin's Creed / Sleeping Dogs style, with moves only enemies have.
+    ///
+    /// Crowd: rowdies WAIT in a wide ring (stance, pacing, taunts, the odd thrown bottle, walking over to
+    /// grab a lathi) or are ENGAGED (close, allowed to attack). EnemyDirector lets one attack at a time.
+    ///
+    /// Every attack is telegraphed by colour: RED strike (parry/block), ORANGE unblockable / charge /
+    /// ground pound (dodge), YELLOW grab (dodge, or mash E to break free once caught).
+    ///
+    /// Rowdy: wild swings, stomach kicks, shoves, collar grabs, hold-from-behind, thrown bottles, weapons.
+    /// Thadiyan: shoulder charge, ground pound, bear hug, armour against light hits.
+    /// Boss: combos, feints, counters a flurry, grab-throw, and at half health rages with an iron pipe.
     /// </summary>
     public class EnemyFighter : Fighter
     {
-        enum AIState { Approach, Wait, Engage, CloseIn, Windup, Recover, Stagger, Down, GetUp, Grabbed, Dead }
+        enum AIState
+        {
+            Approach, Wait, Engage, CloseIn, Windup, Recover, Stagger, Down, GetUp, Grabbed, Dead,
+            Charging, HoldingHero, ThrowingObject, SeekWeapon, Begging, Fleeing, Roaring,
+        }
 
         public EnemyKind kind;
         public EnemyProfile Profile { get; private set; }
@@ -30,21 +41,63 @@ namespace MadrasGethu
         int poiseHits;
         bool hasToken;
 
+        // Combos and feints (boss)
+        AttackData[] currentCombo;
+        int comboStep;
+        bool feinting;
+        int blockStreak;
+        float lastBlockTime;
+
+        // Charge (Thadiyan)
+        Vector3 chargeDirection;
+        bool chargeHit;
+
+        // Holding the hero (grab / bear hug / hold from behind)
+        bool holdFromBehind;
+        float squeezeTimer;
+
+        // Weapons and thrown objects
+        public Weapon HeldWeapon { get; private set; }
+        Weapon seekTarget;
+        float nextWeaponCheck;
+        float nextThrowTime;
+        bool throwReleased;
+        static float globalNextThrow;
+        static readonly HashSet<Weapon> reservedWeapons = new HashSet<Weapon>();
+
+        // Mood
+        bool phaseTwo;
+        bool hurtShouted;
+        bool surrendered;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            globalNextThrow = 0f;
+            reservedWeapons.Clear();
+        }
+
         // Being thrown into other enemies
         Fighter thrower;
         float thrownTimer;
         readonly HashSet<Fighter> thrownHits = new HashSet<Fighter>();
 
         public bool IsTelegraphing => state == AIState.Windup;
+        public TelegraphColor CurrentTelegraph => state == AIState.Windup && currentAttack != null ? currentAttack.Telegraph : TelegraphColor.None;
+        public bool IsFeinting => state == AIState.Windup && feinting;
         public bool IsGrabbed => state == AIState.Grabbed;
+        public bool IsBegging => state == AIState.Begging;
+        public bool IsFleeing => state == AIState.Fleeing;
         public override bool IsDowned => state == AIState.Down || state == AIState.GetUp;
         public override bool CanBeTargeted => !IsDead && state != AIState.Grabbed;
         public bool IsBoss => kind == EnemyKind.Boss;
-        bool Waiting => state == AIState.Wait || state == AIState.Approach;
 
         public bool CanBeGrabbed =>
-            !IsDead && !IsDowned && state != AIState.Grabbed &&
+            !IsDead && !IsDowned && state != AIState.Grabbed && state != AIState.HoldingHero &&
             (Profile.grabbable || state == AIState.Stagger);
+
+        float MoodSpeed => !IsBoss && HealthFraction < 0.3f ? 0.7f : phaseTwo ? 1.15f : 1f;
+        float MoodCooldown => !IsBoss && HealthFraction < 0.3f ? 1.4f : phaseTwo ? 0.7f : 1f;
 
         public void Configure(EnemyKind enemyKind)
         {
@@ -58,6 +111,8 @@ namespace MadrasGethu
             engageRadius = Random.Range(2.3f, 3.0f);
             strafeDirection = Random.value < 0.5f ? -1f : 1f;
             nextTauntTime = Time.time + Random.Range(3f, 8f);
+            nextThrowTime = Time.time + Random.Range(6f, 12f);
+            nextWeaponCheck = Time.time + Random.Range(2f, 5f);
         }
 
         protected override void Awake()
@@ -71,6 +126,8 @@ namespace MadrasGethu
         void Update()
         {
             Visual.SetAnimatorBool("Held", state == AIState.Grabbed);
+            Visual.SetAnimatorBool("Holding", state == AIState.HoldingHero);
+            Visual.SetAnimatorBool("Begging", state == AIState.Begging);
             if (state == AIState.Dead) return;
             float dt = Time.deltaTime;
             stateTimer -= dt;
@@ -84,9 +141,16 @@ namespace MadrasGethu
                 HitOthersWhileThrown();
             }
 
+            if (!hurtShouted && !IsBoss && HealthFraction < 0.3f)
+            {
+                hurtShouted = true;
+                Shouts.Say(this, ShoutType.Hurt);
+            }
+
             if (!playerAlive && state != AIState.Down && state != AIState.GetUp && state != AIState.Grabbed)
             {
                 // The hero is down for good: stand and gloat.
+                if (state == AIState.HoldingHero) StopHoldingHero();
                 ReleaseToken();
                 Visual.SetTelegraph(false);
                 Visual.SetCombatStance(false);
@@ -101,7 +165,7 @@ namespace MadrasGethu
             {
                 case AIState.Approach:
                     Visual.SetCombatStance(dist < 9f);
-                    MoveTowards(dirToPlayer, Profile.runSpeed);
+                    MoveTowards(dirToPlayer, Profile.runSpeed * MoodSpeed);
                     if (dist <= waitRadius + 1f) state = AIState.Wait;
                     break;
 
@@ -116,7 +180,9 @@ namespace MadrasGethu
                             break;
                         }
                     }
-                    HoldRing(dirToPlayer, dist, waitRadius, 1.0f, allowTaunt: true);
+                    if (TryStartThrow(player, dist)) break;
+                    if (TryStartWeaponSeek()) break;
+                    HoldRing(dirToPlayer, dist, waitRadius, 1.0f * MoodSpeed, allowTaunt: true);
                     break;
 
                 case AIState.Engage:
@@ -125,35 +191,77 @@ namespace MadrasGethu
                         state = AIState.Wait;   // swapped out: step back and watch
                         break;
                     }
-                    HoldRing(dirToPlayer, dist, engageRadius, Profile.circleSpeed, allowTaunt: false);
-                    if (Time.time >= nextAttackTime && !player.IsDowned && dist < engageRadius + 1.5f
+                    HoldRing(dirToPlayer, dist, engageRadius, Profile.circleSpeed * MoodSpeed, allowTaunt: false);
+                    if (Time.time >= nextAttackTime && !player.IsDowned && !player.IsHeld && dist < engageRadius + 1.5f
                         && EnemyDirector.RequestAttack(this))
                     {
                         hasToken = true;
-                        currentAttack = Profile.attacks[Random.Range(0, Profile.attacks.Count)];
+                        ChooseAttack(player, dist);
                         state = AIState.CloseIn;
                         stateTimer = 2.5f;
+                    }
+                    else if (Time.time >= nextAttackTime && player.IsHeld && !player.IsHeldBy(this) && dist < engageRadius + 2f
+                             && EnemyDirector.RequestAttack(this))
+                    {
+                        // A friend is holding him from behind: free hits.
+                        hasToken = true;
+                        currentAttack = Profile.attacks[0];
+                        currentCombo = null;
+                        feinting = false;
+                        state = AIState.CloseIn;
+                        stateTimer = 2f;
                     }
                     break;
 
                 case AIState.CloseIn:
-                    MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.2f));
-                    if (dist <= currentAttack.range * 0.85f + player.radius)
+                {
+                    bool charge = currentAttack.kind == AttackKind.Charge;
+                    float reach = charge ? currentAttack.range : currentAttack.range * 0.85f + player.radius;
+                    if (!charge) MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.2f) * MoodSpeed);
+                    else Motor.FaceDirection(dirToPlayer);
+                    if (dist <= reach)
                         BeginWindup();
                     else if (stateTimer <= 0f || player.IsDowned)
                         EndAttack();
                     break;
+                }
 
                 case AIState.Windup:
                     Motor.FaceDirection(dirToPlayer);
-                    if (stateTimer <= 0f) ReleaseAttack(dist);
+                    if (stateTimer <= 0f) ReleaseAttack(dist, dirToPlayer, player);
                     break;
 
                 case AIState.Recover:
-                    if (stateTimer <= 0f) EndAttack();
+                    if (stateTimer <= 0f) ContinueComboOrEnd(player, dist);
+                    break;
+
+                case AIState.Charging:
+                    UpdateCharge(player);
+                    break;
+
+                case AIState.HoldingHero:
+                    UpdateHoldingHero(player);
+                    break;
+
+                case AIState.ThrowingObject:
+                    Motor.FaceDirection(dirToPlayer);
+                    if (!throwReleased && stateTimer <= 0.3f)
+                    {
+                        throwReleased = true;
+                        ReleaseThrownObject(player);
+                    }
+                    if (stateTimer <= 0f) state = AIState.Wait;
+                    break;
+
+                case AIState.SeekWeapon:
+                    UpdateSeekWeapon();
                     break;
 
                 case AIState.Stagger:
+                    if (stateTimer <= 0f) ResumeStance();
+                    break;
+
+                case AIState.Roaring:
                     if (stateTimer <= 0f) ResumeStance();
                     break;
 
@@ -180,6 +288,15 @@ namespace MadrasGethu
                     }
                     break;
 
+                case AIState.Begging:
+                    Motor.FaceDirection(dirToPlayer);
+                    if (stateTimer <= 0f) StartFleeing();   // nobody decided: he makes a run for it
+                    break;
+
+                case AIState.Fleeing:
+                    UpdateFleeing(dirToPlayer);
+                    break;
+
                 case AIState.Grabbed:
                     break;
             }
@@ -188,6 +305,7 @@ namespace MadrasGethu
         /// <summary>Back to fighting stance: close in if this rowdy holds a combat slot, otherwise wait.</summary>
         void ResumeStance()
         {
+            if (surrendered) { StartFleeing(); return; }
             state = EnemyDirector.IsEngaged(this) ? AIState.Engage : AIState.Wait;
         }
 
@@ -211,7 +329,7 @@ namespace MadrasGethu
             // Far behind (the hero ran off): jog to catch up.
             if (dist > ringRadius + 3f)
             {
-                MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.5f));
+                MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.5f) * MoodSpeed);
                 return;
             }
 
@@ -224,6 +342,7 @@ namespace MadrasGethu
                 if (!pacing && allowTaunt && Time.time > nextTauntTime && Random.value < 0.35f)
                 {
                     Visual.Play(FighterPose.Taunt, 1.5f);
+                    Shouts.Say(this, ShoutType.Taunt, 0.6f);
                     nextTauntTime = Time.time + Random.Range(6f, 12f);
                 }
             }
@@ -251,36 +370,152 @@ namespace MadrasGethu
             return push;
         }
 
-        // ------------------------------------------------------------------ attacking
+        // ------------------------------------------------------------------ choosing and making attacks
+
+        void ChooseAttack(PlayerFighter player, float dist)
+        {
+            currentCombo = null;
+            comboStep = 0;
+            feinting = false;
+
+            if (HeldWeapon != null)
+            {
+                bool heavy = Random.value < 0.3f;
+                currentAttack = HeldWeapon.MakeAttack(heavy);
+                currentAttack.startup = heavy ? 0.8f : 0.55f;
+                currentAttack.recovery = heavy ? 0.8f : 0.6f;
+                currentAttack.announce = false;
+                currentAttack.gethuGain = 0f;
+                if (heavy) currentAttack.unblockable = true;   // orange: dodge the overhead smash
+                return;
+            }
+
+            if (Profile.combos.Count > 0 && Random.value < Profile.comboChance)
+            {
+                currentCombo = Profile.combos[Random.Range(0, Profile.combos.Count)];
+                currentAttack = currentCombo[0];
+                return;
+            }
+
+            currentAttack = Profile.PickAttack();
+            if (currentAttack.kind == AttackKind.Strike && !currentAttack.unblockable && Random.value < Profile.feintChance)
+                feinting = true;
+        }
 
         void BeginWindup()
         {
             state = AIState.Windup;
-            stateTimer = currentAttack.startup;
-            Visual.Play(FighterPose.Windup, currentAttack.startup, currentAttack.startup);
-            Visual.SetTelegraph(true);
-            if (currentAttack.unblockable && GameManager.Instance != null)
-                GameManager.Instance.AddPopup("UNBLOCKABLE!", Center + Vector3.up, new Color(1f, 0.4f, 0.1f), 0.8f);
+            float startup = currentAttack.startup;
+            if (currentCombo != null && comboStep > 0) startup = Mathf.Max(0.28f, startup * 0.65f);   // combo follow-ups come faster
+            stateTimer = startup;
+            Visual.Play(FighterPose.Windup, startup, startup);
+            Visual.SetTelegraph(currentAttack.Telegraph);
+
+            if (GameManager.Instance != null)
+            {
+                if (currentAttack.Telegraph == TelegraphColor.Orange)
+                    GameManager.Instance.AddPopup(currentAttack.kind == AttackKind.Charge ? "CHARGE! DODGE!" : "UNBLOCKABLE!",
+                        Center + Vector3.up, new Color(1f, 0.55f, 0.1f), 0.8f);
+                else if (currentAttack.Telegraph == TelegraphColor.Yellow)
+                    GameManager.Instance.AddPopup("GRAB! DODGE!", Center + Vector3.up, new Color(1f, 0.9f, 0.2f), 0.8f);
+            }
+            if (comboStep == 0) Shouts.Say(this, currentAttack.kind == AttackKind.Grab ? ShoutType.Grab : ShoutType.Attack, 0.3f);
         }
 
-        void ReleaseAttack(float dist)
+        void ReleaseAttack(float dist, Vector3 dirToPlayer, PlayerFighter player)
         {
             Visual.SetTelegraph(false);
+
+            if (feinting)
+            {
+                // Fake: pull the punch, step back, laugh.
+                feinting = false;
+                Visual.Play(FighterPose.Taunt, 0.6f, 0.6f);
+                Motor.AddLunge(-transform.forward, 0.5f);
+                Shouts.Say(this, ShoutType.Feint, 0.8f);
+                state = AIState.Recover;
+                stateTimer = 0.5f;
+                return;
+            }
+
+            switch (currentAttack.kind)
+            {
+                case AttackKind.Charge:
+                    chargeDirection = dirToPlayer;
+                    chargeHit = false;
+                    state = AIState.Charging;
+                    stateTimer = 1.3f;
+                    Visual.Play(FighterPose.Charge, 1.3f, 1.3f);
+                    return;
+
+                case AttackKind.Grab:
+                {
+                    Visual.Play(currentAttack.pose, 0.4f, 0.6f);
+                    Motor.AddLunge(transform.forward, Mathf.Clamp(dist - 0.8f, 0f, currentAttack.lunge));
+                    bool inFront = Vector3.Angle(transform.forward, Flat(player.transform.position - transform.position)) < 60f;
+                    if (dist <= currentAttack.range + player.radius + 0.4f && inFront)
+                    {
+                        // From behind him (he's facing away) -> hold him for the gang.
+                        holdFromBehind = Vector3.Dot(player.transform.forward, dirToPlayer) > 0.35f && kind == EnemyKind.Rowdy;
+                        if (player.TryGetGrabbedBy(this, holdFromBehind))
+                        {
+                            state = AIState.HoldingHero;
+                            stateTimer = HoldDuration;
+                            squeezeTimer = 0.4f;
+                            Visual.SetGrip(player, holdFromBehind);
+                            EnemyDirector.HeroHeldFromBehind = holdFromBehind;
+                            if (GameManager.Instance != null)
+                                GameManager.Instance.AddPopup(holdFromBehind ? "HELD FROM BEHIND!" : currentAttack.name.ToUpper() + "!",
+                                    player.Center + Vector3.up, new Color(1f, 0.85f, 0.2f), 0.9f);
+                            return;
+                        }
+                    }
+                    state = AIState.Recover;   // missed: stumbles past
+                    stateTimer = currentAttack.recovery;
+                    return;
+                }
+            }
+
+            // Strikes, weapon swings, ground pound.
             Visual.Play(currentAttack.pose, 0.3f, currentAttack.recovery + 0.3f);
             float lunge = Mathf.Clamp(dist - currentAttack.range * 0.6f, 0f, currentAttack.lunge);
             Motor.AddLunge(transform.forward, lunge);
             var result = CombatUtil.Strike(this, currentAttack);
-            if (result.hits > 0 && GameManager.Instance != null)
+            if (currentAttack.kind == AttackKind.GroundPound)
+            {
+                FX.Dust(transform.position, 28);
+                if (GameManager.Instance != null) GameManager.Instance.Shake(0.45f, 0.35f);
+            }
+            else if (result.hits > 0 && GameManager.Instance != null)
+            {
                 GameManager.Instance.Shake(currentAttack.heavy ? 0.25f : 0.12f);
+            }
+            if (result.Connected && HeldWeapon != null && HeldWeapon.RegisterHit()) HeldWeapon = null;
             state = AIState.Recover;
             stateTimer = currentAttack.recovery;
+            if (currentCombo != null && comboStep < currentCombo.Length - 1) stateTimer = 0.15f;
+        }
+
+        void ContinueComboOrEnd(PlayerFighter player, float dist)
+        {
+            if (currentCombo != null && comboStep < currentCombo.Length - 1 && player != null && !player.IsDowned && !player.IsDead)
+            {
+                comboStep++;
+                currentAttack = currentCombo[comboStep];
+                if (dist <= currentAttack.range + player.radius + 0.6f) BeginWindup();
+                else { state = AIState.CloseIn; stateTimer = 1.2f; }
+                return;
+            }
+            EndAttack();
         }
 
         void EndAttack()
         {
+            currentCombo = null;
+            feinting = false;
             ReleaseToken();
             ResumeStance();
-            nextAttackTime = Time.time + Random.Range(Profile.attackCooldown.x, Profile.attackCooldown.y);
+            nextAttackTime = Time.time + Random.Range(Profile.attackCooldown.x, Profile.attackCooldown.y) * MoodCooldown;
         }
 
         void ReleaseToken()
@@ -293,12 +528,304 @@ namespace MadrasGethu
         /// <summary>Called when the player counters this enemy's telegraphed attack.</summary>
         public void Countered() => Parried(true, -transform.forward);
 
+        /// <summary>The hero bit on a feint: punish him with a quick, unparryable jab.</summary>
+        public void PunishParry(PlayerFighter hero)
+        {
+            feinting = false;
+            Visual.SetTelegraph(false);
+            Visual.Play(FighterPose.Jab, 0.3f, 0.4f);
+            Vector3 dir = Flat(hero.transform.position - transform.position).normalized;
+            hero.ReceiveHit(new HitInfo { attacker = this, damage = 12f, direction = dir, knockback = 4f, heavy = true, unblockable = true });
+            Shouts.Say(this, ShoutType.Feint);
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddPopup("FEINT!", Center + Vector3.up, new Color(1f, 0.5f, 0.3f), 1f);
+            state = AIState.Recover;
+            stateTimer = 0.5f;
+        }
+
+        // ------------------------------------------------------------------ Thadiyan charge
+
+        void UpdateCharge(PlayerFighter player)
+        {
+            Motor.SetDesiredVelocity(chargeDirection * 9f, instant: true);
+            Motor.FaceDirection(chargeDirection, true);
+
+            if (!chargeHit && player != null)
+            {
+                float d = Flat(player.transform.position - transform.position).magnitude;
+                if (d < radius + player.radius + 0.45f)
+                {
+                    chargeHit = true;
+                    player.ReceiveHit(currentAttack.ToHit(this, chargeDirection));
+                    if (GameManager.Instance != null) GameManager.Instance.Shake(0.4f, 0.3f);
+                }
+            }
+
+            // Crashing into a prop or a wall leaves him dazed: your opening.
+            var spot = FinisherSpot.FindHit(transform.position, radius + 0.3f);
+            bool wall = Physics.SphereCast(Center, 0.4f, chargeDirection, out var hit, 0.6f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                        && hit.collider.bounds.size.y > 1.2f && Vector3.Dot(hit.normal, Vector3.up) < 0.5f;
+            if (spot != null || wall)
+            {
+                if (spot != null) spot.Break(chargeDirection);
+                FX.Dust(transform.position + chargeDirection * 0.6f, 16);
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.Shake(0.4f, 0.3f);
+                    GameManager.Instance.AddPopup("STUNNED!", Center + Vector3.up, new Color(0.6f, 0.9f, 1f), 1f);
+                }
+                Motor.ClearImpulse();
+                ReleaseToken();
+                state = AIState.Stagger;
+                stateTimer = 1.8f;
+                Visual.Play(FighterPose.StaggerBack, 1.8f, 1.2f);
+                poiseHits = Profile.poise;   // he will flinch from your hits while dazed
+                return;
+            }
+
+            if (stateTimer <= 0f)
+            {
+                state = AIState.Recover;
+                stateTimer = currentAttack.recovery;
+            }
+        }
+
+        // ------------------------------------------------------------------ holding the hero
+
+        float HoldDuration =>
+            holdFromBehind ? 3.0f :
+            Profile.grabOutcome == "bearhug" ? 2.6f :
+            Profile.grabOutcome == "throw" ? 1.4f : 1.8f;
+
+        void UpdateHoldingHero(PlayerFighter player)
+        {
+            if (player == null || !player.IsHeldBy(this))
+            {
+                StopHoldingHero();
+                ResumeStance();
+                return;
+            }
+
+            Vector3 holdPos = transform.position + transform.forward * (holdFromBehind ? 0.5f : 0.6f);
+            Quaternion facing = Quaternion.LookRotation(holdFromBehind ? transform.forward : -transform.forward);
+            player.HeldAt(holdPos, facing);
+
+            if (Profile.grabOutcome == "bearhug" && !holdFromBehind)
+            {
+                squeezeTimer -= Time.deltaTime;
+                if (squeezeTimer <= 0f)
+                {
+                    squeezeTimer = 0.4f;
+                    player.ReceiveHit(new HitInfo { attacker = this, damage = 4f, direction = transform.forward, unblockable = true });
+                    FX.HitSpark(player.Center, false);
+                }
+            }
+
+            if (stateTimer > 0f) return;
+
+            // He didn't break free in time.
+            Vector3 dir = transform.forward;
+            StopHoldingHero();
+            player.ReleasedByEnemy();
+            if (holdFromBehind)
+            {
+                player.ReceiveHit(new HitInfo { attacker = this, damage = 4f, direction = dir, knockback = 5f, unblockable = true });
+            }
+            else if (Profile.grabOutcome == "headbutt")
+            {
+                Visual.Play(FighterPose.Headbutt, 0.4f, 0.5f);
+                player.ReceiveHit(new HitInfo { attacker = this, damage = 12f, direction = dir, knockback = 4f, heavy = true, unblockable = true });
+            }
+            else
+            {
+                // Bear hug or boss: throws him down the street.
+                Visual.Play(FighterPose.Throw, 0.5f, 0.7f);
+                player.ReceiveHit(new HitInfo { attacker = this, damage = 12f, direction = dir, knockback = 9f, launch = 5f, heavy = true, unblockable = true });
+            }
+            state = AIState.Recover;
+            stateTimer = 0.6f;
+        }
+
+        void StopHoldingHero()
+        {
+            Visual.SetGrip(null, false);
+            if (holdFromBehind) EnemyDirector.HeroHeldFromBehind = false;
+            holdFromBehind = false;
+        }
+
+        /// <summary>The hero mashed free: elbow / shove, and the holder stumbles back.</summary>
+        public void HeroBrokeFree(Vector3 pushDirection)
+        {
+            StopHoldingHero();
+            ReleaseToken();
+            state = AIState.Stagger;
+            stateTimer = 1.0f;
+            Visual.Play(FighterPose.StaggerBack, 1.0f, 1.0f);
+            Motor.AddLunge(pushDirection, 1.3f);
+            Shouts.Say(this, ShoutType.Hurt, 0.5f);
+        }
+
+        // ------------------------------------------------------------------ thrown bottles / bricks
+
+        bool TryStartThrow(PlayerFighter player, float dist)
+        {
+            if (!Profile.throwsObjects || HeldWeapon != null || player == null || player.IsDowned) return false;
+            if (Time.time < nextThrowTime || Time.time < globalNextThrow || dist < 4.5f || dist > 11f) return false;
+            nextThrowTime = Time.time + Random.Range(10f, 16f);
+            globalNextThrow = Time.time + Random.Range(4f, 7f);
+            state = AIState.ThrowingObject;
+            stateTimer = 0.7f;
+            throwReleased = false;
+            Visual.Play(FighterPose.ThrowObject, 0.7f, 0.7f);
+            Shouts.Say(this, ShoutType.Throw, 0.6f);
+            return true;
+        }
+
+        void ReleaseThrownObject(PlayerFighter player)
+        {
+            if (player == null) return;
+            Vector3 hand = Visual.RightHand.position;
+            var w = Weapon.Create(Random.value < 0.6f ? WeaponType.Bottle : WeaponType.Brick, hand);
+            w.transform.position = hand;   // Create lays it on the ground; throw it from the hand
+            Vector3 lead = player.Motor.MoveVelocity * 0.4f;
+            w.Throw(this, player.Center + lead);
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddPopup("INCOMING!", player.Center + Vector3.up * 1.2f, new Color(1f, 0.9f, 0.3f), 0.7f);
+        }
+
+        // ------------------------------------------------------------------ picking up weapons
+
+        bool TryStartWeaponSeek()
+        {
+            if (!Profile.picksUpWeapons || HeldWeapon != null || Time.time < nextWeaponCheck) return false;
+            nextWeaponCheck = Time.time + Random.Range(3f, 6f);
+            if (Random.value > 0.4f) return false;
+            var w = Weapon.FindNearbyOnGround(transform.position, 8f);
+            if (w == null || reservedWeapons.Contains(w)) return false;
+            reservedWeapons.Add(w);
+            seekTarget = w;
+            state = AIState.SeekWeapon;
+            stateTimer = 5f;
+            return true;
+        }
+
+        void UpdateSeekWeapon()
+        {
+            if (seekTarget == null || !seekTarget.OnGround || stateTimer <= 0f)
+            {
+                if (seekTarget != null) reservedWeapons.Remove(seekTarget);
+                seekTarget = null;
+                state = AIState.Wait;
+                return;
+            }
+            Vector3 to = Flat(seekTarget.transform.position - transform.position);
+            if (to.magnitude > 0.8f)
+            {
+                MoveTowards(to.normalized, 3f * MoodSpeed);
+                return;
+            }
+            Visual.Play(FighterPose.PickUp, 0.6f, 0.6f);
+            PickUp(seekTarget);
+            reservedWeapons.Remove(seekTarget);
+            seekTarget = null;
+            Shouts.Say(this, ShoutType.PickUp, 0.7f);
+            state = AIState.Wait;
+        }
+
+        public void PickUp(Weapon w)
+        {
+            if (w == null) return;
+            HeldWeapon = w;
+            w.Attach(this);
+        }
+
+        /// <summary>Weapon knocked out of his hand (perfect parry, knockdown, death).</summary>
+        public void Disarm()
+        {
+            if (HeldWeapon == null) return;
+            HeldWeapon.Drop();
+            HeldWeapon = null;
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddPopup("DISARMED!", Center + Vector3.up, new Color(0.6f, 0.9f, 1f), 0.8f);
+        }
+
+        // ------------------------------------------------------------------ surrender (last rowdy standing)
+
+        /// <summary>Last rowdy standing loses his nerve: begs for mercy or runs for it.</summary>
+        public void Surrender()
+        {
+            if (IsDead || surrendered || kind != EnemyKind.Rowdy) return;
+            surrendered = true;
+            ReleaseToken();
+            EnemyDirector.Disengage(this);
+            Disarm();
+            if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
+            if (Random.value < 0.5f)
+            {
+                state = AIState.Begging;
+                stateTimer = 10f;
+                Visual.SetTelegraph(false);
+                Visual.SetCombatStance(false);
+                Visual.Play(FighterPose.Beg, 10f);
+                Shouts.Say(this, ShoutType.Beg);
+                if (GameManager.Instance != null)
+                    GameManager.Instance.AddPopup("HE'S BEGGING", Center + Vector3.up * 1.6f, new Color(0.9f, 0.9f, 0.9f), 0.8f);
+            }
+            else
+            {
+                StartFleeing();
+            }
+        }
+
+        /// <summary>The hero spared him.</summary>
+        public void LetGo()
+        {
+            if (state != AIState.Begging) return;
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddPopup("MERCY", Center + Vector3.up, new Color(0.7f, 1f, 0.7f), 1f);
+            StartFleeing();
+        }
+
+        void StartFleeing()
+        {
+            surrendered = true;
+            state = AIState.Fleeing;
+            stateTimer = 12f;
+            Visual.SetCombatStance(false);
+            Shouts.Say(this, ShoutType.Flee, 0.8f);
+        }
+
+        void UpdateFleeing(Vector3 dirToPlayer)
+        {
+            // Run for the nearest end of the street, away from the hero.
+            float endZ = transform.position.z >= 0f ? 31f : -31f;
+            Vector3 toEnd = Flat(new Vector3(0f, 0f, endZ) - transform.position).normalized;
+            if (Vector3.Dot(toEnd, dirToPlayer) > 0.6f) toEnd = -toEnd;   // hero is in the way: other end
+            MoveTowards((toEnd + Separation() * 0.5f).normalized, Profile.runSpeed * 1.1f);
+            if (Mathf.Abs(transform.position.z) > 30f || stateTimer <= 0f)
+            {
+                if (GameManager.Instance != null) GameManager.Instance.EnemyEscaped(this);
+                else Destroy(gameObject);
+            }
+        }
+
         // ------------------------------------------------------------------ taking hits
 
         public override HitResult ReceiveHit(HitInfo hit)
         {
             if (IsDead) return HitResult.Ignored;
+            if (state == AIState.Roaring) return HitResult.Ignored;
             if (IsDowned && !hit.hitsDowned) return HitResult.Ignored;
+
+            // Begging: any blow finishes him.
+            if (state == AIState.Begging && hit.attacker != null && hit.attacker.team == Team.Player)
+            {
+                if (GameManager.Instance != null)
+                    GameManager.Instance.AddPopup("NO MERCY", Center + Vector3.up, new Color(1f, 0.4f, 0.3f), 1f);
+                hit.damage = Health + 1f;
+                ApplyDamage(hit.damage, hit, HitResult.Hit);
+                return HitResult.Hit;
+            }
 
             // Bigger rowdies sometimes put their guard up while circling.
             bool canBlock = (state == AIState.Engage || state == AIState.Wait || state == AIState.Approach) && !hit.heavy && !hit.unblockable;
@@ -309,20 +836,34 @@ namespace MadrasGethu
                 Motor.AddImpulse(hit.direction * hit.knockback * 0.5f);
                 if (GameManager.Instance != null)
                     GameManager.Instance.AddPopup("BLOCKED", Center + Vector3.up * 0.8f, new Color(0.7f, 0.85f, 1f), 0.7f);
+                if (Profile.countersBlocks) TryRiposte();
                 return HitResult.Blocked;
             }
 
             Visual.SetTelegraph(false);
             Visual.Flash();
-            if (hit.attacker != null && hit.attacker.team == Team.Player)
+            if (hit.attacker != null && hit.attacker.team == Team.Player && !surrendered)
                 EnemyDirector.ForceEngage(this, hit.attacker.transform.position);
             ApplyDamage(hit.damage, hit, HitResult.Hit);
             if (IsDead) return HitResult.Hit;
+
+            if (Profile.hasPhaseTwo && !phaseTwo && HealthFraction <= 0.5f)
+            {
+                EnterPhaseTwo();
+                return HitResult.Hit;
+            }
 
             if (state == AIState.Grabbed)
             {
                 Visual.Flinch(0.8f);
                 return HitResult.Hit;
+            }
+
+            if (state == AIState.HoldingHero)
+            {
+                var p = Player;
+                StopHoldingHero();
+                if (p != null) p.ReleasedByEnemy();
             }
 
             Motor.FaceDirection(-hit.direction, true);
@@ -340,7 +881,8 @@ namespace MadrasGethu
                 return HitResult.Hit;
             }
 
-            bool armoured = Profile.poise > 0 && !hit.heavy && poiseHits < Profile.poise;
+            bool armoured = Profile.poise > 0 && !hit.heavy && poiseHits < Profile.poise
+                            && state != AIState.Fleeing;
             if (armoured)
             {
                 poiseHits++;
@@ -351,18 +893,63 @@ namespace MadrasGethu
 
             poiseHits = 0;
             ReleaseToken();
+            currentCombo = null;
+            bool wasFleeing = state == AIState.Fleeing;
             state = AIState.Stagger;
             stateTimer = hit.heavy ? 0.65f : 0.42f;
             Visual.Play(FighterPose.Flinch, stateTimer);
             Visual.Flinch(1f);
             Motor.AddImpulse(hit.direction * hit.knockback);
+            if (wasFleeing) surrendered = true;
             return HitResult.Hit;
+        }
+
+        /// <summary>Boss: blocks two of your punches in a row and snaps back with a quick counter.</summary>
+        void TryRiposte()
+        {
+            if (Time.time - lastBlockTime > 2f) blockStreak = 0;
+            lastBlockTime = Time.time;
+            blockStreak++;
+            if (blockStreak < 2 || Player == null) return;
+            blockStreak = 0;
+            currentCombo = null;
+            feinting = false;
+            currentAttack = Profile.attacks[0].Clone();
+            currentAttack.startup = 0.24f;
+            state = AIState.Windup;
+            stateTimer = currentAttack.startup;
+            Visual.Play(FighterPose.Windup, currentAttack.startup, currentAttack.startup);
+            Visual.SetTelegraph(TelegraphColor.Red);
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddPopup("HE READ YOU!", Center + Vector3.up, new Color(1f, 0.5f, 0.3f), 0.9f);
+        }
+
+        void EnterPhaseTwo()
+        {
+            phaseTwo = true;
+            ReleaseToken();
+            currentCombo = null;
+            Visual.SetTelegraph(false);
+            state = AIState.Roaring;
+            stateTimer = 1.4f;
+            Visual.Play(FighterPose.Roar, 1.4f, 1.4f);
+            Shouts.Say(this, ShoutType.BossRage);
+            var pipe = Weapon.Create(WeaponType.IronPipe, transform.position);
+            PickUp(pipe);
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.ShowBanner("KUMARAN ANNA IS FURIOUS", "He's grabbed an iron pipe and called his boys!", 2.5f);
+                GameManager.Instance.Shake(0.4f, 0.5f);
+                GameManager.Instance.SpawnReinforcements(EnemyKind.Rowdy, 2);
+            }
         }
 
         void KnockDown(Vector3 impulse, float duration)
         {
             ReleaseToken();
+            currentCombo = null;
             poiseHits = 0;
+            if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
             state = AIState.Down;
             stateTimer = duration;
             Visual.Play(FighterPose.Knockdown, duration);
@@ -370,6 +957,7 @@ namespace MadrasGethu
             Motor.AddImpulse(impulse);
             Vector3 flat = new Vector3(impulse.x, 0f, impulse.z);
             if (flat.magnitude >= 9f) Visual.Tumble(flat, 0.65f);   // hit hard enough to roll over
+            if (HeldWeapon != null && Random.value < 0.5f) Disarm();
         }
 
         protected override void OnDeath(HitInfo killingBlow)
@@ -377,10 +965,13 @@ namespace MadrasGethu
             ReleaseToken();
             EnemyDirector.Disengage(this);   // frees the slot so a waiting rowdy steps in
             if (state == AIState.Grabbed) Motor.SetFrozen(false);
+            if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
+            if (seekTarget != null) reservedWeapons.Remove(seekTarget);
+            Disarm();
             state = AIState.Dead;
             Visual.SetTelegraph(false);
             Visual.SetCombatStance(false);
-                        Visual.SetLying(true);
+            Visual.SetLying(true);
             Visual.Play(FighterPose.Dead, 999f);
             Motor.AddImpulse(killingBlow.direction * Mathf.Max(killingBlow.knockback, 4f) + Vector3.up * 3f);
 
@@ -479,6 +1070,9 @@ namespace MadrasGethu
         {
             Visual.SetTelegraph(false);
             ReleaseToken();
+            currentCombo = null;
+            feinting = false;
+            if (perfect) Disarm();   // a perfect parry knocks the weapon out of his hand
             state = AIState.Stagger;
             stateTimer = perfect ? 1.0f : 0.75f;
             Visual.Play(FighterPose.StaggerBack, stateTimer, stateTimer);

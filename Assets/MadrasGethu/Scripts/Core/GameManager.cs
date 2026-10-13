@@ -94,6 +94,8 @@ namespace MadrasGethu
 
             var wave = waves[WaveIndex];
             CurrentState = State.Fighting;
+            surrenderOffered = false;
+            lastAliveCount = 0;
             ShowBanner(wave.title, wave.subtitle, 2.5f);
             pendingSpawns.Clear();
             foreach (var kind in wave.enemies) pendingSpawns.Enqueue(kind);
@@ -115,6 +117,7 @@ namespace MadrasGethu
                 case State.Fighting:
                     SpawnPending();
                     AliveEnemies.RemoveAll(e => e == null || e.IsDead);
+                    CheckLastManStanding();
                     if (pendingSpawns.Count == 0 && AliveEnemies.Count == 0)
                     {
                         CurrentState = State.BetweenWaves;
@@ -164,6 +167,39 @@ namespace MadrasGethu
             AliveEnemies.Add(enemy);
         }
 
+        int lastAliveCount;
+        bool surrenderOffered;
+
+        /// <summary>When a rowdy's friends are all down, he may lose his nerve: beg or run.</summary>
+        void CheckLastManStanding()
+        {
+            int count = AliveEnemies.Count;
+            if (pendingSpawns.Count == 0 && count == 1 && lastAliveCount > 1 && !surrenderOffered)
+            {
+                surrenderOffered = true;
+                var last = AliveEnemies[0];
+                if (last != null && last.kind == EnemyKind.Rowdy && Random.value < 0.65f)
+                    last.Surrender();
+            }
+            lastAliveCount = count;
+        }
+
+        /// <summary>A fleeing rowdy made it out of the street: he counts as beaten.</summary>
+        public void EnemyEscaped(EnemyFighter enemy)
+        {
+            AliveEnemies.Remove(enemy);
+            AddPopup("HE RAN AWAY", enemy.Center + Vector3.up, Color.gray, 0.8f);
+            Destroy(enemy.gameObject);
+        }
+
+        /// <summary>The boss calls for backup.</summary>
+        public void SpawnReinforcements(EnemyKind kind, int count)
+        {
+            if (CurrentState != State.Fighting) return;
+            for (int i = 0; i < count; i++) pendingSpawns.Enqueue(kind);
+            spawnTimer = 0.8f;
+        }
+
         public void OnPlayerDied()
         {
             if (CurrentState == State.GameOver) return;
@@ -184,6 +220,9 @@ namespace MadrasGethu
             EnemyDirector.Reset();
             foreach (var spot in FinisherSpot.All)
                 spot.Repair();
+            foreach (var w in Weapon.All.ToArray())
+                if (w != null && w.Holder == null) Destroy(w.gameObject);
+            KasimeduArenaBuilder.PlaceWeapons();
             if (Player != null) Player.Respawn(playerStart);
             hitStopUntil = slowMoUntil = 0f;
             Time.timeScale = 1f;

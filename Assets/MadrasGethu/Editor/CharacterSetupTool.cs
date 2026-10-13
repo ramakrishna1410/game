@@ -27,7 +27,7 @@ namespace MadrasGethu.EditorTools
         const string CharactersFolder = ArtRoot + "/Characters";
         const string AnimationsFolder = ArtRoot + "/Animations";
         const string GeneratedFolder = ArtRoot + "/Generated";
-        const string ControllerPath = GeneratedFolder + "/FighterAnimator.controller";
+        const string ControllerPath = GeneratedFolder + "/HeroAnimator.controller";
         const string ArenaScenePath = "Assets/MadrasGethu/Scenes/KasimeduArena.unity";
 
         enum SlotKind { Locomotion, Trigger, HoldBool, Final }
@@ -72,7 +72,7 @@ namespace MadrasGethu.EditorTools
                 T("Kick", 1.4f, new[] { "kick", "mmakick", "frontkick", "roundhousekick", "legkick" }),
                 T("Stomp", 1.3f, new[] { "stomp", "stomping" }, "Kick"),
                 T("Knee", 1.5f, new[] { "knee", "kneestrike", "kneekick" }, "Kick"),
-                T("Throw", 1.3f, new[] { "throw", "throwing", "toss" }, "Haymaker", "Hook"),
+                T("Throw", 1.3f, new[] { "throw", "judothrow", "grabthrow" }, "Haymaker", "Hook"),
                 T("Slam", 1.3f, new[] { "slam", "overheadslam", "doublehandslam" }, "Haymaker", "Uppercut"),
                 T("Counter", 1.6f, new[] { "counter", "counterpunch" }, "Cross", "Haymaker"),
                 T("Dodge", 1.4f, new[] { "dodge", "dodging", "sidestep" }),
@@ -91,6 +91,22 @@ namespace MadrasGethu.EditorTools
                 T("Taunt", 1f, new[] { "taunt", "taunting", "comeon", "challenge" }),
                 T("GetUp", 1.3f, new[] { "getup", "gettingup", "standup", "standingup" }),
 
+                // Enemy-only moves (put them in Animations/Rowdy, /Thadiyan or /Boss)
+                T("RowdySwing", 1f, new[] { "rowdyswing", "wildswing", "sloppypunch", "streetpunch" }, "Haymaker", "Cross"),
+                T("RowdyKick", 1f, new[] { "rowdykick", "stomachkick" }, "Kick"),
+                T("RowdyShove", 1f, new[] { "rowdyshove", "shoving", "twohandshove" }, "Push", "Haymaker"),
+                T("RowdyGrab", 1f, new[] { "rowdygrab", "grabattempt", "reachgrab" }, "Grab", "Push"),
+                T("BearHug", 1f, new[] { "bearhug", "hug", "crush" }, "RowdyGrab", "Grab"),
+                T("Charge", 1f, new[] { "charge", "shouldercharge", "tackle", "mutantrun", "runningtackle" }, "Run"),
+                T("GroundPound", 1f, new[] { "groundpound", "mutantjumpattack", "groundslam", "doubleaxe" }, "Slam", "Haymaker"),
+                T("Roar", 1f, new[] { "roar", "mutantroaring", "angry", "rage", "yelling" }, "Taunt"),
+                // Weapons and objects
+                T("PickUp", 1f, new[] { "pickup", "pickingup", "pickupobject", "lootpickup" }),
+                T("WeaponSwing", 1f, new[] { "weaponswing", "swordslash", "batswing", "stickswing", "onehandswing" }, "Haymaker", "Hook"),
+                T("WeaponSmash", 1f, new[] { "weaponsmash", "overheadsmash", "greatswordslash", "twohandsmash" }, "Slam", "Haymaker"),
+                T("ThrowObject", 1f, new[] { "throwobject", "throwing", "grenadethrow", "toss" }, "Throw", "Haymaker"),
+
+                new Slot { name = "Beg", kind = SlotKind.HoldBool, boolParameter = "Begging", aliases = new[] { "beg", "begging", "pleading", "kneelbeg", "kneeling" }, fallbacks = new[] { "Flinch" } },
                 new Slot { name = "Block", kind = SlotKind.HoldBool, boolParameter = "Blocking", aliases = new[] { "block", "blocking", "centerblock", "bodyblock" }, fallbacks = new[] { "Guard" } },
                 new Slot { name = "Grab", kind = SlotKind.HoldBool, boolParameter = "Holding", aliases = new[] { "grab", "grabbing", "hold", "holding" }, fallbacks = new[] { "Guard" } },
                 new Slot { name = "Held", kind = SlotKind.HoldBool, boolParameter = "Held", aliases = new[] { "held", "beingheld", "choked", "struggle", "struggling", "grabbedreaction" }, fallbacks = new[] { "Flinch" } },
@@ -110,6 +126,10 @@ namespace MadrasGethu.EditorTools
             EnsureFolder(ArtRoot);
             EnsureFolder(CharactersFolder);
             EnsureFolder(AnimationsFolder);
+            EnsureFolder(AnimationsFolder + "/Hero");
+            EnsureFolder(AnimationsFolder + "/Rowdy");
+            EnsureFolder(AnimationsFolder + "/Thadiyan");
+            EnsureFolder(AnimationsFolder + "/Boss");
             EnsureFolder(GeneratedFolder);
 
             var characterFiles = FindFbx(CharactersFolder);
@@ -145,55 +165,77 @@ namespace MadrasGethu.EditorTools
                 }
                 var heroAvatar = avatars[heroPath];
 
-                // 2. Animations
-                var slots = CreateSlots();
-                var animationFiles = FindFbx(AnimationsFolder);
+                // 2+3. Animations and one Animator per character type.
+                //   Animations/          shared moves (everyone)
+                //   Animations/Hero/     hero-only moves (override the shared ones)
+                //   Animations/Rowdy/    enemy moves (Thadiyan and Boss inherit these)
+                //   Animations/Thadiyan/, Animations/Boss/
+                var importCache = new Dictionary<string, AnimationClip>();
                 var unmatched = new List<string>();
-                for (int i = 0; i < animationFiles.Count; i++)
+                var controllers = new Dictionary<string, AnimatorController>();
+                var report = new StringBuilder();
+                bool anyEnemy = characterFiles.Any(p => Normalize(Path.GetFileNameWithoutExtension(p)) != "hero");
+
+                foreach (var type in CharacterNames)
                 {
-                    string path = animationFiles[i];
-                    EditorUtility.DisplayProgressBar("Madras Gethu", "Importing " + Path.GetFileName(path),
-                        0.2f + 0.5f * i / Mathf.Max(1, animationFiles.Count));
-                    var slot = MatchSlot(slots, Path.GetFileNameWithoutExtension(path));
-                    if (slot == null || slot.ownFile)
+                    bool needed = type == "Hero" || characterFiles.Any(p => Normalize(Path.GetFileNameWithoutExtension(p)) == Normalize(type))
+                                  || (type == "Rowdy" && anyEnemy);
+                    if (!needed) continue;
+
+                    EditorUtility.DisplayProgressBar("Madras Gethu", "Animations for " + type + "...", 0.2f + 0.15f * controllers.Count);
+                    var slots = CreateSlots();
+                    foreach (var folder in AnimationFolderChain(type))
                     {
-                        unmatched.Add(Path.GetFileName(path));
-                        continue;
+                        foreach (var path in FindFbx(folder))
+                        {
+                            var slot = MatchSlot(slots, Path.GetFileNameWithoutExtension(path));
+                            if (slot == null)
+                            {
+                                if (!unmatched.Contains(Path.GetFileName(path))) unmatched.Add(Path.GetFileName(path));
+                                continue;
+                            }
+                            if (!importCache.TryGetValue(path, out var clip))
+                            {
+                                clip = SetupAnimation(path, slot, heroAvatar);
+                                importCache[path] = clip;
+                            }
+                            if (clip != null) { slot.clip = clip; slot.ownFile = true; }   // later folders override earlier ones
+                        }
                     }
-                    slot.clip = SetupAnimation(path, slot, heroAvatar);
-                    slot.ownFile = slot.clip != null;
+                    ResolveFallbacks(slots);
+
+                    if (slots.First(sl => sl.name == "Idle").clip == null)
+                    {
+                        EditorUtility.ClearProgressBar();
+                        EditorUtility.DisplayDialog("Madras Gethu",
+                            "An Idle animation is required.\n\nDownload Mixamo \"Idle\" (Without Skin) and save it as\n" +
+                            AnimationsFolder + "/Idle.fbx", "OK");
+                        return;
+                    }
+
+                    controllers[type] = BuildController(slots, GeneratedFolder + "/" + type + "Animator.controller");
+                    AppendSlotReport(report, type, slots);
                 }
-                ResolveFallbacks(slots);
 
-                var idle = slots.First(s => s.name == "Idle");
-                if (idle.clip == null)
-                {
-                    EditorUtility.ClearProgressBar();
-                    EditorUtility.DisplayDialog("Madras Gethu",
-                        "An Idle animation is required.\n\nDownload Mixamo \"Idle\" (Without Skin) and save it as\n" +
-                        AnimationsFolder + "/Idle.fbx", "OK");
-                    return;
-                }
-
-                // 3. Animator Controller
-                EditorUtility.DisplayProgressBar("Madras Gethu", "Building Animator Controller...", 0.75f);
-                var controller = BuildController(slots);
-
-                // 4. Prefabs
+                // 4. Prefabs, each with its own type's Animator
                 EditorUtility.DisplayProgressBar("Madras Gethu", "Creating prefabs...", 0.85f);
                 var prefabs = new Dictionary<string, GameObject>();
                 foreach (var path in characterFiles)
                 {
                     string name = Path.GetFileNameWithoutExtension(path);
+                    string type = CharacterNames.FirstOrDefault(t => Normalize(t) == Normalize(name)) ?? (path == heroPath ? "Hero" : "Rowdy");
+                    var controller = controllers.TryGetValue(type, out var c) ? c
+                                   : controllers.TryGetValue("Rowdy", out var r) && type != "Hero" ? r
+                                   : controllers["Hero"];
                     prefabs[Normalize(name)] = CreatePrefab(path, name, controller);
                 }
 
                 // 5. Plug into the arena scene
                 EditorUtility.DisplayProgressBar("Madras Gethu", "Updating the arena scene...", 0.95f);
-                string sceneResult = AssignToBootstrap(prefabs, heroPath, controller);
+                string sceneResult = AssignToBootstrap(prefabs, heroPath, controllers["Hero"]);
 
                 EditorUtility.ClearProgressBar();
-                ShowReport(slots, unmatched, characterFiles, sceneResult);
+                ShowReport(report.ToString(), unmatched, characterFiles, sceneResult);
             }
             catch (System.Exception e)
             {
@@ -490,12 +532,12 @@ namespace MadrasGethu.EditorTools
 
         // ------------------------------------------------------------------ animator controller
 
-        static AnimatorController BuildController(List<Slot> slots)
+        static AnimatorController BuildController(List<Slot> slots, string controllerPath)
         {
-            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath) != null)
-                AssetDatabase.DeleteAsset(ControllerPath);
+            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
+                AssetDatabase.DeleteAsset(controllerPath);
 
-            var controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+            var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("MoveX", AnimatorControllerParameterType.Float);
             controller.AddParameter("MoveZ", AnimatorControllerParameterType.Float);
@@ -753,22 +795,36 @@ namespace MadrasGethu.EditorTools
         static GameObject Lookup(Dictionary<string, GameObject> prefabs, string key) =>
             prefabs.TryGetValue(key, out var prefab) ? prefab : null;
 
-        static void ShowReport(List<Slot> slots, List<string> unmatched, List<string> characters, string sceneResult)
+        static IEnumerable<string> AnimationFolderChain(string type)
+        {
+            yield return AnimationsFolder;
+            if (type == "Hero") { yield return AnimationsFolder + "/Hero"; yield break; }
+            yield return AnimationsFolder + "/Rowdy";
+            if (type != "Rowdy") yield return AnimationsFolder + "/" + type;
+        }
+
+        static void AppendSlotReport(StringBuilder sb, string type, List<Slot> slots)
+        {
+            sb.AppendLine(type.ToUpper());
+            sb.AppendLine("  Own animations: " + string.Join(", ", slots.Where(x => x.ownFile).Select(x => x.name)));
+            var borrowed = slots.Where(x => !x.ownFile && x.clip != null).Select(x => x.name + "→" + x.clip.name).ToList();
+            if (borrowed.Count > 0) sb.AppendLine("  Stand-ins: " + string.Join(", ", borrowed));
+            var missing = slots.Where(x => x.clip == null).Select(x => x.name).ToList();
+            if (missing.Count > 0) sb.AppendLine("  Missing (optional): " + string.Join(", ", missing));
+            sb.AppendLine();
+        }
+
+        static void ShowReport(string slotReport, List<string> unmatched, List<string> characters, string sceneResult)
         {
             var sb = new StringBuilder();
             sb.AppendLine("Characters: " + string.Join(", ", characters.Select(Path.GetFileNameWithoutExtension)));
             sb.AppendLine();
-            sb.AppendLine("Animations found: " + string.Join(", ", slots.Where(s => s.ownFile).Select(s => s.name)));
-            var borrowed = slots.Where(s => !s.ownFile && s.clip != null).Select(s => s.name + "→" + s.clip.name).ToList();
-            if (borrowed.Count > 0) sb.AppendLine("Using stand-ins: " + string.Join(", ", borrowed));
-            var missing = slots.Where(s => s.clip == null).Select(s => s.name).ToList();
-            if (missing.Count > 0) sb.AppendLine("Missing (optional): " + string.Join(", ", missing));
+            sb.Append(slotReport);
             if (unmatched.Count > 0)
             {
-                sb.AppendLine();
                 sb.AppendLine("Not recognised (rename them to a slot name, e.g. Jab.fbx): " + string.Join(", ", unmatched));
+                sb.AppendLine();
             }
-            sb.AppendLine();
             sb.AppendLine(sceneResult);
             sb.AppendLine();
             sb.AppendLine("Press Play to fight!");

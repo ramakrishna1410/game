@@ -99,6 +99,49 @@ The hero's hands are placed on the rowdy's collar by IK whatever the Grab animat
 > Exact Mixamo names vary. Pick whatever looks closest. Only the **file name** matters.
 > The tool also recognises Mixamo's own names (e.g. `Boxing Idle.fbx`, `Hook Punch.fbx`), but renaming to the first column is safest.
 
+## Enemy-only animations (separate folders)
+Enemies now fight differently from the hero. The folders are:
+
+```
+Art/Animations/            shared by everyone (Idle, Walk, Run, Guard, Flinch, Knockdown, GetUp, Dead, ...)
+Art/Animations/Hero/       hero-only versions (optional; overrides the shared files for the hero)
+Art/Animations/Rowdy/      enemy moves (the Thadiyan and the boss also use these)
+Art/Animations/Thadiyan/   bruiser-only overrides
+Art/Animations/Boss/       boss-only overrides
+```
+
+Download these with a **Rowdy** character selected in Mixamo (Without Skin) into `Art/Animations/Rowdy/`:
+
+| Save as | Search Mixamo for | Used for |
+|---|---|---|
+| `RowdySwing.fbx` | Punching (a sloppy, wide swing) | wild swing |
+| `RowdyKick.fbx` | Kick / front kick | stomach kick |
+| `RowdyShove.fbx` | Push | shove |
+| `RowdyGrab.fbx` | Grab / reaching | grabbing the hero |
+| `Taunt.fbx` | Taunt | waiting rowdies |
+| `ThrowObject.fbx` | Throw (overhand) | throwing bottles and bricks |
+| `PickUp.fbx` | Picking Up | picking up a weapon |
+| `WeaponSwing.fbx` | Sword Slash / bat swing | lathi / pipe swing |
+| `WeaponSmash.fbx` | Great Sword Slash / overhead | weapon overhead smash |
+| `Beg.fbx` | Kneeling / pleading | last rowdy begging for mercy |
+| `Guard.fbx` | Drunk Idle / loose Fight Idle | a street stance instead of the hero's boxing guard |
+
+Into `Art/Animations/Thadiyan/` (Mixamo's **Mutant** set suits him):
+
+| Save as | Search Mixamo for |
+|---|---|
+| `Charge.fbx` | Mutant Run / tackle (In Place) |
+| `GroundPound.fbx` | Mutant Jump Attack |
+| `BearHug.fbx` | Mutant Swiping / grab |
+| `Roar.fbx` | Mutant Roaring |
+| `RowdySwing.fbx` | Mutant Punch |
+
+Into `Art/Animations/Boss/`: a boxing **Jab**, **Hook**, **Kick**, `Roar.fbx` (Yelling) and `WeaponSwing.fbx` for his iron pipe.
+
+Into `Art/Animations/Hero/` (optional): `WeaponSwing.fbx`, `WeaponSmash.fbx`, `PickUp.fbx`, `ThrowObject.fbx` if you want the hero to handle weapons differently from the rowdies.
+
+Anything missing falls back to a similar shared move, so the game always works.
+
 ## 4. Run the tool
 1. Make sure the arena scene exists (**Madras Gethu → Create Kasimedu Arena Scene**, which you've already done).
 2. Click **Madras Gethu → Setup Characters (Mixamo)**.

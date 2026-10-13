@@ -56,9 +56,14 @@ The prototype is light. It runs fine on integrated Intel Arc graphics with 16 GB
 | Dodge: sidestep / backstep when squared up, roll otherwise (direction + key) | C or Ctrl | LT |
 | Grab → knee / throw | E → Left click / E or Right click | B → X / B or Y |
 | **Gethu**: finisher while grabbing near a prop, or Gethu Mode when full | Q | RT |
+| Pick up a weapon (stand on it) / throw the weapon you hold | E | B |
+| Break free when a rowdy grabs you | tap E fast | tap B fast |
+| Spare a begging rowdy (hit him to finish him) | E | B |
 | Show/hide controls | H | View/Back |
 | Restart after win/lose | Enter | Start |
 | Free the mouse | Esc | |
+
+**Enemy warning colours:** 🔵 the blue **F** box means parry; **orange** means unblockable, so dodge (C); **yellow** means a grab, so dodge, or tap E to break free if he catches you.
 
 **How to fight:**
 - Mix lights and heavies. The number of light hits before a heavy decides which heavy ender you get.

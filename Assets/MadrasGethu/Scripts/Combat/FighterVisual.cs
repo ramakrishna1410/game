@@ -55,7 +55,7 @@ namespace MadrasGethu
         bool lying;
         float flinch;
         float flashTimer;
-        bool telegraph;
+        TelegraphColor telegraph;
         bool built;
 
         public bool UsesAnimator => animator != null;
@@ -329,7 +329,7 @@ namespace MadrasGethu
             poseTimer = 0f;
             lying = false;
             lie = 0f;
-            telegraph = false;
+            telegraph = TelegraphColor.None;
             if (animator != null)
             {
                 animator.Rebind();
@@ -355,8 +355,34 @@ namespace MadrasGethu
         /// <summary>Red glow used by enemies to warn the player that an attack is coming (counter window).</summary>
         public void SetTelegraph(bool on)
         {
-            telegraph = on;
+            telegraph = on ? TelegraphColor.Red : TelegraphColor.None;
         }
+
+        public void SetTelegraph(TelegraphColor color)
+        {
+            telegraph = color;
+        }
+
+        static Color TelegraphTint(TelegraphColor c) =>
+            c == TelegraphColor.Orange ? new Color(2.4f, 0.9f, 0.15f)
+            : c == TelegraphColor.Yellow ? new Color(2.2f, 2.0f, 0.3f)
+            : new Color(2.2f, 0.35f, 0.3f);
+
+        /// <summary>Where a held weapon goes: the right hand bone, or the placeholder fist.</summary>
+        public Transform RightHand
+        {
+            get
+            {
+                if (animator != null && animator.isHuman)
+                {
+                    var hand = animator.GetBoneTransform(HumanBodyBones.RightHand);
+                    if (hand != null) return hand;
+                }
+                return armR != null ? armR : transform;
+            }
+        }
+
+        public bool IsPlaceholder => animator == null;
 
         // ------------------------------------------------------------------ animation
 
@@ -498,8 +524,8 @@ namespace MadrasGethu
             Color tint = Color.white;
             if (flashTimer > 0f)
                 tint = new Color(2.2f, 2.2f, 2.2f);
-            else if (telegraph && Mathf.Repeat(Time.time * 10f, 1f) < 0.6f)
-                tint = new Color(2.2f, 0.35f, 0.3f);
+            else if (telegraph != TelegraphColor.None && Mathf.Repeat(Time.time * 10f, 1f) < 0.6f)
+                tint = TelegraphTint(telegraph);
             if (tint == currentTint) return;
             currentTint = tint;
 
@@ -530,8 +556,11 @@ namespace MadrasGethu
             Material overrideMat = null;
             if (flashTimer > 0f)
                 overrideMat = Palette.Get(Color.white, new Color(1f, 1f, 1f) * 1.5f);
-            else if (telegraph && Mathf.Repeat(Time.time * 10f, 1f) < 0.6f)
-                overrideMat = Palette.Get(new Color(1f, 0.15f, 0.1f), new Color(2.5f, 0.2f, 0.1f));
+            else if (telegraph != TelegraphColor.None && Mathf.Repeat(Time.time * 10f, 1f) < 0.6f)
+            {
+                Color t = TelegraphTint(telegraph);
+                overrideMat = Palette.Get(new Color(Mathf.Min(1f, t.r * 0.45f), Mathf.Min(1f, t.g * 0.45f), Mathf.Min(1f, t.b * 0.45f)), t);
+            }
 
             for (int i = 0; i < renderers.Count; i++)
             {

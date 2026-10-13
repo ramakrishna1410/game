@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held }
 
         [Header("Movement")]
         public float walkSpeed = 1.6f;
@@ -85,6 +85,16 @@ namespace MadrasGethu
         float grabActionCooldown;
 
         EnemyFighter grabbed;
+
+        // Held by an enemy (grab, bear hug, hold from behind)
+        EnemyFighter heldBy;
+        public float BreakFreeProgress { get; private set; }
+        public bool IsHeld => State == PlayerState.Held;
+        public bool IsHeldBy(EnemyFighter e) => State == PlayerState.Held && heldBy == e;
+        public bool HeldFromBehind { get; private set; }
+
+        // Weapon in hand
+        public Weapon HeldWeapon { get; private set; }
         bool grabFromBehind;
         Vector3 grabPullStart;
         int grabStrikeIndex;
@@ -180,6 +190,7 @@ namespace MadrasGethu
             grabActionCooldown -= dt;
             ContextPrompt = null;
             Visual.SetAnimatorBool("Holding", State == PlayerState.Grab);
+            Visual.SetAnimatorBool("Held", State == PlayerState.Held);
 
             if (ComboTimer > 0f)
             {
@@ -213,6 +224,7 @@ namespace MadrasGethu
                 case PlayerState.Block: UpdateBlock(); break;
                 case PlayerState.Grab: UpdateGrab(); break;
                 case PlayerState.Parry: UpdateParry(); break;
+                case PlayerState.Held: UpdateHeld(); break;
                 case PlayerState.Finisher: UpdateFinisher(); break;
                 case PlayerState.Stagger:
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
@@ -299,6 +311,14 @@ namespace MadrasGethu
             if (!heavy && !light) return false;
             heavyBufferedUntil = 0f;
             lightBufferedUntil = 0f;
+
+            // Weapon in hand: swing (light) or overhead smash (heavy) instead of boxing combos.
+            if (HeldWeapon != null)
+            {
+                StartAttack(HeldWeapon.MakeAttack(heavy), null);
+                lightIndex = 0;
+                return true;
+            }
 
             // Dodge -> attack: spin out of the dodge with a backfist.
             if (Time.time - lastDodgeEnd < 0.4f)
@@ -413,6 +433,11 @@ namespace MadrasGethu
         {
             float mult = MassMode ? massModeDamageMultiplier : 1f;
             var result = CombatUtil.Strike(this, currentAttack, mult);
+            if (result.Connected && HeldWeapon != null &&
+                (currentAttack.pose == FighterPose.WeaponSwing || currentAttack.pose == FighterPose.WeaponSmash))
+            {
+                if (HeldWeapon.RegisterHit()) HeldWeapon = null;
+            }
             if (result.hits > 0)
             {
                 RegisterHits(result.hits, currentAttack.gethuGain * result.hits);
@@ -588,13 +613,20 @@ namespace MadrasGethu
             float bestDist = 3.6f;
             foreach (var f in All)
             {
-                if (f is EnemyFighter e && e.IsTelegraphing)
+                if (f is EnemyFighter e && e.IsTelegraphing && e.CurrentTelegraph == TelegraphColor.Red)
                 {
                     float d = Flat(e.transform.position - transform.position).magnitude;
                     if (d < bestDist) { bestDist = d; best = e; }
                 }
             }
             if (best == null) return false;
+
+            if (best.IsFeinting)
+            {
+                // Bit on the fake: he punishes you.
+                best.PunishParry(this);
+                return true;
+            }
 
             parryTarget = best;
             parryPerfect = best.TimeToImpact <= perfectParryWindow;
@@ -655,6 +687,37 @@ namespace MadrasGethu
 
         void TryGrab()
         {
+            // A rowdy begging for mercy nearby: E spares him.
+            foreach (var f in All)
+            {
+                if (f is EnemyFighter beggar && beggar.IsBegging && Flat(beggar.transform.position - transform.position).magnitude < 3.2f)
+                {
+                    beggar.LetGo();
+                    AddGethu(15f);
+                    return;
+                }
+            }
+
+            // Armed: E throws the weapon at the nearest rowdy in front.
+            if (HeldWeapon != null)
+            {
+                ThrowWeapon();
+                return;
+            }
+
+            // Weapon at your feet: pick it up.
+            var weapon = Weapon.FindNearbyOnGround(transform.position, 1.5f);
+            if (weapon != null)
+            {
+                Visual.Play(FighterPose.PickUp, 0.4f, 0.5f);
+                HeldWeapon = weapon;
+                weapon.Attach(this);
+                if (GM != null) GM.AddPopup(weapon.displayName.ToUpper(), Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.7f);
+                SetState(PlayerState.Stagger);   // short pick-up pause
+                stateTimer = 0.15f;
+                return;
+            }
+
             var target = CombatUtil.FindTarget(this, MoveInputWorld().sqrMagnitude > 0.01f ? MoveInputWorld() : transform.forward, 2.0f)
                 as EnemyFighter;
             if (target != null && target.CanBeGrabbed)
@@ -814,6 +877,92 @@ namespace MadrasGethu
             finisherIsWallSlam = true;
             BeginFinisherSequence(null);
             return true;
+        }
+
+        // ------------------------------------------------------------------ weapons
+
+        void ThrowWeapon()
+        {
+            var w = HeldWeapon;
+            HeldWeapon = null;
+            var target = CombatUtil.FindTarget(this, MoveInputWorld().sqrMagnitude > 0.01f ? MoveInputWorld() : transform.forward, 14f);
+            Vector3 aim = target != null ? target.Center : Center + transform.forward * 10f;
+            if (target != null) Motor.FaceDirection(target.transform.position - transform.position, instant: true);
+            Visual.Play(FighterPose.ThrowObject, 0.35f, 0.5f);
+            w.Throw(this, aim);
+            SetState(PlayerState.Stagger);
+            stateTimer = 0.1f;
+        }
+
+        void DropWeapon()
+        {
+            if (HeldWeapon == null) return;
+            HeldWeapon.Drop();
+            HeldWeapon = null;
+        }
+
+        // ------------------------------------------------------------------ held by an enemy
+
+        /// <summary>An enemy's grab connects. Returns false if the hero can't be grabbed right now.</summary>
+        public bool TryGetGrabbedBy(EnemyFighter enemy, bool fromBehind)
+        {
+            if (IsDead || Invulnerable || IsDowned || State == PlayerState.Held || State == PlayerState.Jump) return false;
+            if (grabbed != null) ReleaseGrab(Vector3.zero, false);
+            heldBy = enemy;
+            HeldFromBehind = fromBehind;
+            BreakFreeProgress = 0f;
+            Motor.SetFrozen(true);
+            SetState(PlayerState.Held);
+            Visual.Play(FighterPose.Flinch, 0.3f);
+            ComboHits = 0;
+            lightIndex = 0;
+            return true;
+        }
+
+        public void HeldAt(Vector3 position, Quaternion rotation)
+        {
+            transform.SetPositionAndRotation(position, rotation);
+        }
+
+        /// <summary>The holder let go (time ran out, he got hit, or he was knocked down).</summary>
+        public void ReleasedByEnemy()
+        {
+            if (State != PlayerState.Held) return;
+            heldBy = null;
+            Motor.SetFrozen(false);
+            SetState(PlayerState.Free);
+        }
+
+        void UpdateHeld()
+        {
+            if (heldBy == null || heldBy.IsDead)
+            {
+                ReleasedByEnemy();
+                return;
+            }
+            ContextPrompt = "TAP  E / B  TO BREAK FREE!";
+
+            // Mash to escape. A bear hug is harder to break than a collar grab.
+            float perPress = heldBy.kind == EnemyKind.Thadiyan && !HeldFromBehind ? 0.11f : 0.16f;
+            BreakFreeProgress = Mathf.Max(0f, BreakFreeProgress - 0.3f * Time.deltaTime);
+            if (GameInput.GrabPressed)
+            {
+                BreakFreeProgress += perPress;
+                Visual.Flinch(0.25f);
+            }
+            if (BreakFreeProgress < 1f) return;
+
+            // Free: elbow / shove him off.
+            var holder = heldBy;
+            heldBy = null;
+            Motor.SetFrozen(false);
+            Vector3 away = Flat(holder.transform.position - transform.position).normalized;
+            if (away.sqrMagnitude < 0.01f) away = -transform.forward;
+            holder.HeroBrokeFree(away);
+            Visual.Play(HeldFromBehind ? FighterPose.Backfist : FighterPose.Push, 0.35f, 0.45f);
+            AddGethu(6f);
+            if (GM != null) GM.AddPopup("BROKE FREE!", Center + Vector3.up, new Color(0.6f, 1f, 0.6f), 0.9f);
+            SetState(PlayerState.Free);
         }
 
         /// <summary>Lets go of the grabbed rowdy without touching his state (he is being launched).</summary>
@@ -985,6 +1134,17 @@ namespace MadrasGethu
 
             if (State == PlayerState.Grab) ReleaseGrab(hit.direction * 2f, false);
 
+            if (State == PlayerState.Held && hit.launch <= 0f)
+            {
+                // Held: you take it, but stay in his grip.
+                ApplyDamage(hit.damage * (MassMode ? 0.5f : 1f), hit, HitResult.Hit);
+                Visual.Flash();
+                Visual.Flinch(0.8f);
+                if (GM != null) GM.Shake(0.15f);
+                return HitResult.Hit;
+            }
+            if (State == PlayerState.Held) ReleasedByEnemy();
+
             float damage = hit.damage * (MassMode ? 0.5f : 1f);
             ApplyDamage(damage, hit, HitResult.Hit);
             Visual.Flash();
@@ -1004,6 +1164,7 @@ namespace MadrasGethu
             Motor.FaceDirection(-hit.direction, instant: true);
             if (hit.launch > 0f)
             {
+                DropWeapon();
                 SetState(PlayerState.Down);
                 Visual.SetLying(true);
                 Visual.Play(FighterPose.Knockdown, 1.1f);
@@ -1022,6 +1183,8 @@ namespace MadrasGethu
         protected override void OnDeath(HitInfo killingBlow)
         {
             if (grabbed != null) ReleaseGrab(Vector3.zero, false);
+            if (State == PlayerState.Held) { heldBy = null; Motor.SetFrozen(false); }
+            DropWeapon();
             SetState(PlayerState.Dead);
             massModeTimer = 0f;
             Visual.SetLying(true);
@@ -1034,6 +1197,9 @@ namespace MadrasGethu
         public void Respawn(Vector3 position)
         {
             if (grabbed != null) ReleaseGrab(Vector3.zero, false);
+            heldBy = null;
+            Motor.SetFrozen(false);
+            DropWeapon();
             ResetHealth(maxHealth);
             Gethu = 0f;
             massModeTimer = 0f;

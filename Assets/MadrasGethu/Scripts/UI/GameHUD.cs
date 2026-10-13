@@ -93,6 +93,15 @@ namespace MadrasGethu
             Bar(new Rect(x, y, gw, 16 * S), p.GethuFraction, g);
             for (int i = 1; i < 3; i++)
                 Bar(new Rect(x + gw * i / 3f - 1, y, 2 * S, 16 * S), 1f, new Color(0f, 0f, 0f, 0.8f));
+            // Weapon in hand and how many hits it has left.
+            if (p.HeldWeapon != null)
+            {
+                var held = p.HeldWeapon;
+                string pips = new string('■', Mathf.Max(0, held.HitsLeft)) + new string('□', Mathf.Max(0, held.durability - held.HitsLeft));
+                Shadowed(new Rect(x, y + 22 * S, 520 * S, 26 * S),
+                    $"{held.displayName.ToUpper()}  {pips}   (E: throw)", small, new Color(1f, 0.85f, 0.5f));
+            }
+
             string gethuLabel = p.MassMode ? "GETHU MODE!" : p.GethuFraction >= 1f ? "GETHU FULL · Q / RT" : "GETHU";
             Shadowed(new Rect(x + gw + 10 * S, y - 6 * S, 300 * S, 28 * S), gethuLabel, small, Gold);
         }
@@ -110,6 +119,18 @@ namespace MadrasGethu
         {
             var p = GM.Player;
             if (p == null) return;
+
+            // Grabbed by a rowdy: mash meter.
+            if (p.IsHeld)
+            {
+                float pulse = 0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 20f);
+                var meter = new Rect(Screen.width * 0.5f - 200 * S, Screen.height * 0.62f, 400 * S, 24 * S);
+                Shadowed(new Rect(0, meter.y - 60 * S, Screen.width, 50 * S), "TAP  E / B  TO BREAK FREE!",
+                    new GUIStyle(big) { fontSize = Mathf.RoundToInt(big.fontSize * 0.75f * pulse) }, new Color(1f, 0.85f, 0.2f));
+                Bar(meter, 1f, Panel);
+                Bar(meter, p.BreakFreeProgress, new Color(0.4f, 1f, 0.4f));
+                return;
+            }
             if (string.IsNullOrEmpty(p.ContextPrompt))
             {
                 // Big pulsing reminder when the Gethu meter is full and unused.
@@ -141,16 +162,28 @@ namespace MadrasGethu
                 Vector3 sp = cam.WorldToScreenPoint(new Vector3(e.transform.position.x, top + 0.25f, e.transform.position.z));
                 if (sp.z <= 0f) continue;
 
-                // Counter prompt: this rowdy is about to swing.
-                if (e.IsTelegraphing)
+                // Warning above a rowdy about to attack: what to press depends on the colour.
+                var tele = e.CurrentTelegraph;
+                if (tele != TelegraphColor.None)
                 {
                     float pulse = 0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 18f);
                     float size = 46 * S * pulse;
                     var box = new Rect(sp.x - size / 2f, Screen.height - sp.y - size - 14 * S, size, size);
-                    Bar(box, 1f, new Color(0.1f, 0.7f, 1f, 0.9f));
+                    Color boxColor = tele == TelegraphColor.Red ? new Color(0.1f, 0.7f, 1f, 0.9f)
+                                   : tele == TelegraphColor.Orange ? new Color(1f, 0.5f, 0.1f, 0.9f)
+                                   : new Color(1f, 0.85f, 0.15f, 0.9f);
+                    string key = tele == TelegraphColor.Red ? "F" : "C";
+                    string what = tele == TelegraphColor.Red ? "PARRY" : tele == TelegraphColor.Orange ? "DODGE" : "DODGE GRAB";
+                    Bar(box, 1f, boxColor);
                     var keyStyle = new GUIStyle(center) { fontSize = Mathf.RoundToInt(20 * S * pulse) };
-                    Shadowed(box, "F", keyStyle, Color.white);
-                    Shadowed(new Rect(sp.x - 60 * S, box.yMax, 120 * S, 20 * S), "COUNTER", new GUIStyle(small) { alignment = TextAnchor.MiddleCenter }, new Color(0.6f, 0.9f, 1f));
+                    Shadowed(box, key, keyStyle, Color.white);
+                    Shadowed(new Rect(sp.x - 70 * S, box.yMax, 140 * S, 20 * S), what, new GUIStyle(small) { alignment = TextAnchor.MiddleCenter }, boxColor);
+                }
+                if (e.IsBegging)
+                {
+                    Shadowed(new Rect(sp.x - 220 * S, Screen.height - sp.y - 40 * S, 440 * S, 26 * S),
+                        "E: let him go   ·   Hit him: finish him", new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold },
+                        new Color(1f, 0.9f, 0.6f));
                 }
 
                 if (e.IsBoss)
@@ -252,8 +285,10 @@ namespace MadrasGethu
                 "WASD / L-stick ....... move      Shift / LB ... sprint",
                 "Space / A ............ jump      C, Ctrl / LT . dodge (+direction)",
                 "Left click / X ....... punch     Right click / Y ... heavy",
-                "F / RB ............... block (hold) · PARRY when 'F' shows (late = PERFECT)",
-                "E / B ................ grab collar → click: knee/headbutt/punch",
+                "F / RB ............... block (hold) · PARRY when blue F shows (late = PERFECT)",
+                "C / LT ............... dodge  · ORANGE = unblockable, YELLOW = grab: dodge!",
+                "Grabbed? ............. tap E / B fast to break free",
+                "E / B ................ grab collar → click: knee/headbutt/punch · pick up weapon",
                 "   while holding ...... E / RMB: throw · F: shove · aim at a wall: WALL SLAM",
                 "Q / RT ............... Gethu Mode, or finisher near a marked prop",
                 "",

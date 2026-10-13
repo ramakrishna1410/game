@@ -36,6 +36,7 @@ namespace MadrasGethu
             BuildStreetLamps(root);
             BuildProps(root);
             BuildBoundaries(root);
+            PlaceWeapons();
             Random.InitState(System.Environment.TickCount);   // fixed layout, but unpredictable fights
         }
 
@@ -331,6 +332,21 @@ namespace MadrasGethu
             for (int s = -1; s <= 1; s += 2)
                 Palette.Primitive(PrimitiveType.Cylinder, v, new Vector3(s * 0.62f, 0.25f, -0.6f), new Vector3(0.45f, 0.06f, 0.45f), black, collider: false, name: "Rear Wheel")
                     .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+        }
+
+        // ------------------------------------------------------------------ street weapons
+
+        /// <summary>Lathis, pipes, planks, bottles and bricks lying around the harbour lane.</summary>
+        public static void PlaceWeapons()
+        {
+            Weapon.Create(WeaponType.Lathi, new Vector3(-5.2f, 0f, 3.5f));        // leaning by the tea kadai
+            Weapon.Create(WeaponType.IronPipe, new Vector3(4.6f, 0f, -5.5f));     // by the fish crates
+            Weapon.Create(WeaponType.Plank, new Vector3(-6.0f, 0f, -14f));
+            Weapon.Create(WeaponType.Bottle, new Vector3(-4.6f, 0f, 7.5f));
+            Weapon.Create(WeaponType.Bottle, new Vector3(5.2f, 0f, 11f));
+            Weapon.Create(WeaponType.Brick, new Vector3(-1.5f, 0f, -20f));
+            Weapon.Create(WeaponType.IronPipe, new Vector3(2.5f, 0f, 18f));
+            Weapon.Create(WeaponType.Lathi, new Vector3(-3f, 0f, 24f));
         }
 
         // ------------------------------------------------------------------ invisible walls

@@ -24,6 +24,9 @@ namespace MadrasGethu
         static readonly List<EnemyFighter> waiting = new List<EnemyFighter>();
         static float nextAttackTime;
 
+        /// <summary>A rowdy is holding the hero from behind: his friends get to swing (two at once).</summary>
+        public static bool HeroHeldFromBehind;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         public static void Reset()
         {
@@ -31,6 +34,7 @@ namespace MadrasGethu
             attackers.Clear();
             waiting.Clear();
             nextAttackTime = 0f;
+            HeroHeldFromBehind = false;
         }
 
         static void Clean()
@@ -109,7 +113,8 @@ namespace MadrasGethu
             Clean();
             if (!engaged.Contains(enemy)) return false;
             if (attackers.Contains(enemy)) return true;
-            if (attackers.Count >= MaxAttackers || Time.time < nextAttackTime) return false;
+            int max = HeroHeldFromBehind ? MaxAttackers + 1 : MaxAttackers;
+            if (attackers.Count >= max || (!HeroHeldFromBehind && Time.time < nextAttackTime)) return false;
             attackers.Add(enemy);
             return true;
         }
