@@ -252,7 +252,7 @@ namespace MadrasGethu
         {
             state = AIState.Windup;
             stateTimer = currentAttack.startup;
-            Visual.Play(FighterPose.Windup, currentAttack.startup);
+            Visual.Play(FighterPose.Windup, currentAttack.startup, currentAttack.startup);
             Visual.SetTelegraph(true);
             if (currentAttack.unblockable && GameManager.Instance != null)
                 GameManager.Instance.AddPopup("UNBLOCKABLE!", Center + Vector3.up, new Color(1f, 0.4f, 0.1f), 0.8f);
@@ -261,7 +261,7 @@ namespace MadrasGethu
         void ReleaseAttack(float dist)
         {
             Visual.SetTelegraph(false);
-            Visual.Play(currentAttack.pose, 0.3f);
+            Visual.Play(currentAttack.pose, 0.3f, currentAttack.recovery + 0.3f);
             float lunge = Mathf.Clamp(dist - currentAttack.range * 0.6f, 0f, currentAttack.lunge);
             Motor.AddLunge(transform.forward, lunge);
             var result = CombatUtil.Strike(this, currentAttack);

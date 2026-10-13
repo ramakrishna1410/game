@@ -489,6 +489,12 @@ namespace MadrasGethu.EditorTools
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("MoveX", AnimatorControllerParameterType.Float);
             controller.AddParameter("MoveZ", AnimatorControllerParameterType.Float);
+            // Speed of one-shot moves, set by the game each time so the punch lands when the hit registers.
+            controller.AddParameter("ActionSpeed", AnimatorControllerParameterType.Float);
+            var parameters = controller.parameters;
+            foreach (var p in parameters)
+                if (p.name == "ActionSpeed") p.defaultFloat = 1.2f;   // never 0, or moves would freeze
+            controller.parameters = parameters;
             controller.AddParameter("Guard", AnimatorControllerParameterType.Bool);
             foreach (var s in slots)
             {
@@ -546,7 +552,9 @@ namespace MadrasGethu.EditorTools
             {
                 var state = sm.AddState(slot.name);
                 state.motion = slot.clip;
-                state.speed = slot.speed;
+                state.speed = 1f;
+                state.speedParameter = "ActionSpeed";
+                state.speedParameterActive = true;
                 var enter = sm.AddAnyStateTransition(state);
                 enter.AddCondition(AnimatorConditionMode.If, 0f, slot.name);
                 enter.canTransitionToSelf = true;

@@ -159,29 +159,59 @@ namespace MadrasGethu
                 SetLayerRecursively(child.gameObject, layer);
         }
 
+        readonly List<string> triggerParams = new List<string>();
+        readonly Dictionary<string, float> clipLengths = new Dictionary<string, float>();
+
         void CacheAnimatorParams()
         {
             animatorParams = new HashSet<string>();
-            if (animator == null) return;
+            triggerParams.Clear();
+            clipLengths.Clear();
+            if (animator == null || animator.runtimeAnimatorController == null) return;
             foreach (var p in animator.parameters)
+            {
                 animatorParams.Add(p.name);
+                if (p.type == AnimatorControllerParameterType.Trigger) triggerParams.Add(p.name);
+            }
+            // The setup tool names each clip after its move (Jab, Cross, ...), so moves can be timed to the game.
+            foreach (var clip in animator.runtimeAnimatorController.animationClips)
+                if (clip != null && !clipLengths.ContainsKey(clip.name))
+                    clipLengths[clip.name] = clip.length;
         }
 
         // ------------------------------------------------------------------ public API
 
         /// <summary>Plays a pose for the given time, then returns to idle/guard.</summary>
-        public void Play(FighterPose newPose, float duration)
+        /// <param name="animationTime">
+        /// If set, the move's animation is sped up or slowed down to last exactly this long, so the punch
+        /// visibly lands when the game registers the hit. Otherwise it plays at a natural speed.
+        /// </param>
+        public void Play(FighterPose newPose, float duration, float animationTime = 0f)
         {
             // Held poses (block, grab) are re-requested every frame: keep them running instead of restarting.
-            if (newPose == pose && poseTimer > 0.05f)
+            bool held = newPose == FighterPose.Block || newPose == FighterPose.Grab;
+            if (held && newPose == pose && poseTimer > 0.05f)
             {
                 poseTimer = Mathf.Max(poseTimer, duration);
                 return;
             }
             pose = newPose;
             poseTimer = duration;
-            if (animator != null && animatorParams != null && animatorParams.Contains(newPose.ToString()))
-                animator.SetTrigger(newPose.ToString());
+
+            string trigger = newPose.ToString();
+            if (animator == null || animatorParams == null || !animatorParams.Contains(trigger)) return;
+
+            if (animatorParams.Contains("ActionSpeed"))
+            {
+                float speed = 1.2f;
+                if (animationTime > 0f && clipLengths.TryGetValue(trigger, out float length) && length > 0f)
+                    speed = Mathf.Clamp(length / animationTime, 0.6f, 3.5f);
+                animator.SetFloat("ActionSpeed", speed);
+            }
+            // Clear older requests so extra button presses don't queue up and fire late.
+            foreach (var t in triggerParams)
+                if (t != trigger) animator.ResetTrigger(t);
+            animator.SetTrigger(trigger);
         }
 
         public void SetCombatStance(bool on)

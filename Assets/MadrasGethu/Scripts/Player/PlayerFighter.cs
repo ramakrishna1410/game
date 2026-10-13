@@ -88,25 +88,25 @@ namespace MadrasGethu
         void BuildDefaultMoves()
         {
             lightChain.Add(new AttackData("Jab", FighterPose.Jab, 7f)
-                { startup = 0.08f, recovery = 0.22f, range = 1.5f, lunge = 1.2f, knockback = 1.5f, gethuGain = 4f });
+                { startup = 0.12f, recovery = 0.30f, range = 1.5f, lunge = 0.9f, knockback = 1.5f, gethuGain = 4f });
             lightChain.Add(new AttackData("Cross", FighterPose.Cross, 8f)
-                { startup = 0.09f, recovery = 0.24f, range = 1.55f, lunge = 1.2f, knockback = 1.8f, gethuGain = 4f });
+                { startup = 0.13f, recovery = 0.32f, range = 1.55f, lunge = 0.9f, knockback = 1.8f, gethuGain = 4f });
             lightChain.Add(new AttackData("Hook", FighterPose.Hook, 9f)
-                { startup = 0.1f, recovery = 0.26f, range = 1.6f, lunge = 1.2f, knockback = 2.2f, arc = 140f, gethuGain = 5f });
+                { startup = 0.15f, recovery = 0.36f, range = 1.6f, lunge = 0.9f, knockback = 2.2f, arc = 140f, gethuGain = 5f });
             lightChain.Add(new AttackData("Body Blow", FighterPose.BodyBlow, 11f)
-                { startup = 0.11f, recovery = 0.32f, range = 1.6f, lunge = 1.4f, knockback = 3.5f, gethuGain = 6f, hitStop = 0.07f, shake = 0.15f });
+                { startup = 0.16f, recovery = 0.42f, range = 1.6f, lunge = 1.0f, knockback = 3.5f, gethuGain = 6f, hitStop = 0.07f, shake = 0.15f });
 
             // Heavy ender depends on how many lights came before it (like Yakuza's rush + finisher strings).
             heavyEnders.Add(new AttackData("Haymaker", FighterPose.Haymaker, 16f)
-                { startup = 0.24f, recovery = 0.45f, range = 1.7f, lunge = 1.8f, knockback = 7f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
+                { startup = 0.28f, recovery = 0.55f, range = 1.7f, lunge = 1.2f, knockback = 7f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
             heavyEnders.Add(new AttackData("Kasimedu Kick", FighterPose.Kick, 15f)
-                { startup = 0.2f, recovery = 0.45f, range = 1.95f, lunge = 1.4f, knockback = 9f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
+                { startup = 0.26f, recovery = 0.55f, range = 1.95f, lunge = 1.0f, knockback = 9f, heavy = true, gethuGain = 8f, hitStop = 0.09f, shake = 0.25f });
             heavyEnders.Add(new AttackData("Uppercut", FighterPose.Uppercut, 18f)
-                { startup = 0.18f, recovery = 0.5f, range = 1.6f, lunge = 1.2f, knockback = 2f, launch = 7f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
+                { startup = 0.24f, recovery = 0.55f, range = 1.6f, lunge = 1.0f, knockback = 2f, launch = 7f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
             heavyEnders.Add(new AttackData("Spinning Backfist", FighterPose.Backfist, 18f)
-                { startup = 0.2f, recovery = 0.5f, range = 1.9f, arc = 360f, lunge = 0.6f, knockback = 8f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
+                { startup = 0.26f, recovery = 0.55f, range = 1.9f, arc = 360f, lunge = 0.5f, knockback = 8f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.3f });
             heavyEnders.Add(new AttackData("Royapuram Rush Finisher", FighterPose.Haymaker, 26f)
-                { startup = 0.2f, recovery = 0.55f, range = 1.8f, lunge = 1.8f, knockback = 10f, launch = 4f, heavy = true, gethuGain = 14f, hitStop = 0.13f, shake = 0.4f });
+                { startup = 0.28f, recovery = 0.65f, range = 1.8f, lunge = 1.2f, knockback = 10f, launch = 4f, heavy = true, gethuGain = 14f, hitStop = 0.13f, shake = 0.4f });
 
             stomp = new AttackData("Stomp", FighterPose.Stomp, 14f)
                 { startup = 0.2f, recovery = 0.4f, range = 1.4f, arc = 140f, lunge = 1.0f, knockback = 1f, heavy = true, hitsDowned = true, gethuGain = 6f, hitStop = 0.08f, shake = 0.2f };
@@ -145,8 +145,8 @@ namespace MadrasGethu
 
             if (IsDead) return;
 
-            if (GameInput.LightPressed) lightBufferedUntil = Time.time + 0.35f;
-            if (GameInput.HeavyPressed) heavyBufferedUntil = Time.time + 0.35f;
+            if (GameInput.LightPressed) lightBufferedUntil = Time.time + 0.45f;
+            if (GameInput.HeavyPressed) heavyBufferedUntil = Time.time + 0.45f;
 
             bool enemiesNear = CombatUtil.FindTarget(this, Vector3.zero, 7f, true) != null;
             Visual.SetCombatStance(enemiesNear || State == PlayerState.Block);
@@ -267,21 +267,21 @@ namespace MadrasGethu
 
             attackTarget = forcedTarget != null
                 ? forcedTarget
-                : CombatUtil.FindTarget(this, MoveInputWorld().sqrMagnitude > 0.01f ? MoveInputWorld() : transform.forward, 4.5f,
+                : CombatUtil.FindTarget(this, MoveInputWorld().sqrMagnitude > 0.01f ? MoveInputWorld() : transform.forward, 3.2f,
                     attack.hitsDowned);
 
             // Step in during the wind-up so the hit lands when we arrive.
-            lungeRemaining = attack.lunge * 0.4f;
+            lungeRemaining = 0.1f;   // punching the air: just a small weight shift
             if (attackTarget != null)
             {
                 Vector3 to = Flat(attackTarget.transform.position - transform.position);
                 Motor.FaceDirection(to, instant: true);
                 float gap = to.magnitude - attackTarget.radius - radius;
-                lungeRemaining = Mathf.Clamp(gap - attack.range * 0.45f, 0f, attack.lunge + 1.2f);
+                lungeRemaining = Mathf.Clamp(gap - attack.range * 0.45f, 0f, attack.lunge);
             }
             lungeDirection = transform.forward;
             lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(attack.startup, 0.05f));
-            Visual.Play(attack.pose, attack.startup + 0.2f);
+            Visual.Play(attack.pose, attack.startup + 0.2f, attack.startup + attack.recovery);
         }
 
         void UpdateAttack()
@@ -302,8 +302,11 @@ namespace MadrasGethu
             }
 
             float total = currentAttack.startup + currentAttack.recovery;
-            bool canCancel = struck && stateTimer >= currentAttack.startup + 0.06f;
-            if (canCancel && TryCommonActions(allowAttacks: true)) return;
+            // Dodge / block / grab can cut a move short; the next punch only comes in the combo window,
+            // so every punch plays out and button-mashing gives a steady jab-cross-hook-body rhythm.
+            bool canDefend = struck && stateTimer >= currentAttack.startup + 0.06f;
+            bool canChain = struck && stateTimer >= currentAttack.startup + currentAttack.recovery * 0.55f;
+            if (canDefend && TryCommonActions(allowAttacks: canChain)) return;
 
             if (stateTimer >= total)
             {
@@ -367,7 +370,7 @@ namespace MadrasGethu
             else Motor.FaceDirection(dir, instant: true);
             Motor.ClearImpulse();
             Motor.AddLunge(dir, dodgeDistance);
-            Visual.Play(FighterPose.Dodge, dodgeDuration);
+            Visual.Play(FighterPose.Dodge, dodgeDuration, dodgeDuration + 0.1f);
             lightIndex = 0;
         }
 
@@ -499,7 +502,7 @@ namespace MadrasGethu
                 victim.Throw(this, throwDir);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = 10f, direction = throwDir, hitsDowned = true });
                 RegisterHits(1, 8f);
-                Visual.Play(FighterPose.Throw, 0.4f);
+                Visual.Play(FighterPose.Throw, 0.4f, 0.7f);
                 if (GM != null) GM.Shake(0.2f);
                 SetState(PlayerState.Stagger);   // brief recovery
                 stateTimer = 0.1f;
@@ -510,7 +513,7 @@ namespace MadrasGethu
             {
                 lightBufferedUntil = 0f;
                 grabActionCooldown = knee.recovery;
-                Visual.Play(FighterPose.Knee, 0.25f);
+                Visual.Play(FighterPose.Knee, 0.25f, 0.4f);
                 float mult = MassMode ? massModeDamageMultiplier : 1f;
                 grabbed.ReceiveHit(knee.ToHit(this, transform.forward, mult));
                 FX.HitSpark(grabbed.Center, false);
@@ -573,7 +576,7 @@ namespace MadrasGethu
                 Gethu = 0f;
             }
 
-            Visual.Play(FighterPose.Slam, 0.6f);
+            Visual.Play(FighterPose.Slam, 0.6f, 0.9f);
             if (GM != null) GM.SlowMo(0.35f, 0.7f);
             if (cam != null) cam.FovKick(6f);
         }
