@@ -75,6 +75,20 @@ namespace MadrasGethu
         public int[] gradeHits = { 5, 10, 20, 35 };
         static readonly string[] GradeNames = { "NALLA!", "SEMMA!", "MASS!", "THALAIVAA!" };
 
+        [Header("Practice")]
+        [Tooltip("Gethu meter stays full (practice yard).")]
+        public bool infiniteGethu;
+        [Tooltip("Takes no damage (practice yard).")]
+        public bool invincible;
+
+        /// <summary>Raised when a named move connects (combo specials, finishers): the practice checklist listens.</summary>
+        public event System.Action<string> MoveLanded;
+
+        public void NotifyMoveLanded(string moveName)
+        {
+            if (MoveLanded != null && !string.IsNullOrEmpty(moveName)) MoveLanded(moveName);
+        }
+
         public PlayerState State { get; private set; } = PlayerState.Free;
         public float Gethu { get; private set; }
         public float GethuFraction => Gethu / maxGethu;
@@ -266,6 +280,7 @@ namespace MadrasGethu
             }
 
             if (IsDead) return;
+            if (infiniteGethu && !MassMode) Gethu = maxGethu;
 
             if (GameInput.LightPressed) lightBufferedUntil = Time.time + 0.45f;
             if (GameInput.HeavyPressed) heavyBufferedUntil = Time.time + 0.45f;
@@ -596,6 +611,7 @@ namespace MadrasGethu
             }
             if (result.hits > 0)
             {
+                NotifyMoveLanded(currentAttack.name);
                 RegisterHits(result.hits, currentAttack.gethuGain * result.hits);
                 if (GM != null)
                 {
@@ -1212,6 +1228,15 @@ namespace MadrasGethu
         {
             const float impactTime = 0.32f;
 
+            // Close side-on shot of the smash.
+            if (cam != null)
+            {
+                Vector3 focus = Vector3.Lerp(transform.position, finisherEndPoint, 0.5f) + Vector3.up * 1.0f;
+                Vector3 side = Vector3.Cross(Vector3.up, transform.forward);
+                if (Vector3.Dot(cam.transform.position - transform.position, side) < 0f) side = -side;
+                cam.SetCinematicShot(focus + side * 2.8f - transform.forward * 0.6f + Vector3.up * 0.2f, focus, 46f, 0f);
+            }
+
             if (!finisherImpactDone && finisherVictim != null)
             {
                 float t = Mathf.Clamp01(stateTimer / impactTime);
@@ -1228,7 +1253,10 @@ namespace MadrasGethu
             }
 
             if (stateTimer >= 0.9f)
+            {
                 SetState(PlayerState.Free);
+                if (cam != null) cam.EndCinematic(0.2f);
+            }
         }
 
         void FinisherImpact()
@@ -1239,6 +1267,7 @@ namespace MadrasGethu
             float damage = finisherDamage;
             string title = finisherTitle;
 
+            NotifyMoveLanded(title);
             if (victim != null && !victim.IsDead)
             {
                 victim.ReleaseFromGrab(dir * 4f + Vector3.up * 3f, knockDown: true);
@@ -1270,6 +1299,7 @@ namespace MadrasGethu
                 FX.Dust(transform.position + dir, 24);
             }
 
+            if (cam != null) cam.ZoomPunch(7f);
             if (GM != null)
             {
                 GM.HitStop(0.12f);
@@ -1284,6 +1314,7 @@ namespace MadrasGethu
         public override HitResult ReceiveHit(HitInfo hit)
         {
             if (IsDead || Invulnerable) return HitResult.Ignored;
+            if (invincible) { Visual.Flinch(0.5f); return HitResult.Hit; }
 
             bool facing = Vector3.Dot(transform.forward, -hit.direction) > 0.2f;
             if (State == PlayerState.Block && facing && !hit.unblockable)
@@ -1363,6 +1394,7 @@ namespace MadrasGethu
         public void Respawn(Vector3 position)
         {
             if (wrestleMove != null) EndWrestle();
+            if (cam != null) cam.EndCinematic(0f);
             if (grabbed != null) ReleaseGrab(Vector3.zero, false);
             heldBy = null;
             Motor.SetFrozen(false);

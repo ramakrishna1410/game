@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public class GameManager : MonoBehaviour
     {
-        public enum State { Intro, Fighting, BetweenWaves, Victory, GameOver }
+        public enum State { Intro, Fighting, BetweenWaves, Victory, GameOver, Practice }
 
         [System.Serializable]
         public class Wave
@@ -33,6 +33,21 @@ namespace MadrasGethu
         public List<Wave> waves = new List<Wave>();
         public List<Vector3> spawnPoints = new List<Vector3>();
         public Vector3 playerStart;
+
+        [Header("Practice yard")]
+        public bool practiceMode;
+        public Vector3 dummySpawn;
+        public EnemyKind dummyKind = EnemyKind.Rowdy;
+
+        public bool PracticeMode => practiceMode;
+        public EnemyFighter Dummy { get; private set; }
+        /// <summary>Moves landed in the practice yard (upper case, no "!").</summary>
+        public readonly HashSet<string> PracticeLanded = new HashSet<string>();
+        public string PracticeLastMove { get; private set; }
+        public float PracticeLastHit { get; private set; }
+        public float PracticeStringDamage { get; private set; }
+        float lastDummyHitTime;
+        readonly Dictionary<FinisherSpot, float> brokenSince = new Dictionary<FinisherSpot, float>();
 
         public State CurrentState { get; private set; }
         public int WaveIndex { get; private set; }
@@ -68,7 +83,102 @@ namespace MadrasGethu
 
         void Start()
         {
-            BeginIntro();
+            if (practiceMode) BeginPractice();
+            else BeginIntro();
+        }
+
+        // ------------------------------------------------------------------ practice yard
+
+        void BeginPractice()
+        {
+            CurrentState = State.Practice;
+            WaveIndex = -1;
+            ShowBanner("PRACTICE YARD", "One dummy. He won't move, won't hit back, and won't go down for good.", 3f);
+            if (Player != null)
+            {
+                Player.infiniteGethu = true;
+                Player.invincible = true;
+                Player.MoveLanded += OnPracticeMoveLanded;
+            }
+            SpawnDummy();
+        }
+
+        void SpawnDummy()
+        {
+            if (Dummy != null)
+            {
+                AliveEnemies.Remove(Dummy);
+                Destroy(Dummy.gameObject);
+            }
+            EnemyDirector.Reset();
+            Dummy = CharacterFactory.CreateEnemy(dummyKind, dummySpawn);
+            Dummy.isDummy = true;
+            Dummy.displayName = "Dummy (" + Dummy.Profile.displayName + ")";
+            Dummy.gameObject.name = Dummy.displayName;
+            Dummy.Damaged += OnDummyDamaged;
+            AliveEnemies.Add(Dummy);
+        }
+
+        void ResetPractice()
+        {
+            SpawnDummy();
+            foreach (var spot in FinisherSpot.All) spot.Repair();
+            brokenSince.Clear();
+            foreach (var w in Weapon.All.ToArray())
+                if (w != null && w.Holder == null) Destroy(w.gameObject);
+            PracticeYardBuilder.PlaceWeapons();
+        }
+
+        /// <summary>Not while the hero has hold of the dummy (grab, finisher), or the hero would hold a deleted body.</summary>
+        bool CanReplaceDummy =>
+            Player == null || (Player.Grabbed == null && Player.State != PlayerFighter.PlayerState.Wrestle && Player.State != PlayerFighter.PlayerState.Finisher);
+
+        void UpdatePractice()
+        {
+            if (GameInput.PracticeResetPressed && CanReplaceDummy) ResetPractice();
+            if (GameInput.PracticeSwitchPressed && CanReplaceDummy)
+            {
+                dummyKind = dummyKind == EnemyKind.Rowdy ? EnemyKind.Thadiyan : dummyKind == EnemyKind.Thadiyan ? EnemyKind.Boss : EnemyKind.Rowdy;
+                SpawnDummy();
+                AddPopup(Dummy.displayName.ToUpper(), Dummy.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 1f);
+            }
+            if (GameInput.PracticeGethuPressed && Player != null)
+            {
+                Player.infiniteGethu = !Player.infiniteGethu;
+                AddPopup(Player.infiniteGethu ? "INFINITE GETHU: ON" : "INFINITE GETHU: OFF", Player.Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 0.9f);
+            }
+
+            if (Dummy == null) SpawnDummy();
+            // Knocked out of the yard (or far off): put him back on his mark.
+            if (!Dummy.IsGrabbed && !Dummy.IsDowned && CanReplaceDummy &&
+                (Dummy.transform.position.y < -2f || Vector3.ProjectOnPlane(Dummy.transform.position - dummySpawn, Vector3.up).magnitude > 14f))
+                SpawnDummy();
+
+            if (Time.time - lastDummyHitTime > 2.5f) PracticeStringDamage = 0f;
+
+            // Smashed props come back after a few seconds so you can practise again.
+            foreach (var spot in FinisherSpot.All)
+            {
+                if (spot == null || !spot.IsBroken) continue;
+                if (!brokenSince.TryGetValue(spot, out float t)) brokenSince[spot] = Time.time;
+                else if (Time.time - t > 5f) { spot.Repair(); brokenSince.Remove(spot); }
+            }
+        }
+
+        void OnDummyDamaged(Fighter f, HitInfo hit, HitResult result)
+        {
+            if (Time.time - lastDummyHitTime > 2.5f) PracticeStringDamage = 0f;
+            lastDummyHitTime = Time.time;
+            PracticeLastHit = hit.damage;
+            PracticeStringDamage += hit.damage;
+        }
+
+        void OnPracticeMoveLanded(string moveName)
+        {
+            string key = moveName.Trim().TrimEnd('!').Trim().ToUpperInvariant();
+            PracticeLastMove = key;
+            if (PracticeLanded.Add(key))
+                AddPopup("NEW: " + key, (Dummy != null ? Dummy.Center : Player.Center) + Vector3.up * 1.6f, new Color(0.5f, 1f, 0.6f), 1f);
         }
 
         // ------------------------------------------------------------------ game flow
@@ -133,6 +243,10 @@ namespace MadrasGethu
                 case State.BetweenWaves:
                     stateTimer -= Time.unscaledDeltaTime;
                     if (stateTimer <= 0f) StartNextWave();
+                    break;
+
+                case State.Practice:
+                    UpdatePractice();
                     break;
 
                 case State.Victory:

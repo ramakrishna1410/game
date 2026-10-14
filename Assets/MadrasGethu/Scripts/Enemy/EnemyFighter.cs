@@ -89,6 +89,11 @@ namespace MadrasGethu
         public bool IsBegging => state == AIState.Begging;
         public bool IsFleeing => state == AIState.Fleeing;
         public bool IsDazed => state == AIState.Dazed;
+
+        /// <summary>Practice dummy: never moves on his own, never attacks, never dies.</summary>
+        public bool isDummy;
+        protected override bool Immortal => isDummy;
+        float lastHitTime;
         /// <summary>The hero can grab him now (Thadiyan included) and use a wrestling finisher.</summary>
         public bool IsOpen => state == AIState.Dazed || state == AIState.Stagger;
         public override bool IsDowned => state == AIState.Down || state == AIState.GetUp;
@@ -155,7 +160,7 @@ namespace MadrasGethu
                 CheckWallBounce();
             }
 
-            if (!hurtShouted && !IsBoss && HealthFraction < 0.3f)
+            if (!hurtShouted && !IsBoss && !isDummy && HealthFraction < 0.3f)
             {
                 hurtShouted = true;
                 Shouts.Say(this, ShoutType.Hurt);
@@ -178,12 +183,14 @@ namespace MadrasGethu
             switch (state)
             {
                 case AIState.Approach:
+                    if (isDummy) { DummyIdle(); break; }
                     Visual.SetCombatStance(dist < 9f);
                     MoveTowards(dirToPlayer, Profile.runSpeed * MoodSpeed);
                     if (dist <= waitRadius + 1f) state = AIState.Wait;
                     break;
 
                 case AIState.Wait:
+                    if (isDummy) { DummyIdle(); break; }
                     if (Time.time >= nextEngageCheck)
                     {
                         nextEngageCheck = Time.time + 0.4f;
@@ -200,6 +207,7 @@ namespace MadrasGethu
                     break;
 
                 case AIState.Engage:
+                    if (isDummy) { DummyIdle(); break; }
                     if (!EnemyDirector.IsEngaged(this))
                     {
                         state = AIState.Wait;   // swapped out: step back and watch
@@ -324,6 +332,18 @@ namespace MadrasGethu
                     if (stateTimer <= 0f) ResumeStance();
                     break;
                 }
+            }
+        }
+
+        /// <summary>Dummy: stands his ground in a guard, and heals back up a little after you stop hitting him.</summary>
+        void DummyIdle()
+        {
+            Motor.SetDesiredVelocity(Vector3.zero);
+            Visual.SetCombatStance(true);
+            if (Time.time - lastHitTime > 2.5f && Health < maxHealth)
+            {
+                Heal(maxHealth);
+                dazedOnce = false;
             }
         }
 
@@ -841,6 +861,7 @@ namespace MadrasGethu
             if (IsDead) return HitResult.Ignored;
             if (state == AIState.Roaring) return HitResult.Ignored;
             if (IsDowned && !hit.hitsDowned) return HitResult.Ignored;
+            lastHitTime = Time.time;
 
             // Begging: any blow finishes him.
             if (state == AIState.Begging && hit.attacker != null && hit.attacker.team == Team.Player)
@@ -853,7 +874,7 @@ namespace MadrasGethu
             }
 
             // Bigger rowdies sometimes put their guard up while circling.
-            bool canBlock = (state == AIState.Engage || state == AIState.Wait || state == AIState.Approach) && !hit.heavy && !hit.unblockable;
+            bool canBlock = !isDummy && (state == AIState.Engage || state == AIState.Wait || state == AIState.Approach) && !hit.heavy && !hit.unblockable;
             if (canBlock && Random.value < Profile.blockChance)
             {
                 Motor.FaceDirection(-hit.direction, true);
@@ -867,12 +888,12 @@ namespace MadrasGethu
 
             Visual.SetTelegraph(false);
             Visual.Flash();
-            if (hit.attacker != null && hit.attacker.team == Team.Player && !surrendered)
+            if (hit.attacker != null && hit.attacker.team == Team.Player && !surrendered && !isDummy)
                 EnemyDirector.ForceEngage(this, hit.attacker.transform.position);
             ApplyDamage(hit.damage, hit, HitResult.Hit);
             if (IsDead) return HitResult.Hit;
 
-            if (Profile.hasPhaseTwo && !phaseTwo && HealthFraction <= 0.5f)
+            if (Profile.hasPhaseTwo && !phaseTwo && !isDummy && HealthFraction <= 0.5f)
             {
                 EnterPhaseTwo();
                 return HitResult.Hit;
@@ -1209,7 +1230,11 @@ namespace MadrasGethu
                 GameManager.Instance.Shake(0.3f);
                 GameManager.Instance.HitStop(0.08f);
             }
-            if (Player != null) Player.AddGethu(8f);
+            if (Player != null)
+            {
+                Player.AddGethu(8f);
+                Player.NotifyMoveLanded("Wall Bounce");
+            }
         }
 
         /// <summary>Seconds until this rowdy's telegraphed hit lands (huge when not attacking).</summary>

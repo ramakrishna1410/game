@@ -42,7 +42,7 @@ namespace MadrasGethu
 
         // ------------------------------------------------------------------ lighting
 
-        static void SetupNightLighting(Transform root)
+        public static void SetupNightLighting(Transform root)
         {
             var moonGo = new GameObject("Moonlight");
             moonGo.transform.SetParent(root, false);
@@ -242,7 +242,7 @@ namespace MadrasGethu
             return spot;
         }
 
-        static void BuildTeaKadai(Transform root, Vector3 position)
+        public static void BuildTeaKadai(Transform root, Vector3 position)
         {
             var spot = MakeSpot(root, "Tea Kadai", position, out var v);
             spot.finisherName = "TEA KADAI SMASH!";
@@ -277,7 +277,7 @@ namespace MadrasGethu
             Palette.Primitive(PrimitiveType.Cube, v, new Vector3(1.5f, 0.25f, 0f), new Vector3(0.4f, 0.5f, 2f), wood * 0.8f, name: "Bench");
         }
 
-        static void BuildFishCrates(Transform root, Vector3 position, bool finisher)
+        public static void BuildFishCrates(Transform root, Vector3 position, bool finisher)
         {
             Transform parent;
             if (finisher)
@@ -307,7 +307,7 @@ namespace MadrasGethu
                 }
         }
 
-        static void BuildAuto(Transform root, Vector3 position, float yaw)
+        public static void BuildAuto(Transform root, Vector3 position, float yaw)
         {
             var spot = MakeSpot(root, "Parked Auto", position, out var v);
             spot.finisherName = "AUTO SMASH!";

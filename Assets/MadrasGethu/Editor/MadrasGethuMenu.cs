@@ -9,6 +9,7 @@ namespace MadrasGethu.EditorTools
     {
         const string SceneFolder = "Assets/MadrasGethu/Scenes";
         const string ScenePath = SceneFolder + "/KasimeduArena.unity";
+        public const string PracticeScenePath = SceneFolder + "/PracticeYard.unity";
 
         [MenuItem("Madras Gethu/Create Kasimedu Arena Scene", priority = 0)]
         public static void CreateArenaScene()
@@ -16,9 +17,7 @@ namespace MadrasGethu.EditorTools
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
 
-            if (!AssetDatabase.IsValidFolder(SceneFolder))
-                AssetDatabase.CreateFolder("Assets/MadrasGethu", "Scenes");
-
+            EnsureSceneFolder();
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var bootstrap = new GameObject("Game Bootstrap");
             bootstrap.AddComponent<GameBootstrap>();
@@ -40,6 +39,75 @@ namespace MadrasGethu.EditorTools
             }
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 EditorSceneManager.OpenScene(ScenePath);
+        }
+
+        [MenuItem("Madras Gethu/Create Practice Yard Scene", priority = 2)]
+        public static void CreatePracticeScene()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            EnsureSceneFolder();
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var go = new GameObject("Game Bootstrap (Practice)");
+            var bootstrap = go.AddComponent<GameBootstrap>();
+            bootstrap.practiceMode = true;
+            EditorSceneManager.SaveScene(scene, PracticeScenePath);
+
+            // Use the same characters as the arena (set by Setup Characters), so the dummy isn't a block.
+            bool copied = CopyCharactersFromArena(bootstrap);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, PracticeScenePath);
+            AddSceneToBuildSettings(PracticeScenePath);
+
+            Selection.activeGameObject = go;
+            EditorUtility.DisplayDialog("Madras Gethu",
+                "Practice Yard created at\n" + PracticeScenePath +
+                (copied ? "\n\nYour characters were copied from the arena scene." : "\n\n(No characters set up yet: placeholder bodies are used.)") +
+                "\n\nPress Play.  R = reset dummy · T = switch dummy · G = infinite Gethu on/off", "Practice pannalaam!");
+        }
+
+        [MenuItem("Madras Gethu/Open Practice Yard Scene", priority = 3)]
+        public static void OpenPracticeScene()
+        {
+            if (!System.IO.File.Exists(PracticeScenePath))
+            {
+                CreatePracticeScene();
+                return;
+            }
+            if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                EditorSceneManager.OpenScene(PracticeScenePath);
+        }
+
+        /// <summary>Copies the character models and animator from the arena scene's bootstrap.</summary>
+        static bool CopyCharactersFromArena(GameBootstrap target)
+        {
+            if (!System.IO.File.Exists(ScenePath)) return false;
+            var arena = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+            GameBootstrap source = null;
+            foreach (var root in arena.GetRootGameObjects())
+            {
+                source = root.GetComponentInChildren<GameBootstrap>(true);
+                if (source != null) break;
+            }
+            bool found = source != null && source.playerModelPrefab != null;
+            if (source != null)
+            {
+                target.playerModelPrefab = source.playerModelPrefab;
+                target.enemyModelPrefab = source.enemyModelPrefab;
+                target.thadiyanModelPrefab = source.thadiyanModelPrefab;
+                target.bossModelPrefab = source.bossModelPrefab;
+                target.fighterAnimator = source.fighterAnimator;
+                EditorUtility.SetDirty(target);
+            }
+            EditorSceneManager.CloseScene(arena, true);
+            return found;
+        }
+
+        static void EnsureSceneFolder()
+        {
+            if (!AssetDatabase.IsValidFolder(SceneFolder))
+                AssetDatabase.CreateFolder("Assets/MadrasGethu", "Scenes");
         }
 
         static void AddSceneToBuildSettings(string path)

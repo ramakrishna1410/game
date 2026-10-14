@@ -24,6 +24,7 @@ namespace MadrasGethu
         void Start()
         {
             helpAutoHideAt = Time.unscaledTime + 12f;
+            if (GM != null && GM.PracticeMode) { showHelp = false; helpAutoHideAt = float.MaxValue; }
         }
 
         void Update()
@@ -58,6 +59,7 @@ namespace MadrasGethu
             DrawPlayerPanel();
             DrawCombo();
             DrawWaveInfo();
+            if (GM.PracticeMode) DrawPractice();
             DrawBanner();
             DrawPrompt();
             DrawQte();
@@ -171,7 +173,7 @@ namespace MadrasGethu
         {
             var p = GM.Player;
             if (p == null) return;
-            float cx = Screen.width * 0.5f, cy = Screen.height * 0.6f;
+            float cx = Screen.width * 0.5f, cy = Screen.height * 0.74f;   // low, so the close-up stays visible
 
             if (p.QteActive)
             {
@@ -407,6 +409,98 @@ namespace MadrasGethu
                 Color c = p.color;
                 c.a = Mathf.Clamp01(1.2f - age);
                 Shadowed(new Rect(sp.x - 300 * S, Screen.height - sp.y - 25 * S, 600 * S, 50 * S), p.text, style, c);
+            }
+        }
+
+        // ------------------------------------------------------------------ practice yard
+
+        static readonly string[,] PracticeMoves =
+        {
+            { "COMBOS", "" },
+            { "Haymaker", "RMB" },
+            { "Charged Haymaker", "hold RMB" },
+            { "Kasimedu Kick", "LMB RMB" },
+            { "Shoulder Barge", "LMB RMB RMB" },
+            { "Kasimedu Haymaker", "LMB RMB RMB RMB" },
+            { "Uppercut", "LMB LMB RMB" },
+            { "Air Hammer", "LMB LMB RMB RMB" },
+            { "Spinning Backfist", "LMB x3 RMB" },
+            { "Royapuram Rush Finisher", "LMB x4 RMB" },
+            { "Double Hammer", "heavy, RMB" },
+            { "Leg Sweep", "back + RMB" },
+            { "Shoulder Rush", "forward + RMB (far)" },
+            { "Running Knee", "sprint + LMB" },
+            { "Clothesline", "sprint + RMB" },
+            { "Back Elbow", "LMB, him behind you" },
+            { "Pivot Backfist", "dodge, LMB" },
+            { "Flying Kick", "jump, LMB" },
+            { "Stomp", "RMB on the ground" },
+            { "Wall Bounce", "heavy into a wall" },
+            { "Wall Slam", "grab, E at the wall" },
+            { "WRESTLING", "" },
+            { "Body Slam", "grab, Q" },
+            { "Dhobi Pachad", "grab, move, Q" },
+            { "German Suplex", "grab from behind, Q" },
+            { "Spinebuster", "grab at a wall, Q" },
+            { "Powerbomb", "grab, Q (full Gethu)" },
+            { "Spear", "sprint at him, Q" },
+            { "Elbow Drop", "him on the ground, Q" },
+            { "PROPS", "" },
+            { "Tea Kadai Smash", "grab at the kadai, Q" },
+            { "Meen Petti Slam", "grab at the crates, Q" },
+            { "Auto Smash", "grab at the auto, Q" },
+        };
+
+        /// <summary>Practice yard: a checklist of every move (ticks when it lands), damage numbers and the yard keys.</summary>
+        void DrawPractice()
+        {
+            float x = Screen.width - 440 * S, y = 30 * S, w = 410 * S;
+            var right = new GUIStyle(small) { alignment = TextAnchor.UpperRight };
+            Shadowed(new Rect(x, y, w, 26 * S), "PRACTICE YARD", new GUIStyle(label) { alignment = TextAnchor.UpperRight }, Gold);
+            y += 30 * S;
+            var p = GM.Player;
+            string dummyName = GM.Dummy != null ? GM.Dummy.Profile.displayName : "-";
+            Shadowed(new Rect(x, y, w, 22 * S), $"R reset dummy  ·  T dummy: {dummyName}  ·  G infinite Gethu: {(p != null && p.infiniteGethu ? "ON" : "OFF")}", right, Color.white);
+            y += 26 * S;
+            if (GM.PracticeStringDamage > 0f)
+            {
+                Shadowed(new Rect(x, y, w, 24 * S), $"Last hit {GM.PracticeLastHit:0}   ·   String damage {GM.PracticeStringDamage:0}", right, new Color(1f, 0.85f, 0.5f));
+                y += 26 * S;
+            }
+            if (!string.IsNullOrEmpty(GM.PracticeLastMove))
+            {
+                Shadowed(new Rect(x, y, w, 24 * S), "Last move: " + GM.PracticeLastMove, right, new Color(0.6f, 1f, 0.7f));
+                y += 26 * S;
+            }
+
+            if (showHelp) return;   // the controls panel is showing instead
+
+            // Checklist on the left, under the health bars.
+            int rows = PracticeMoves.GetLength(0);
+            int done = 0, total = 0;
+            for (int i = 0; i < rows; i++)
+                if (PracticeMoves[i, 1] != "") { total++; if (GM.PracticeLanded.Contains(PracticeMoves[i, 0].ToUpperInvariant())) done++; }
+
+            float lh = 19 * S, cx = 30 * S, cy = 150 * S, cw = 420 * S;
+            var rowStyle = new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * S) };
+            var hintStyle = new GUIStyle(rowStyle) { alignment = TextAnchor.UpperRight };
+            Bar(new Rect(cx - 8 * S, cy - 8 * S, cw + 16 * S, (rows + 1) * lh + 16 * S), 1f, new Color(0f, 0f, 0f, 0.4f));
+            Shadowed(new Rect(cx, cy, cw, lh), $"MOVES LANDED  {done} / {total}", new GUIStyle(rowStyle) { fontStyle = FontStyle.Bold }, Gold);
+            for (int i = 0; i < rows; i++)
+            {
+                float ry = cy + (i + 1) * lh;
+                string name = PracticeMoves[i, 0], hint = PracticeMoves[i, 1];
+                if (hint == "")
+                {
+                    Shadowed(new Rect(cx, ry, cw, lh), name, new GUIStyle(rowStyle) { fontStyle = FontStyle.Bold }, new Color(1f, 0.7f, 0.3f));
+                    continue;
+                }
+                bool landed = GM.PracticeLanded.Contains(name.ToUpperInvariant());
+                Color c = landed ? new Color(0.55f, 1f, 0.6f) : new Color(1f, 1f, 1f, 0.75f);
+                float dot = 11 * S;
+                HudIcons.Draw(new Rect(cx, ry + (lh - dot) / 2f, dot, dot), landed ? HudIcons.Disc : HudIcons.Ring, c);
+                Shadowed(new Rect(cx + dot + 6 * S, ry, cw, lh), name, rowStyle, c);
+                Shadowed(new Rect(cx, ry, cw, lh), hint, hintStyle, new Color(1f, 1f, 1f, landed ? 0.45f : 0.6f));
             }
         }
 

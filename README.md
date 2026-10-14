@@ -48,6 +48,27 @@ The prototype is light. It runs fine on integrated Intel Arc graphics with 16 GB
 > Tip: keep the laptop plugged in and in performance mode while working in Unity.
 > For glowing street lamps, add **GameObject → Volume → Global Volume**, create a new profile, and add a **Bloom** override.
 
+## Practice Yard
+
+A separate scene to learn the moves on **one dummy that never moves, never attacks and never dies**.
+
+1. In Unity: **Madras Gethu → Create Practice Yard Scene** (it copies your characters from the arena scene).
+2. Press **Play**.
+
+| Key | What it does |
+|---|---|
+| R | Reset the dummy to his mark (also repairs props and puts the weapons back) |
+| T | Switch dummy: Rowdy → Thadiyan → Boss |
+| G | Infinite Gethu on/off (on by default, so you can practise every finisher) |
+
+The left panel lists every move with its input; each one ticks green the first time it lands. The top right shows the last hit, the damage of your current string and the last move. Smashed props rebuild themselves after a few seconds. The yard has a brick wall (wall slams, wall bounces, spinebuster), a tea kadai, fish crates, an auto and a weapon rack.
+
+Use **Madras Gethu → Open Practice Yard Scene** later, or **Open Kasimedu Arena Scene** to go back to the waves.
+
+## Finisher camera
+
+Wrestling and prop finishers switch to a **close-up cinematic camera**: a low angle looking up at the lift, side-on for the throw, street level for the slam, overhead for the elbow drop. It pushes in slowly while a prompt waits, punches in on impact and holds on the landing in slow motion before easing back. To turn it off, untick **Cinematic Finishers** on the Main Camera's *Third Person Camera* while playing.
+
 ## Controls
 
 Keyboard and mouse for now (gamepad prompts come later).
@@ -123,7 +144,7 @@ Assets/MadrasGethu/
     Player/        PlayerFighter: combos, block/counter, dodge, grabs, finishers, Gethu meter
                    PlayerWrestling: wrestling finishers and QTE prompts · MoveUnlocks: skill-tree hooks
     Enemy/         EnemyFighter AI, EnemyProfile (stats per enemy type), EnemyDirector (attack turns)
-    World/         KasimeduArenaBuilder (placeholder level), FinisherSpot (tea kadai / crates / auto)
+    World/         KasimeduArenaBuilder (placeholder level), PracticeYardBuilder, FinisherSpot (tea kadai / crates / auto)
     CameraSystem/  ThirdPersonCamera
     UI/            GameHUD (health, Gethu, combo grades, button prompts, QTE ring), HudIcons (key caps, hand, skull)
   Editor/          "Madras Gethu" menu: creates the arena scene

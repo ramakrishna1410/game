@@ -25,6 +25,9 @@ namespace MadrasGethu
 
         public Vector3 playerStart = new Vector3(0f, 0.1f, -6f);
 
+        [Tooltip("Practice yard: one dummy that never moves, never attacks and never dies. No waves.")]
+        public bool practiceMode;
+
         void Awake()
         {
             Time.timeScale = 1f;
@@ -34,7 +37,12 @@ namespace MadrasGethu
             CharacterFactory.BossModelPrefab = bossModelPrefab;
             CharacterFactory.FighterAnimator = fighterAnimator;
 
-            if (buildArena)
+            if (practiceMode)
+            {
+                playerStart = PracticeYardBuilder.PlayerStart;
+                if (buildArena) PracticeYardBuilder.Build(new GameObject("Practice Yard").transform);
+            }
+            else if (buildArena)
             {
                 var arena = new GameObject("Kasimedu Harbour").transform;
                 KasimeduArenaBuilder.Build(arena);
@@ -46,11 +54,19 @@ namespace MadrasGethu
             var gm = gmGo.AddComponent<GameManager>();
             gm.playerStart = playerStart;
             gm.Cam = cam;
-            gm.spawnPoints.Add(new Vector3(0f, 0.1f, 28f));
-            gm.spawnPoints.Add(new Vector3(-4f, 0.1f, 24f));
-            gm.spawnPoints.Add(new Vector3(2f, 0.1f, -28f));
-            gm.spawnPoints.Add(new Vector3(-3f, 0.1f, -24f));
-            AddWaves(gm);
+            if (practiceMode)
+            {
+                gm.practiceMode = true;
+                gm.dummySpawn = PracticeYardBuilder.DummySpawn;
+            }
+            else
+            {
+                gm.spawnPoints.Add(new Vector3(0f, 0.1f, 28f));
+                gm.spawnPoints.Add(new Vector3(-4f, 0.1f, 24f));
+                gm.spawnPoints.Add(new Vector3(2f, 0.1f, -28f));
+                gm.spawnPoints.Add(new Vector3(-3f, 0.1f, -24f));
+                AddWaves(gm);
+            }
 
             var player = CharacterFactory.CreatePlayer(playerStart, cam);
             gm.Player = player;

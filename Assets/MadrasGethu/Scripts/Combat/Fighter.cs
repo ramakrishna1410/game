@@ -53,9 +53,18 @@ namespace MadrasGethu
         /// <summary>Called by attackers. Implementations decide on block, dodge, armour and reactions.</summary>
         public abstract HitResult ReceiveHit(HitInfo hit);
 
+        /// <summary>Practice dummies: take hits and react, but never go below 1 health.</summary>
+        protected virtual bool Immortal => false;
+
         protected void ApplyDamage(float amount, HitInfo hit, HitResult result)
         {
             if (IsDead) return;
+            if (Immortal)
+            {
+                Health = Mathf.Max(1f, Health - amount);
+                Damaged?.Invoke(this, hit, result);
+                return;
+            }
             Health = Mathf.Max(0f, Health - amount);
             Damaged?.Invoke(this, hit, result);
             if (Health <= 0f)

@@ -771,9 +771,30 @@ namespace MadrasGethu.EditorTools
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return "Scene not updated (you cancelled saving the open scene). Assign the prefabs on Game Bootstrap by hand.";
 
+            var rowdy = Lookup(prefabs, "rowdy");
+            string message;
+            if (!AssignInScene(ArenaScenePath, prefabs, heroPath, controller))
+                message = "No Game Bootstrap found in the arena scene. Assign the prefabs by hand.";
+            else
+                message = rowdy != null
+                    ? "Kasimedu Arena scene updated with your characters."
+                    : "Kasimedu Arena scene updated. No Rowdy.fbx found, so enemies use the Hero model for now.";
+
+            // The practice yard uses the same characters.
+            if (File.Exists(MadrasGethuMenu.PracticeScenePath))
+            {
+                if (AssignInScene(MadrasGethuMenu.PracticeScenePath, prefabs, heroPath, controller))
+                    message += " Practice Yard updated too.";
+                EditorSceneManager.OpenScene(ArenaScenePath, OpenSceneMode.Single);
+            }
+            return message;
+        }
+
+        static bool AssignInScene(string scenePath, Dictionary<string, GameObject> prefabs, string heroPath, AnimatorController controller)
+        {
             var scene = EditorSceneManager.GetActiveScene();
-            if (scene.path != ArenaScenePath)
-                scene = EditorSceneManager.OpenScene(ArenaScenePath, OpenSceneMode.Single);
+            if (scene.path != scenePath)
+                scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
 
             GameBootstrap bootstrap = null;
             foreach (var root in scene.GetRootGameObjects())
@@ -781,8 +802,7 @@ namespace MadrasGethu.EditorTools
                 bootstrap = root.GetComponentInChildren<GameBootstrap>(true);
                 if (bootstrap != null) break;
             }
-            if (bootstrap == null)
-                return "No Game Bootstrap found in the arena scene. Assign the prefabs by hand.";
+            if (bootstrap == null) return false;
 
             var hero = Lookup(prefabs, Normalize(Path.GetFileNameWithoutExtension(heroPath)));
             var rowdy = Lookup(prefabs, "rowdy");
@@ -796,10 +816,7 @@ namespace MadrasGethu.EditorTools
             EditorUtility.SetDirty(bootstrap);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-
-            return rowdy != null
-                ? "Kasimedu Arena scene updated with your characters."
-                : "Kasimedu Arena scene updated. No Rowdy.fbx found, so enemies use the Hero model for now.";
+            return true;
         }
 
         static GameObject Lookup(Dictionary<string, GameObject> prefabs, string key) =>
