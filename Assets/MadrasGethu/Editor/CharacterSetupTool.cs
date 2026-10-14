@@ -892,7 +892,7 @@ namespace MadrasGethu.EditorTools
                         float impact = 0f;
                         if (reach != Reach.None)
                         {
-                            string key = slot.clip.GetInstanceID() + "/" + reach;
+                            string key = AssetDatabase.GetAssetPath(slot.clip) + "/" + slot.clip.name + "/" + reach;
                             if (!cache.TryGetValue(key, out impact))
                             {
                                 impact = MeasureImpact(go, animator, slot.clip, reach);
