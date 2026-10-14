@@ -14,6 +14,7 @@ namespace MadrasGethu
         static readonly Color Panel = new Color(0f, 0f, 0f, 0.55f);
 
         bool showHelp = true;
+        bool showChecklist = true;
         float helpAutoHideAt;
         float displayedHealth = 1f;
         GUIStyle label, big, huge, small, center, keyText;
@@ -30,6 +31,7 @@ namespace MadrasGethu
         void Update()
         {
             if (GameInput.HelpPressed) { showHelp = !showHelp; helpAutoHideAt = float.MaxValue; }
+            if (GameInput.PracticeListPressed) showChecklist = !showChecklist;
             if (Time.unscaledTime > helpAutoHideAt) { showHelp = false; helpAutoHideAt = float.MaxValue; }
         }
 
@@ -435,14 +437,14 @@ namespace MadrasGethu
             { "Pivot Backfist", "dodge, LMB" },
             { "Flying Kick", "jump, LMB" },
             { "Stomp", "RMB on the ground" },
-            { "Wall Bounce", "heavy into a wall" },
+            { "Wall Bounce", "knock him into a wall" },
             { "Wall Slam", "grab, E at the wall" },
             { "WRESTLING", "" },
             { "Body Slam", "grab, Q" },
             { "Dhobi Pachad", "grab, move, Q" },
             { "German Suplex", "grab from behind, Q" },
-            { "Spinebuster", "grab at a wall, Q" },
-            { "Powerbomb", "grab, Q (full Gethu)" },
+            { "Spinebuster", "grab, push at a wall, Q" },
+            { "Powerbomb", "grab, SHIFT+Q (full)" },
             { "Spear", "sprint at him, Q" },
             { "Elbow Drop", "him on the ground, Q" },
             { "PROPS", "" },
@@ -461,6 +463,8 @@ namespace MadrasGethu
             var p = GM.Player;
             string dummyName = GM.Dummy != null ? GM.Dummy.Profile.displayName : "-";
             Shadowed(new Rect(x, y, w, 22 * S), $"R reset dummy  ·  T dummy: {dummyName}  ·  G infinite Gethu: {(p != null && p.infiniteGethu ? "ON" : "OFF")}", right, Color.white);
+            y += 22 * S;
+            Shadowed(new Rect(x, y, w, 22 * S), showChecklist ? "L hide move list" : "L show move list", right, new Color(1f, 1f, 1f, 0.7f));
             y += 26 * S;
             if (GM.PracticeStringDamage > 0f)
             {
@@ -473,7 +477,7 @@ namespace MadrasGethu
                 y += 26 * S;
             }
 
-            if (showHelp) return;   // the controls panel is showing instead
+            if (showHelp || !showChecklist) return;   // the controls panel is showing instead, or it's folded away
 
             // Checklist on the left, under the health bars.
             int rows = PracticeMoves.GetLength(0);
@@ -529,8 +533,8 @@ namespace MadrasGethu
                 "",
                 "WRESTLING (Q, 1 Gethu bar; follow the ring prompts)",
                 "hold, standing still .. Body Slam      hold, moving ...... Dhobi Pachad",
-                "hold from behind ...... German Suplex  hold, facing a wall Spinebuster",
-                "hold, FULL Gethu ...... Powerbomb      sprint at a rowdy . Spear",
+                "hold from behind ...... German Suplex  hold, push at wall  Spinebuster",
+                "hold, SHIFT+Q (full) .. Powerbomb      sprint at a rowdy . Spear",
                 "rowdy on the ground ... Elbow Drop     combos: NALLA > SEMMA > MASS > THALAIVAA",
             };
             float w = 760 * S, lh = 22 * S;

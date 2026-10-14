@@ -372,7 +372,7 @@ namespace MadrasGethu
 
         static void Wall(Transform root, Vector3 position, Vector3 size)
         {
-            var go = new GameObject("Invisible Wall") { layer = 2 };   // Ignore Raycast: blocks fighters, not the camera
+            var go = new GameObject("Invisible Wall") { layer = CombatUtil.BoundaryLayer };   // blocks fighters and ragdolls, not the camera
             go.transform.SetParent(root, false);
             go.transform.localPosition = position;
             var box = go.AddComponent<BoxCollider>();

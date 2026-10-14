@@ -39,6 +39,8 @@ namespace MadrasGethu
         Material[] originalMaterials;
         Renderer[] modelRenderers;
         HandIK handIK;
+        Ragdoll ragdoll;
+        Transform ownerRoot;   // the fighter's root (CharacterController); the body is detached from it while ragdolled
         float tumbleTimer;
         float tumbleDuration;
         Vector3 tumbleAxis;
@@ -97,6 +99,16 @@ namespace MadrasGethu
                 tintBlock = new MaterialPropertyBlock();
                 CacheAnimatorParams();
                 SetLayerRecursively(model, gameObject.layer);
+                ownerRoot = transform.parent;
+                if (animator != null && animator.isHuman)
+                {
+                    ragdoll = animator.gameObject.AddComponent<Ragdoll>();
+                    if (!ragdoll.Build(animator))
+                    {
+                        Destroy(ragdoll);
+                        ragdoll = null;
+                    }
+                }
                 return;
             }
 
@@ -183,6 +195,53 @@ namespace MadrasGethu
             foreach (var clip in animator.runtimeAnimatorController.animationClips)
                 if (clip != null && !clipLengths.ContainsKey(clip.name))
                     clipLengths[clip.name] = clip.length;
+
+            // Contact frames measured by the setup tool (also covers moves that borrow another move's clip).
+            impactTimes.Clear();
+            var timings = AnimationTimings.Load();
+            if (timings != null)
+            {
+                string controllerName = animator.runtimeAnimatorController.name;
+                foreach (var e in timings.entries)
+                {
+                    if (e.controller != controllerName) continue;
+                    if (e.length > 0f) clipLengths[e.move] = e.length;
+                    if (e.impact > 0f) impactTimes[e.move] = e.impact;
+                }
+            }
+        }
+
+        readonly Dictionary<string, float> impactTimes = new Dictionary<string, float>();
+
+        /// <summary>
+        /// Seconds into this move's animation (at normal speed) where the fist/foot connects. 0 if there is
+        /// no animation for it. Without measured data, assumes 40% of the clip.
+        /// </summary>
+        public float ImpactTime(FighterPose move)
+        {
+            string trigger = move.ToString();
+            if (animator == null || animatorParams == null || !animatorParams.Contains(trigger)) return 0f;
+            if (impactTimes.TryGetValue(trigger, out float t)) return t;
+            return clipLengths.TryGetValue(trigger, out float length) ? length * 0.4f : 0f;
+        }
+
+        /// <summary>
+        /// Plays an attack so its contact frame lands exactly <paramref name="impactIn"/> seconds from now
+        /// (within limits: very slow clips are sped up at most 2.6x). Returns when contact will really
+        /// happen; the caller should apply the hit at that moment, not before.
+        /// </summary>
+        public float PlayTimed(FighterPose move, float impactIn, float afterImpact)
+        {
+            float clipImpact = ImpactTime(move);
+            if (clipImpact <= 0f)
+            {
+                Play(move, impactIn + Mathf.Min(afterImpact, 0.3f), impactIn + afterImpact);
+                return impactIn;
+            }
+            float speed = Mathf.Clamp(clipImpact / Mathf.Max(0.05f, impactIn), 0.6f, 2.6f);
+            float actual = clipImpact / speed;
+            PlayAtSpeed(move, actual + Mathf.Min(afterImpact, 0.3f), speed);
+            return actual;
         }
 
         // ------------------------------------------------------------------ public API
@@ -204,16 +263,24 @@ namespace MadrasGethu
             pose = newPose;
             poseTimer = duration;
 
+            float speed = 1.2f;
+            if (animationTime > 0f && clipLengths.TryGetValue(newPose.ToString(), out float length) && length > 0f)
+                speed = Mathf.Clamp(length / animationTime, 0.6f, 3.5f);
+            SendTrigger(newPose, speed);
+        }
+
+        void PlayAtSpeed(FighterPose newPose, float duration, float speed)
+        {
+            pose = newPose;
+            poseTimer = duration;
+            SendTrigger(newPose, speed);
+        }
+
+        void SendTrigger(FighterPose newPose, float speed)
+        {
             string trigger = newPose.ToString();
             if (animator == null || animatorParams == null || !animatorParams.Contains(trigger)) return;
-
-            if (animatorParams.Contains("ActionSpeed"))
-            {
-                float speed = 1.2f;
-                if (animationTime > 0f && clipLengths.TryGetValue(trigger, out float length) && length > 0f)
-                    speed = Mathf.Clamp(length / animationTime, 0.6f, 3.5f);
-                animator.SetFloat("ActionSpeed", speed);
-            }
+            if (animatorParams.Contains("ActionSpeed")) animator.SetFloat("ActionSpeed", speed);
             // Clear older requests so extra button presses don't queue up and fire late.
             foreach (var t in triggerParams)
                 if (t != trigger) animator.ResetTrigger(t);
@@ -364,8 +431,93 @@ namespace MadrasGethu
         }
 
         /// <summary>Back to a neutral standing pose (used on respawn, also resets the Animator).</summary>
+        // ------------------------------------------------------------------ ragdoll
+
+        public bool CanRagdoll => ragdoll != null;
+        public bool IsRagdoll => ragdoll != null && ragdoll.Active;
+        /// <summary>Ragdoll at rest (always true without a ragdoll).</summary>
+        public bool RagdollSettled => ragdoll == null || !ragdoll.Active || ragdoll.Settled;
+        public Vector3 RagdollVelocity => ragdoll != null ? ragdoll.Velocity : Vector3.zero;
+        public Vector3 RagdollCenter => ragdoll != null && ragdoll.Active ? ragdoll.Hips.position : transform.position + Vector3.up;
+
+        /// <summary>
+        /// Goes limp and falls under physics with the given velocity (knockdowns, throws, slams, death).
+        /// Keeps the exact pose the body is in, even mid-lift in a wrestling move. Calling it again while
+        /// already limp adds to the motion (stomps).
+        /// </summary>
+        public void StartRagdoll(Vector3 velocity)
+        {
+            if (ragdoll == null) return;
+            if (!ragdoll.Active)
+            {
+                ragdoll.CapturePose();
+                carried = false;
+                tumbleTimer = 0f;
+                body.localRotation = Quaternion.identity;
+                body.localPosition = Vector3.zero;
+                ragdoll.RestorePose();
+                if (handIK != null) handIK.SetGrip(null, false);
+                // Detach from the character root, so the root can follow the body without dragging the bones.
+                transform.SetParent(null, true);
+            }
+            // Gentler than the old scripted knockback: people fall, they don't fly across the street.
+            Vector3 flat = new Vector3(velocity.x, 0f, velocity.z);
+            flat = Vector3.ClampMagnitude(flat * 0.6f, 6.5f);
+            Vector3 v = flat + Vector3.up * Mathf.Clamp(velocity.y * 0.7f, -6f, 4.5f);
+            Vector3 spin = flat.sqrMagnitude > 0.01f ? Vector3.Cross(Vector3.up, flat.normalized) * flat.magnitude * 0.8f : Vector3.zero;
+            if (ragdoll.Active) ragdoll.Jolt(v);
+            else ragdoll.Activate(v, spin);
+        }
+
+        /// <summary>
+        /// Ends the ragdoll for a get-up: moves the character root under the body, reattaches the body and
+        /// blends into the get-up animation. Returns true if he was lying on his back.
+        /// </summary>
+        public bool EndRagdoll()
+        {
+            if (ragdoll == null || !ragdoll.Active) return true;
+            bool faceUp = ragdoll.FaceUp;
+            ragdoll.GetUpPlacement(out var position, out var rotation);
+            ragdoll.CapturePose();
+            Reattach(position, rotation);
+            ragdoll.RestorePose();
+            ragdoll.Deactivate(blend: true);
+            lying = false;
+            return faceUp;
+        }
+
+        /// <summary>Snaps straight out of the ragdoll (respawn, reset).</summary>
+        void StopRagdollInstant()
+        {
+            if (ragdoll == null || !ragdoll.Active) return;
+            ragdoll.Deactivate(blend: false);
+            Reattach(ownerRoot != null ? ownerRoot.position : transform.position, ownerRoot != null ? ownerRoot.rotation : transform.rotation);
+        }
+
+        void Reattach(Vector3 rootPosition, Quaternion rootRotation)
+        {
+            if (ownerRoot == null) return;
+            ownerRoot.SetPositionAndRotation(rootPosition, rootRotation);
+            transform.SetParent(ownerRoot, false);
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+        }
+
+        void LateUpdate()
+        {
+            // While limp, the (invisible) character root follows the body around, so targeting, health bars
+            // and distance checks still work.
+            if (ragdoll == null || !ragdoll.Active || ownerRoot == null) return;
+            Vector3 p = ragdoll.Hips.position;
+            float y = ownerRoot.position.y;
+            if (Physics.Raycast(p + Vector3.up * 0.5f, Vector3.down, out var hit, 4f, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
+                y = hit.point.y;
+            ownerRoot.position = new Vector3(p.x, y, p.z);
+        }
+
         public void ResetPose()
         {
+            StopRagdollInstant();
             pose = FighterPose.Idle;
             poseTimer = 0f;
             lying = false;

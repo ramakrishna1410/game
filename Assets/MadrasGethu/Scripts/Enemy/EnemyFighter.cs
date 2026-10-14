@@ -48,6 +48,14 @@ namespace MadrasGethu
         int blockStreak;
         float lastBlockTime;
 
+        // Feint punish: the counter-punch in flight
+        PlayerFighter punishTarget;
+        float punishIn;
+
+        // Swing animation timed to land with the hit
+        bool strikeAnimStarted;
+        float strikeLead;
+
         // Charge (Thadiyan)
         Vector3 chargeDirection;
         bool chargeHit;
@@ -154,6 +162,17 @@ namespace MadrasGethu
                 thrownTimer -= dt;
                 HitOthersWhileThrown();
             }
+            if (punishTarget != null)
+            {
+                punishIn -= dt;
+                if (punishIn <= 0f)
+                {
+                    Vector3 dir = Flat(punishTarget.transform.position - transform.position).normalized;
+                    if (Flat(punishTarget.transform.position - transform.position).magnitude < 2.6f)
+                        punishTarget.ReceiveHit(new HitInfo { attacker = this, damage = 12f, direction = dir, knockback = 4f, heavy = true, unblockable = true });
+                    punishTarget = null;
+                }
+            }
             if (wallBounceTimer > 0f)
             {
                 wallBounceTimer -= dt;
@@ -250,6 +269,11 @@ namespace MadrasGethu
 
                 case AIState.Windup:
                     Motor.FaceDirection(dirToPlayer);
+                    if (!strikeAnimStarted && strikeLead > 0f && stateTimer <= strikeLead && !feinting)
+                    {
+                        strikeAnimStarted = true;
+                        Visual.PlayTimed(currentAttack.pose, Mathf.Max(0.05f, stateTimer), currentAttack.recovery);
+                    }
                     if (stateTimer <= 0f) ReleaseAttack(dist, dirToPlayer, player);
                     break;
 
@@ -288,19 +312,33 @@ namespace MadrasGethu
                     break;
 
                 case AIState.Down:
-                    if (thrownTimer <= 0f && thrower != null && Motor.IsGrounded)
+                {
+                    bool landed = Visual.IsRagdoll ? Visual.RagdollSettled : Motor.IsGrounded;
+                    if (thrownTimer <= 0f && thrower != null && landed)
                     {
                         FX.Dust(transform.position, 10);   // thud on landing
                         thrower = null;
                     }
-                    if (stateTimer <= 0f && Motor.IsGrounded)
+                    if (stateTimer <= 0f && landed)
                     {
                         state = AIState.GetUp;
-                        stateTimer = 0.8f;
-                        Visual.SetLying(false);
-                        Visual.Play(FighterPose.GetUp, 0.8f);
+                        if (Visual.IsRagdoll)
+                        {
+                            // Get up from however he landed: on his back or face down.
+                            bool faceUp = Visual.EndRagdoll();
+                            Motor.SetFrozen(false);
+                            stateTimer = 1.3f;
+                            Visual.Play(faceUp ? FighterPose.GetUp : FighterPose.GetUpFront, stateTimer, stateTimer);
+                        }
+                        else
+                        {
+                            stateTimer = 0.8f;
+                            Visual.SetLying(false);
+                            Visual.Play(FighterPose.GetUp, 0.8f);
+                        }
                     }
                     break;
+                }
 
                 case AIState.GetUp:
                     if (stateTimer <= 0f)
@@ -453,8 +491,13 @@ namespace MadrasGethu
             float startup = currentAttack.startup;
             if (currentCombo != null && comboStep > 0) startup = Mathf.Max(0.28f, startup * 0.65f);   // combo follow-ups come faster
             stateTimer = startup;
-            Visual.Play(FighterPose.Windup, startup, startup);
             Visual.SetTelegraph(currentAttack.Telegraph);
+            // Wind up first, then start the swing so the fist arrives exactly as the windup ends (when the hit lands).
+            strikeAnimStarted = false;
+            float swing = currentAttack.kind == AttackKind.Charge ? 0f : Visual.ImpactTime(currentAttack.pose) / 1.1f;
+            strikeLead = Mathf.Min(startup * 0.9f, swing);
+            if (strikeLead < 0.05f) strikeLead = 0f;
+            Visual.Play(FighterPose.Windup, startup - strikeLead, startup - strikeLead);
 
             if (GameManager.Instance != null)
             {
@@ -495,7 +538,7 @@ namespace MadrasGethu
 
                 case AttackKind.Grab:
                 {
-                    Visual.Play(currentAttack.pose, 0.4f, 0.6f);
+                    if (!strikeAnimStarted) Visual.Play(currentAttack.pose, 0.4f, 0.6f);
                     Motor.AddLunge(transform.forward, Mathf.Clamp(dist - 0.8f, 0f, currentAttack.lunge));
                     bool inFront = Vector3.Angle(transform.forward, Flat(player.transform.position - transform.position)) < 60f;
                     if (dist <= currentAttack.range + player.radius + 0.4f && inFront)
@@ -521,8 +564,8 @@ namespace MadrasGethu
                 }
             }
 
-            // Strikes, weapon swings, ground pound.
-            Visual.Play(currentAttack.pose, 0.3f, currentAttack.recovery + 0.3f);
+            // Strikes, weapon swings, ground pound. (The swing animation already started during the windup.)
+            if (!strikeAnimStarted) Visual.Play(currentAttack.pose, 0.3f, currentAttack.recovery + 0.3f);
             float lunge = Mathf.Clamp(dist - currentAttack.range * 0.6f, 0f, currentAttack.lunge);
             Motor.AddLunge(transform.forward, lunge);
             var result = CombatUtil.Strike(this, currentAttack);
@@ -578,9 +621,9 @@ namespace MadrasGethu
         {
             feinting = false;
             Visual.SetTelegraph(false);
-            Visual.Play(FighterPose.Jab, 0.3f, 0.4f);
-            Vector3 dir = Flat(hero.transform.position - transform.position).normalized;
-            hero.ReceiveHit(new HitInfo { attacker = this, damage = 12f, direction = dir, knockback = 4f, heavy = true, unblockable = true });
+            // The punch lands when his fist gets there, not the moment he starts it.
+            punishTarget = hero;
+            punishIn = Visual.PlayTimed(FighterPose.Jab, 0.14f, 0.3f);
             Shouts.Say(this, ShoutType.Feint);
             if (GameManager.Instance != null)
                 GameManager.Instance.AddPopup("FEINT!", Center + Vector3.up, new Color(1f, 0.5f, 0.3f), 1f);
@@ -608,7 +651,7 @@ namespace MadrasGethu
 
             // Crashing into a prop or a wall leaves him dazed: your opening.
             var spot = FinisherSpot.FindHit(transform.position, radius + 0.3f);
-            bool wall = Physics.SphereCast(Center, 0.4f, chargeDirection, out var hit, 0.6f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+            bool wall = Physics.SphereCast(Center, 0.4f, chargeDirection, out var hit, 0.6f, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore)
                         && hit.collider.bounds.size.y > 1.2f && Vector3.Dot(hit.normal, Vector3.up) < 0.5f;
             if (spot != null || wall)
             {
@@ -956,6 +999,7 @@ namespace MadrasGethu
             {
                 // Stomped while lying down
                 stateTimer = Mathf.Max(stateTimer, 0.8f);
+                if (Visual.IsRagdoll) Visual.StartRagdoll(hit.direction * 2f + Vector3.down * 2f);
                 return HitResult.Hit;
             }
 
@@ -996,6 +1040,8 @@ namespace MadrasGethu
             currentAttack.startup = 0.24f;
             state = AIState.Windup;
             stateTimer = currentAttack.startup;
+            strikeAnimStarted = false;
+            strikeLead = 0f;
             Visual.Play(FighterPose.Windup, currentAttack.startup, currentAttack.startup);
             Visual.SetTelegraph(TelegraphColor.Red);
             if (GameManager.Instance != null)
@@ -1030,11 +1076,22 @@ namespace MadrasGethu
             if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
             state = AIState.Down;
             stateTimer = duration;
-            Visual.Play(FighterPose.Knockdown, duration);
-            Visual.SetLying(true);
-            Motor.AddImpulse(impulse);
-            Vector3 flat = new Vector3(impulse.x, 0f, impulse.z);
-            if (flat.magnitude >= 9f) Visual.Tumble(flat, 0.65f);   // hit hard enough to roll over
+            if (Visual.CanRagdoll)
+            {
+                // Real model: go limp and fall under physics.
+                Motor.SetFrozen(true);
+                Visual.StartRagdoll(impulse);
+                stateTimer = Mathf.Max(duration, 1.3f);
+            }
+            else
+            {
+                Visual.ClearCarry();
+                Visual.Play(FighterPose.Knockdown, duration);
+                Visual.SetLying(true);
+                Motor.AddImpulse(impulse);
+                Vector3 flat = new Vector3(impulse.x, 0f, impulse.z);
+                if (flat.magnitude >= 9f) Visual.Tumble(flat, 0.65f);   // hit hard enough to roll over
+            }
             if (HeldWeapon != null && Random.value < 0.5f) Disarm();
         }
 
@@ -1043,16 +1100,25 @@ namespace MadrasGethu
             ReleaseToken();
             EnemyDirector.Disengage(this);   // frees the slot so a waiting rowdy steps in
             if (state == AIState.Grabbed) Motor.SetFrozen(false);
-            Visual.ClearCarry();
             if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
             if (seekTarget != null) reservedWeapons.Remove(seekTarget);
             Disarm();
             state = AIState.Dead;
             Visual.SetTelegraph(false);
             Visual.SetCombatStance(false);
-            Visual.SetLying(true);
-            Visual.Play(FighterPose.Dead, 999f);
-            Motor.AddImpulse(killingBlow.direction * Mathf.Max(killingBlow.knockback, 4f) + Vector3.up * 3f);
+            Vector3 deathPush = killingBlow.direction * Mathf.Max(killingBlow.knockback, 4f) + Vector3.up * 3f;
+            if (Visual.CanRagdoll)
+            {
+                Motor.SetFrozen(true);
+                Visual.StartRagdoll(deathPush);
+            }
+            else
+            {
+                Visual.ClearCarry();
+                Visual.SetLying(true);
+                Visual.Play(FighterPose.Dead, 999f);
+                Motor.AddImpulse(deathPush);
+            }
 
             if (GameManager.Instance != null && killingBlow.attacker is PlayerFighter player)
                 player.OnEnemyDefeated(this);
@@ -1095,13 +1161,13 @@ namespace MadrasGethu
         {
             if (state != AIState.Grabbed) return;
             Motor.SetFrozen(false);
-            Visual.ClearCarry();
             if (knockDown)
             {
                 KnockDown(push, 1.8f);
             }
             else
             {
+                Visual.ClearCarry();
                 state = AIState.Stagger;
                 stateTimer = 0.5f;
                 Visual.Play(FighterPose.StaggerBack, 0.5f, 0.6f);
@@ -1126,8 +1192,9 @@ namespace MadrasGethu
 
             if (kind == LaunchKind.Throw)
             {
-                KnockDown(direction * 12f + Vector3.up * 5.5f, 2.0f);
-                Visual.Tumble(direction, 0.75f);
+                // A real throw: a couple of metres through the air, then he hits the street and rolls.
+                KnockDown(direction * 8f + Vector3.up * 4f, 2.0f);
+                if (!Visual.CanRagdoll) Visual.Tumble(direction, 0.75f);
                 thrownTimer = 1.0f;
             }
             else
@@ -1145,6 +1212,9 @@ namespace MadrasGethu
 
         LaunchKind launchKind;
         float fallAfterShove;
+
+        /// <summary>How fast the body is really moving (the ragdoll's, while limp).</summary>
+        Vector3 BodyVelocity => Visual.IsRagdoll ? Visual.RagdollVelocity : Motor.Velocity;
 
         /// <summary>The hero deflected this rowdy's attack. Perfect parry: knocked well off balance.</summary>
         public void Parried(bool perfect, Vector3 pushDirection)
@@ -1204,10 +1274,11 @@ namespace MadrasGethu
         void CheckWallBounce()
         {
             if (state != AIState.Down) { wallBounceTimer = 0f; return; }
+            if (Visual.IsRagdoll) { CheckWallSplat(); return; }
             Vector3 v = Flat(Motor.Velocity);
             if (v.magnitude < 3f) return;
             Vector3 dir = v.normalized;
-            if (!Physics.SphereCast(Center, 0.3f, dir, out var hit, radius + 0.35f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            if (!Physics.SphereCast(Center, 0.3f, dir, out var hit, radius + 0.35f, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
                 return;
             if (hit.collider.GetComponentInParent<Fighter>() != null) return;
             if (hit.collider.GetComponentInParent<FinisherSpot>() != null) return;   // props break instead
@@ -1227,6 +1298,35 @@ namespace MadrasGethu
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.AddPopup("WALL BOUNCE!", Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 1.2f);
+                GameManager.Instance.Shake(0.3f);
+                GameManager.Instance.HitStop(0.08f);
+            }
+            if (Player != null)
+            {
+                Player.AddGethu(8f);
+                Player.NotifyMoveLanded("Wall Bounce");
+            }
+        }
+
+        /// <summary>Ragdolled into a wall: physics does the slump; this adds the damage, sound and reward.</summary>
+        void CheckWallSplat()
+        {
+            Vector3 v = Flat(Visual.RagdollVelocity);
+            if (v.magnitude < 2.5f) return;
+            Vector3 from = Visual.RagdollCenter;
+            if (!Physics.SphereCast(from, 0.25f, v.normalized, out var hit, 0.6f, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
+                return;
+            if (hit.collider.GetComponentInParent<FinisherSpot>() != null) return;   // props break instead
+            if (Mathf.Abs(hit.normal.y) > 0.5f || hit.collider.bounds.size.y < 1.2f) return;
+
+            wallBounceTimer = 0f;
+            ApplyDamage(6f, new HitInfo { attacker = Player, damage = 6f, direction = v.normalized, heavy = true }, HitResult.Hit);
+            FX.Dust(hit.point, 14);
+            FX.HitSpark(hit.point, true);
+            stateTimer = Mathf.Max(stateTimer, 1.6f);
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.AddPopup("WALL SPLAT!", hit.point + Vector3.up * 0.8f, new Color(1f, 0.8f, 0.2f), 1.2f);
                 GameManager.Instance.Shake(0.3f);
                 GameManager.Instance.HitStop(0.08f);
             }
@@ -1259,7 +1359,7 @@ namespace MadrasGethu
 
             // Crashing into a tea kadai / crates / auto: smash it, no Gethu needed.
             var spot = FinisherSpot.FindHit(transform.position, radius + 0.6f);
-            Vector3 flyDir = Motor.Velocity.sqrMagnitude > 0.1f ? Flat(Motor.Velocity).normalized : -transform.forward;
+            Vector3 flyDir = BodyVelocity.sqrMagnitude > 0.1f ? Flat(BodyVelocity).normalized : -transform.forward;
             if (spot != null && Vector3.Dot(flyDir, Flat(spot.transform.position - transform.position)) > 0f)
             {
                 spot.Break(flyDir);
@@ -1284,7 +1384,7 @@ namespace MadrasGethu
                 Vector3 d = Flat(f.transform.position - transform.position);
                 if (d.magnitude > f.radius + radius + 0.4f) continue;
                 thrownHits.Add(f);
-                var dir = Motor.Velocity.sqrMagnitude > 0.1f ? Flat(Motor.Velocity).normalized : d.normalized;
+                var dir = BodyVelocity.sqrMagnitude > 0.1f ? Flat(BodyVelocity).normalized : d.normalized;
                 f.ReceiveHit(new HitInfo
                 {
                     attacker = thrower,

@@ -50,6 +50,12 @@ namespace MadrasGethu
         protected virtual void OnEnable() => All.Add(this);
         protected virtual void OnDisable() => All.Remove(this);
 
+        protected virtual void OnDestroy()
+        {
+            // A ragdolled body is detached from the fighter's root: clean it up too.
+            if (visual != null && visual.transform.parent != transform) Destroy(visual.gameObject);
+        }
+
         /// <summary>Called by attackers. Implementations decide on block, dodge, armour and reactions.</summary>
         public abstract HitResult ReceiveHit(HitInfo hit);
 

@@ -7,6 +7,20 @@ namespace MadrasGethu
     {
         static readonly List<Fighter> scratch = new List<Fighter>();
 
+        /// <summary>Invisible arena boundaries: block fighters and ragdolls, but not the camera.</summary>
+        public const int BoundaryLayer = 28;
+        /// <summary>Ragdoll body parts: collide with the world, not with fighters' movement capsules.</summary>
+        public const int RagdollLayer = 29;
+
+        /// <summary>Solid scenery only (no fighters, ragdolls, effects or invisible boundaries).</summary>
+        public static int WorldMask => Physics.DefaultRaycastLayers & ~(1 << BoundaryLayer) & ~(1 << RagdollLayer);
+
+        /// <summary>Sets which layers collide. Called when the game starts.</summary>
+        public static void ConfigurePhysicsLayers()
+        {
+            Physics.IgnoreLayerCollision(RagdollLayer, 2, true);   // limbs don't snag on CharacterControllers, weapons, effects
+        }
+
         public struct StrikeResult
         {
             public int hits;

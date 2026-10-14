@@ -115,14 +115,14 @@ namespace MadrasGethu
         {
             return new WrestleMove { name = "BODY SLAM", id = MoveId.BodySlam, cost = GethuBar }
                 .Step(Shot(With(S(QteKey.Light, "LIFT", 0.45f, FighterPose.Lift), new Vector3(0f, 1.75f, 0.2f), -90f, 0.1f), CamShot.LowHero))
-                .Step(Shot(Impact(With(S(QteKey.Heavy, "SLAM", 0.28f, FighterPose.Slam), new Vector3(0f, 0.2f, 1.1f), -90f, 0.35f), 30f), CamShot.GroundImpact));
+                .Step(Shot(Impact(With(S(QteKey.Heavy, "SLAM", 0.28f, FighterPose.Slam), new Vector3(0f, 0.3f, 1.1f), -90f, 0.35f), 30f), CamShot.GroundImpact));
         }
 
         WrestleMove DhobiPachad()
         {
             return new WrestleMove { name = "DHOBI PACHAD", id = MoveId.DhobiPachad, cost = GethuBar }
                 .Step(Shot(With(S(QteKey.Light, "OVER THE SHOULDER", 0.35f, FighterPose.Lift), new Vector3(0f, 1.6f, 0.25f), -70f, 0f), CamShot.LowHero))
-                .Step(Shot(Impact(With(S(QteKey.Heavy, "BEAT HIM DOWN", 0.42f, FighterPose.Throw), new Vector3(0f, 0.2f, -1.2f), -270f, 0.9f), 32f), CamShot.Side));
+                .Step(Shot(Impact(With(S(QteKey.Heavy, "BEAT HIM DOWN", 0.42f, FighterPose.Throw), new Vector3(0f, 0.3f, -1.2f), -270f, 0.9f), 32f), CamShot.Side));
         }
 
         WrestleMove GermanSuplex()
@@ -135,7 +135,7 @@ namespace MadrasGethu
                 shot.shot = CamShot.Front;
                 m.Step(shot);
             }
-            return m.Step(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.5f, FighterPose.Suplex), new Vector3(0f, 0.25f, -0.9f), -180f, 1.1f), 34f), CamShot.Side));
+            return m.Step(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.5f, FighterPose.Suplex), new Vector3(0f, 0.35f, -0.9f), -180f, 1.1f), 34f), CamShot.Side));
         }
 
         WrestleMove Powerbomb()
@@ -143,7 +143,7 @@ namespace MadrasGethu
             var jump = With(S(QteKey.Jump, "HIGHER", 0.3f, FighterPose.Jump), new Vector3(0f, 2.6f, 0.3f), -125f, 0f);
             jump.hero = new Vector3(0f, 0.5f, 0f);
             jump.shot = CamShot.LowHero;
-            var drive = Impact(With(S(QteKey.Heavy, "DRIVE HIM DOWN", 0.22f, FighterPose.Slam), new Vector3(0f, 0.2f, 1.05f), -90f, 0f), 45f);
+            var drive = Impact(With(S(QteKey.Heavy, "DRIVE HIM DOWN", 0.22f, FighterPose.Slam), new Vector3(0f, 0.3f, 1.05f), -90f, 0f), 45f);
             drive.hero = new Vector3(0f, 0f, 0.2f);
             drive.shot = CamShot.GroundImpact;
             return new WrestleMove { name = "POWERBOMB", id = MoveId.Powerbomb, cost = maxGethu, shockwave = true }
@@ -157,7 +157,7 @@ namespace MadrasGethu
             var run = With(S(QteKey.None, null, 0.28f, FighterPose.Spear), new Vector3(0f, 1.0f, 1.7f), -30f, 0f);
             run.hero = new Vector3(0f, 0f, 1.0f);
             run.shot = CamShot.OverShoulder;
-            var hit = Impact(With(S(QteKey.Heavy, "SPEAR", 0.2f, FighterPose.Spear), new Vector3(0f, 0.25f, 2.8f), -90f, 0f), 28f);
+            var hit = Impact(With(S(QteKey.Heavy, "SPEAR", 0.2f, FighterPose.Spear), new Vector3(0f, 0.3f, 2.8f), -90f, 0f), 28f);
             hit.hero = new Vector3(0f, 0f, 1.9f);
             hit.shot = CamShot.GroundImpact;
             return new WrestleMove { name = "SPEAR", id = MoveId.Spear, cost = GethuBar }.Step(run).Step(hit);
@@ -213,9 +213,12 @@ namespace MadrasGethu
         WrestleMove PickGrabFinisher(Vector3 aim, Vector3 move)
         {
             if (grabbed == null) return null;
-            if (MoveUnlocks.Has(MoveId.Spinebuster) && !grabFromBehind && FindWall(grabbed.Center, aim, 2.6f, out var wallHit))
+            // Powerbomb: Shift + Q with a full meter (a deliberate choice, never automatic).
+            if (!grabFromBehind && GameInput.Sprint && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
+            // Spinebuster: only when you are pushing him towards a wall.
+            if (MoveUnlocks.Has(MoveId.Spinebuster) && !grabFromBehind && move.sqrMagnitude > 0.25f
+                && FindWall(grabbed.Center, aim, 2.6f, out var wallHit))
                 return Spinebuster(Flat(wallHit.point - transform.position).magnitude);
-            if (!grabFromBehind && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
             if (grabFromBehind && MoveUnlocks.Has(MoveId.GermanSuplex)) return GermanSuplex();
             if (!grabFromBehind)
             {
@@ -223,7 +226,7 @@ namespace MadrasGethu
                 if (move.sqrMagnitude > 0.25f && MoveUnlocks.Has(MoveId.DhobiPachad)) return DhobiPachad();
                 if (MoveUnlocks.Has(MoveId.BodySlam)) return BodySlam();
             }
-            return MoveUnlocks.Has(MoveId.Powerbomb) ? Powerbomb() : null;
+            return null;
         }
 
         void StartGrabFinisher(WrestleMove move, Vector3 aim)
@@ -319,7 +322,7 @@ namespace MadrasGethu
         /// <summary>A wall (not a prop, not the floor, not a low box) within maxDistance in that direction.</summary>
         static bool FindWall(Vector3 from, Vector3 aim, float maxDistance, out RaycastHit hit)
         {
-            if (!Physics.SphereCast(from, 0.25f, aim, out hit, maxDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            if (!Physics.SphereCast(from, 0.25f, aim, out hit, maxDistance, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
                 return false;
             if (hit.collider.GetComponentInParent<Fighter>() != null) return false;
             if (hit.collider.GetComponentInParent<FinisherSpot>() != null) return false;
@@ -331,7 +334,7 @@ namespace MadrasGethu
         float Room(Vector3 direction, float max)
         {
             float best = max;
-            var hits = Physics.SphereCastAll(Center, 0.3f, direction, max, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            var hits = Physics.SphereCastAll(Center, 0.3f, direction, max, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore);
             foreach (var h in hits)
             {
                 if (h.distance <= 0f || h.collider.GetComponentInParent<Fighter>() != null) continue;
@@ -494,7 +497,13 @@ namespace MadrasGethu
             Vector3 flat = frame * new Vector3(offset.x, 0f, offset.z) * push;
             var camPos = new Vector3(focus.x + flat.x, wrestleOrigin.y + offset.y, focus.z + flat.z);
             var look = new Vector3(focus.x, wrestleOrigin.y + lookHeight, focus.z);
-            cam.SetCinematicShot(camPos, look, fov * Mathf.Lerp(0.9f, 1f, push), roll);
+
+            // Keep both whole bodies in frame: hero from feet to head, the rowdy within ~0.9 m of his hips.
+            Vector3 heroFeet = transform.position, heroHead = transform.position + Vector3.up * 1.85f;
+            Vector3 center = (heroFeet + heroHead + victimPoint * 2f) * 0.25f;
+            float radius = Mathf.Max(Vector3.Distance(center, heroFeet), Vector3.Distance(center, heroHead),
+                Vector3.Distance(center, victimPoint) + 0.9f);
+            cam.SetCinematicFraming(camPos, look, fov * Mathf.Lerp(0.9f, 1f, push), roll, center, radius * Mathf.Lerp(0.85f, 1f, push));
         }
 
         void UpdateQte(WrestleStep st)
@@ -582,7 +591,12 @@ namespace MadrasGethu
             impactPoint.y = wrestleOrigin.y;
 
             float damage = st.damage * WrestleDamageMultiplier;
-            if (move.carry)
+            if (move.carry && victim.Visual.CanRagdoll)
+            {
+                // He goes limp from exactly the pose he hit the ground in, and physics takes it from there.
+                victim.ReleaseFromGrab(dir * 1.5f + Vector3.down * 3f, knockDown: true);
+            }
+            else if (move.carry)
             {
                 victim.Visual.ClearCarry();
                 victim.HoldAt(impactPoint, wrestleVictimRotation);
@@ -613,10 +627,21 @@ namespace MadrasGethu
 
             if (move.shockwave)
             {
-                var shock = new AttackData("Shockwave", FighterPose.Slam, 15f)
-                    { range = 3.4f, arc = 360f, knockback = 7f, launch = 5f, heavy = true, unblockable = true, hitsDowned = true };
-                var r = CombatUtil.Strike(this, shock, 1f);
-                RegisterHits(r.hits, 0f);
+                // Knocks down everyone around, except the man you just drove into the road.
+                int hits = 0;
+                foreach (var f in All.ToArray())
+                {
+                    if (f == null || f == victim || f.team == team || f.IsDead) continue;
+                    Vector3 to = Flat(f.transform.position - impactPoint);
+                    if (to.magnitude > 3.4f) continue;
+                    var r = f.ReceiveHit(new HitInfo
+                    {
+                        attacker = this, damage = 15f, direction = to.sqrMagnitude > 0.01f ? to.normalized : fwd,
+                        knockback = 6f, launch = 4f, heavy = true, unblockable = true, hitsDowned = true,
+                    });
+                    if (r == HitResult.Hit) hits++;
+                }
+                RegisterHits(hits, 0f);
             }
 
             if (GM != null)
@@ -635,7 +660,11 @@ namespace MadrasGethu
         void EndWrestle()
         {
             var victim = wrestleVictim;
-            if (victim != null && !victim.IsDead && victim.IsGrabbed)
+            if (victim != null && !victim.IsDead && victim.IsGrabbed && victim.Visual.CanRagdoll)
+            {
+                victim.ReleaseFromGrab(Vector3.zero, knockDown: true);
+            }
+            else if (victim != null && !victim.IsDead && victim.IsGrabbed)
             {
                 victim.Visual.ClearCarry();
                 Vector3 p = victim.transform.position;

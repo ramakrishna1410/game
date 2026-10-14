@@ -112,7 +112,7 @@ namespace MadrasGethu
 
         static void InvisibleWall(Transform root, Vector3 position, Vector3 size)
         {
-            var go = new GameObject("Invisible Wall") { layer = 2 };   // blocks fighters, not the camera
+            var go = new GameObject("Invisible Wall") { layer = CombatUtil.BoundaryLayer };   // blocks fighters and ragdolls, not the camera
             go.transform.SetParent(root, false);
             go.transform.localPosition = position;
             go.AddComponent<BoxCollider>().size = size;

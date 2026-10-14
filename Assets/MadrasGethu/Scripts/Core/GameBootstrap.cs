@@ -31,6 +31,7 @@ namespace MadrasGethu
         void Awake()
         {
             Time.timeScale = 1f;
+            CombatUtil.ConfigurePhysicsLayers();
             CharacterFactory.PlayerModelPrefab = playerModelPrefab;
             CharacterFactory.EnemyModelPrefab = enemyModelPrefab;
             CharacterFactory.ThadiyanModelPrefab = thadiyanModelPrefab;

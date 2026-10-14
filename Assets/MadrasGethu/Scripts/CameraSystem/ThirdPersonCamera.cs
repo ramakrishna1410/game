@@ -114,6 +114,46 @@ namespace MadrasGethu
             cineWantRoll = roll;
         }
 
+        /// <summary>
+        /// Like SetCinematicShot, but guarantees everything inside the sphere (center, radius) stays in frame:
+        /// the camera backs off as far as the window's shape needs, and if a wall is in the way it swings
+        /// round or cranes up to a clear angle instead of pushing into the characters.
+        /// </summary>
+        public void SetCinematicFraming(Vector3 desiredPosition, Vector3 lookAt, float fov, float roll, Vector3 boundsCenter, float boundsRadius)
+        {
+            if (cam == null) { SetCinematicShot(desiredPosition, lookAt, fov, roll); return; }
+            float aspect = Mathf.Max(0.3f, cam.aspect);
+            float halfV = fov * 0.5f * Mathf.Deg2Rad;
+            float halfH = Mathf.Atan(Mathf.Tan(halfV) * aspect);
+            float need = boundsRadius / Mathf.Sin(Mathf.Min(halfV, halfH)) * 1.08f;
+
+            Vector3 offset = desiredPosition - boundsCenter;
+            float dist = Mathf.Max(offset.magnitude, need);
+            Vector3 dir = offset.sqrMagnitude > 0.0001f ? offset.normalized : -transform.forward;
+
+            // Try the wanted angle first, then swing round either side, then crane up.
+            Vector3 best = boundsCenter + dir * dist;
+            float bestClear = -1f;
+            for (int i = 0; i < CandidateYaw.Length; i++)
+            {
+                Vector3 d = Quaternion.AngleAxis(CandidateYaw[i], Vector3.up) * dir;
+                if (CandidatePitch[i] != 0f)
+                {
+                    Vector3 side = Vector3.Cross(Vector3.up, d);
+                    if (side.sqrMagnitude > 0.0001f) d = Quaternion.AngleAxis(-CandidatePitch[i], side.normalized) * d;
+                }
+                float clear = dist;
+                if (Physics.SphereCast(boundsCenter, collisionRadius, d, out var hit, dist, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
+                    clear = hit.distance;
+                if (clear >= dist * 0.95f) { best = boundsCenter + d * dist; bestClear = dist; break; }
+                if (clear > bestClear) { bestClear = clear; best = boundsCenter + d * Mathf.Max(0.8f, clear - 0.1f); }
+            }
+            SetCinematicShot(best, Vector3.Lerp(lookAt, boundsCenter, 0.5f), fov, roll);
+        }
+
+        static readonly float[] CandidateYaw = { 0f, 40f, -40f, 80f, -80f, 130f, -130f, 0f, 180f };
+        static readonly float[] CandidatePitch = { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 40f, 30f };
+
         /// <summary>Holds the last shot for a moment (to show the landing), then eases back to the normal camera.</summary>
         public void EndCinematic(float hold = 0.4f)
         {
@@ -142,7 +182,7 @@ namespace MadrasGethu
             float wanted = InCombat ? combatDistance : distance;
             float allowed = wanted;
             if (Physics.SphereCast(pivot, collisionRadius, rot * Vector3.back, out var hit, wanted,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                    CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
                 allowed = Mathf.Max(0.6f, hit.distance - 0.05f);
 
             // Snap in quickly when blocked, ease back out slowly.
@@ -172,7 +212,7 @@ namespace MadrasGethu
                 Vector3 want = cineWantPos;
                 Vector3 toCam = want - cineWantLook;
                 if (toCam.sqrMagnitude > 0.01f && Physics.SphereCast(cineWantLook, collisionRadius, toCam.normalized, out var cineHit, toCam.magnitude,
-                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                        CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
                     want = cineWantLook + toCam.normalized * Mathf.Max(0.8f, cineHit.distance - 0.1f);
                 cinePos = Vector3.Lerp(cinePos, want, k);
                 cineLook = Vector3.Lerp(cineLook, cineWantLook, k);

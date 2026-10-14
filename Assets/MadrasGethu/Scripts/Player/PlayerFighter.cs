@@ -120,6 +120,7 @@ namespace MadrasGethu
         ThirdPersonCamera cam;
         float stateTimer;
         AttackData currentAttack;
+        float strikeAt;           // when the current attack's hit lands (matches the animation's contact frame)
         Fighter attackTarget;
         bool struck;
         Vector3 lungeDirection;
@@ -475,8 +476,9 @@ namespace MadrasGethu
                 lungeRemaining = Mathf.Clamp(gap - attack.range * 0.45f, 0f, attack.lunge);
             }
             lungeDirection = transform.forward;
-            lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(attack.startup, 0.05f));
-            Visual.Play(attack.pose, attack.startup + 0.2f, attack.startup + attack.recovery);
+            // The animation is timed so the fist/foot connects exactly when the hit is applied (strikeAt).
+            strikeAt = Visual.PlayTimed(attack.pose, attack.startup, attack.recovery);
+            lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(strikeAt, 0.05f));
             if (attack.announce && GM != null)
                 GM.AddPopup(attack.name.ToUpper(), Center + Vector3.up * 1.1f, new Color(1f, 0.85f, 0.35f), 0.75f);
         }
@@ -543,7 +545,7 @@ namespace MadrasGethu
                 if (Time.deltaTime > 0f) Motor.SetDesiredVelocity(lungeDirection * (step / Time.deltaTime), instant: true);
             }
 
-            if (!struck && stateTimer >= currentAttack.startup)
+            if (!struck && stateTimer >= strikeAt)
             {
                 struck = true;
                 if (attackTarget != null && !attackTarget.IsDead)
@@ -551,11 +553,11 @@ namespace MadrasGethu
                 if (currentAttack.damage > 0f) PerformStrike();
             }
 
-            float total = currentAttack.startup + currentAttack.recovery;
+            float total = strikeAt + currentAttack.recovery;
             // Dodge / block / grab can cut a move short; the next punch only comes in the combo window,
             // so every punch plays out and button-mashing gives a steady jab-cross-hook-body rhythm.
-            bool canDefend = struck && stateTimer >= currentAttack.startup + 0.06f;
-            bool canChain = struck && stateTimer >= currentAttack.startup + currentAttack.recovery * 0.55f;
+            bool canDefend = struck && stateTimer >= strikeAt + 0.06f;
+            bool canChain = struck && stateTimer >= strikeAt + currentAttack.recovery * 0.55f;
             if (canDefend && TryCommonActions(allowAttacks: canChain)) return;
 
             if (stateTimer >= total)
@@ -570,7 +572,7 @@ namespace MadrasGethu
         {
             if (!charging)
             {
-                if (stateTimer < currentAttack.startup * 0.5f || !GameInput.HeavyHeld) return false;
+                if (stateTimer < strikeAt * 0.5f || !GameInput.HeavyHeld) return false;
                 charging = true;
                 chargeTime = 0f;
                 Visual.Play(FighterPose.Windup, ChargeFull + 0.3f);
@@ -595,7 +597,7 @@ namespace MadrasGethu
             }
             else
             {
-                Visual.Play(currentAttack.pose, currentAttack.startup * 0.5f + 0.2f, currentAttack.startup * 0.5f + currentAttack.recovery);
+                strikeAt = stateTimer + Visual.PlayTimed(currentAttack.pose, Mathf.Max(0.08f, strikeAt - stateTimer), currentAttack.recovery);
             }
             return true;
         }
@@ -960,6 +962,8 @@ namespace MadrasGethu
                 Prompts.Add(new PromptItem { key = "Q", label = spot.finisherName, dim = Gethu < spot.gethuCost });
             else if (wrestle != null)
                 Prompts.Add(new PromptItem { key = "Q", label = wrestle.name, dim = Gethu < wrestle.cost });
+            if (spot == null && !grabFromBehind && Gethu >= maxGethu && !GameInput.Sprint && MoveUnlocks.Has(MoveId.Powerbomb))
+                Prompts.Add(new PromptItem { key = "SHIFT+Q", label = "Powerbomb" });
 
             if (stateTimer > 4.5f)
             {
@@ -1045,7 +1049,7 @@ namespace MadrasGethu
         bool TryWallSlam(Vector3 aim)
         {
             Vector3 from = grabbed.Center;
-            if (!Physics.SphereCast(from, 0.25f, aim, out var hit, 2.2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            if (!Physics.SphereCast(from, 0.25f, aim, out var hit, 2.2f, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
                 return false;
             if (hit.collider.GetComponentInParent<FinisherSpot>() != null) return false;   // props: throw into them instead
             if (Vector3.Dot(hit.normal, Vector3.up) > 0.5f) return false;                  // that's the floor
@@ -1234,7 +1238,8 @@ namespace MadrasGethu
                 Vector3 focus = Vector3.Lerp(transform.position, finisherEndPoint, 0.5f) + Vector3.up * 1.0f;
                 Vector3 side = Vector3.Cross(Vector3.up, transform.forward);
                 if (Vector3.Dot(cam.transform.position - transform.position, side) < 0f) side = -side;
-                cam.SetCinematicShot(focus + side * 2.8f - transform.forward * 0.6f + Vector3.up * 0.2f, focus, 46f, 0f);
+                float span = Vector3.Distance(transform.position, finisherEndPoint) * 0.5f + 1.3f;
+                cam.SetCinematicFraming(focus + side * 2.8f - transform.forward * 0.6f + Vector3.up * 0.2f, focus, 46f, 0f, focus, span);
             }
 
             if (!finisherImpactDone && finisherVictim != null)
@@ -1384,10 +1389,19 @@ namespace MadrasGethu
             DropWeapon();
             SetState(PlayerState.Dead);
             massModeTimer = 0f;
-            Visual.SetLying(true);
-            Visual.Play(FighterPose.Dead, 999f);
             Visual.SetCombatStance(false);
-            Motor.AddImpulse(killingBlow.direction * 4f + Vector3.up * 3f);
+            Vector3 push = killingBlow.direction * 4f + Vector3.up * 3f;
+            if (Visual.CanRagdoll)
+            {
+                Motor.SetFrozen(true);
+                Visual.StartRagdoll(push);
+            }
+            else
+            {
+                Visual.SetLying(true);
+                Visual.Play(FighterPose.Dead, 999f);
+                Motor.AddImpulse(push);
+            }
             if (GM != null) GM.OnPlayerDied();
         }
 

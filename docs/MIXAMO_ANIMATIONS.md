@@ -59,7 +59,8 @@ Save each file with the name in the first column into `Assets/MadrasGethu/Art/An
 | `Dodge.fbx` | Dodging *(or a side step)* |
 | `Flinch.fbx` | Head Hit *(or "Hit Reaction")* |
 | `Knockdown.fbx` | Knocked Down *(or "Falling Back")* |
-| `GetUp.fbx` | Getting Up *(or "Stand Up")* |
+| `GetUp.fbx` | Getting Up *(starts lying on the back)* |
+| `GetUpFront.fbx` | Stand Up / Getting Up *(pick one that starts lying **face down**; preview it in Mixamo)* |
 | `Dead.fbx` | Dying |
 
 ### Grab, shove and parry (recommended)

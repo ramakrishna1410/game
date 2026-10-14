@@ -60,10 +60,17 @@ A separate scene to learn the moves on **one dummy that never moves, never attac
 | R | Reset the dummy to his mark (also repairs props and puts the weapons back) |
 | T | Switch dummy: Rowdy → Thadiyan → Boss |
 | G | Infinite Gethu on/off (on by default, so you can practise every finisher) |
+| L | Show/hide the move list |
 
 The left panel lists every move with its input; each one ticks green the first time it lands. The top right shows the last hit, the damage of your current string and the last move. Smashed props rebuild themselves after a few seconds. The yard has a brick wall (wall slams, wall bounces, spinebuster), a tea kadai, fish crates, an auto and a weapon rack.
 
 Use **Madras Gethu → Open Practice Yard Scene** later, or **Open Kasimedu Arena Scene** to go back to the waves.
+
+## Ragdolls and hit timing
+
+With real (Mixamo) characters:
+- Knocked-down, thrown, slammed and defeated fighters go **limp and fall under physics** (ragdoll), slump against walls, and get up from however they landed (on their back or face down).
+- **Hits land when the fist or foot arrives.** *Setup Characters* measures the contact frame of every attack animation, and the game times each animation to it. **Run Madras Gethu → Setup Characters (Mixamo) again** after updating, so the timings are measured.
 
 ## Finisher camera
 
@@ -118,8 +125,8 @@ Keyboard and mouse for now (gamepad prompts come later).
 | Holding him, standing still | Body Slam | LMB lift → RMB slam |
 | Holding him, moving | Dhobi Pachad | LMB → RMB |
 | Holding him from behind | German Suplex | LMB ×3 body shots → RMB |
-| Holding him in front of a wall | Spinebuster | LMB → RMB |
-| Holding him with **full** Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
+| Holding him, pushing towards a wall | Spinebuster | LMB → RMB |
+| Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
 | Sprinting at a rowdy | Spear | RMB |
 | Rowdy on the ground | Elbow Drop | Space → LMB |
 

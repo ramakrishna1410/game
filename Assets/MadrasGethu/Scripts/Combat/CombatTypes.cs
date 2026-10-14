@@ -13,7 +13,7 @@ namespace MadrasGethu
         Haymaker, Uppercut, Backfist, Kick, Stomp,
         Grab, Knee, Throw, Slam,
         Counter, Dodge,
-        Flinch, Knockdown, GetUp, Dead,
+        Flinch, Knockdown, GetUp, GetUpFront, Dead,
         Windup, Taunt,
         Jump, FlyingKick, DodgeLeft, DodgeRight, DodgeBack, Roll,
         Headbutt, Push, Parry, StaggerBack,

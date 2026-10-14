@@ -89,7 +89,8 @@ namespace MadrasGethu.EditorTools
                 T("Flinch", 1.3f, new[] { "flinch", "hitreaction", "reaction", "headhit", "hit", "takinghit" }),
                 T("Windup", 1f, new[] { "windup", "chargeup" }),
                 T("Taunt", 1f, new[] { "taunt", "taunting", "comeon", "challenge" }),
-                T("GetUp", 1.3f, new[] { "getup", "gettingup", "standup", "standingup" }),
+                T("GetUp", 1.3f, new[] { "getup", "gettingup", "standup", "standingup", "getupback", "gettingupback" }),
+                T("GetUpFront", 1.3f, new[] { "getupfront", "gettingupfront", "standupfront", "getupfromfront", "getupprone", "pronetostand" }, "GetUp"),
 
                 // Enemy-only moves (put them in Animations/Rowdy, /Thadiyan or /Boss)
                 T("RowdySwing", 1f, new[] { "rowdyswing", "wildswing", "sloppypunch", "streetpunch" }, "Haymaker", "Cross"),
@@ -183,6 +184,7 @@ namespace MadrasGethu.EditorTools
                 var importCache = new Dictionary<string, AnimationClip>();
                 var unmatched = new List<string>();
                 var controllers = new Dictionary<string, AnimatorController>();
+                var slotsByType = new Dictionary<string, List<Slot>>();
                 var report = new StringBuilder();
                 bool anyEnemy = characterFiles.Any(p => Normalize(Path.GetFileNameWithoutExtension(p)) != "hero");
 
@@ -224,8 +226,14 @@ namespace MadrasGethu.EditorTools
                     }
 
                     controllers[type] = BuildController(slots, GeneratedFolder + "/" + type + "Animator.controller");
+                    slotsByType[type] = slots;
                     AppendSlotReport(report, type, slots);
                 }
+
+                // 3b. Measure when each punch/kick actually connects, so hits land with the animation.
+                EditorUtility.DisplayProgressBar("Madras Gethu", "Measuring contact frames...", 0.8f);
+                int timed = WriteTimings(slotsByType, controllers, heroPath);
+                report.AppendLine("Contact frames measured for " + timed + " moves (hits now land when the fist/foot arrives).");
 
                 // 4. Prefabs, each with its own type's Animator
                 EditorUtility.DisplayProgressBar("Madras Gethu", "Creating prefabs...", 0.85f);
@@ -817,6 +825,147 @@ namespace MadrasGethu.EditorTools
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return true;
+        }
+
+        // ------------------------------------------------------------------ contact frames
+
+        enum Reach { None, Hands, Feet, Knees, HandUp, SmashHands, SmashFeet, Head }
+
+        static Reach ReachFor(string move)
+        {
+            switch (move)
+            {
+                case "Jab": case "Cross": case "Hook": case "BodyBlow": case "Haymaker": case "Backfist": case "Counter":
+                case "Push": case "Throw": case "ThrowObject": case "RowdySwing": case "RowdyShove": case "RowdyGrab":
+                case "BearHug": case "WeaponSwing": case "Clothesline": case "BackElbow": case "ShoulderBarge": case "Spear":
+                    return Reach.Hands;
+                case "Kick": case "RowdyKick": case "FlyingKick": case "LegSweep":
+                    return Reach.Feet;
+                case "Knee": return Reach.Knees;
+                case "Uppercut": return Reach.HandUp;
+                case "Slam": case "GroundPound": case "WeaponSmash": case "ElbowDrop": return Reach.SmashHands;
+                case "Stomp": return Reach.SmashFeet;
+                case "Headbutt": return Reach.Head;
+                default: return Reach.None;
+            }
+        }
+
+        /// <summary>
+        /// Plays every attack clip on a copy of the hero and finds the frame where the fist, foot, knee or head
+        /// is furthest out (or, for slams and stomps, hits the bottom after the raise). Saved to
+        /// Art/Generated/Resources so the game can time each animation to its hit.
+        /// </summary>
+        static int WriteTimings(Dictionary<string, List<Slot>> slotsByType, Dictionary<string, AnimatorController> controllers, string modelPath)
+        {
+            EnsureFolder(GeneratedFolder + "/Resources");
+            string assetPath = GeneratedFolder + "/Resources/" + AnimationTimings.ResourceName + ".asset";
+            var asset = AssetDatabase.LoadAssetAtPath<AnimationTimings>(assetPath);
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<AnimationTimings>();
+                AssetDatabase.CreateAsset(asset, assetPath);
+            }
+            asset.entries.Clear();
+
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            if (model == null) return 0;
+            var go = (GameObject)Object.Instantiate(model);
+            go.hideFlags = HideFlags.HideAndDontSave;
+            int count = 0;
+            var cache = new Dictionary<string, float>();
+            try
+            {
+                var animator = go.GetComponent<Animator>();
+                if (animator == null) animator = go.AddComponent<Animator>();
+                if (animator.avatar == null)
+                    animator.avatar = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Avatar>().FirstOrDefault();
+                if (animator.avatar == null || !animator.avatar.isHuman) return 0;
+
+                AnimationMode.StartAnimationMode();
+                foreach (var pair in slotsByType)
+                {
+                    if (!controllers.TryGetValue(pair.Key, out var controller)) continue;
+                    foreach (var slot in pair.Value)
+                    {
+                        if (slot.clip == null || (slot.kind != SlotKind.Trigger && slot.kind != SlotKind.Final)) continue;
+                        var reach = ReachFor(slot.name);
+                        float impact = 0f;
+                        if (reach != Reach.None)
+                        {
+                            string key = slot.clip.GetInstanceID() + "/" + reach;
+                            if (!cache.TryGetValue(key, out impact))
+                            {
+                                impact = MeasureImpact(go, animator, slot.clip, reach);
+                                cache[key] = impact;
+                            }
+                            if (impact > 0f) count++;
+                        }
+                        asset.entries.Add(new AnimationTimings.Entry
+                        {
+                            controller = controller.name, move = slot.name, length = slot.clip.length, impact = impact,
+                        });
+                    }
+                }
+            }
+            finally
+            {
+                if (AnimationMode.InAnimationMode()) AnimationMode.StopAnimationMode();
+                Object.DestroyImmediate(go);
+            }
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            return count;
+        }
+
+        static float MeasureImpact(GameObject go, Animator animator, AnimationClip clip, Reach reach)
+        {
+            var hips = animator.GetBoneTransform(HumanBodyBones.Hips);
+            Transform a, b;
+            switch (reach)
+            {
+                case Reach.Feet: case Reach.SmashFeet:
+                    a = animator.GetBoneTransform(HumanBodyBones.LeftFoot); b = animator.GetBoneTransform(HumanBodyBones.RightFoot); break;
+                case Reach.Knees:
+                    a = animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg); b = animator.GetBoneTransform(HumanBodyBones.RightLowerLeg); break;
+                case Reach.Head:
+                    a = b = animator.GetBoneTransform(HumanBodyBones.Head); break;
+                default:
+                    a = animator.GetBoneTransform(HumanBodyBones.LeftHand); b = animator.GetBoneTransform(HumanBodyBones.RightHand); break;
+            }
+            if (hips == null || a == null || b == null) return 0f;
+
+            const int samples = 60;
+            var times = new float[samples];
+            var values = new float[samples];
+            float length = clip.length;
+            for (int i = 0; i < samples; i++)
+            {
+                float t = length * (0.05f + 0.85f * i / (samples - 1));
+                AnimationMode.BeginSampling();
+                AnimationMode.SampleAnimationClip(go, clip, t);
+                AnimationMode.EndSampling();
+                times[i] = t;
+                Vector3 da = a.position - hips.position, db = b.position - hips.position;
+                switch (reach)
+                {
+                    case Reach.HandUp: case Reach.SmashHands: case Reach.SmashFeet:
+                        values[i] = Mathf.Max(da.y, db.y); break;
+                    default:
+                        da.y = 0f; db.y = 0f;
+                        values[i] = Mathf.Max(da.magnitude, db.magnitude); break;
+                }
+            }
+
+            int best = 0;
+            for (int i = 1; i < samples; i++) if (values[i] > values[best]) best = i;
+            if (reach == Reach.SmashHands || reach == Reach.SmashFeet)
+            {
+                // Raised highest at 'best'; the impact is the lowest point after that.
+                int low = best;
+                for (int i = best + 1; i < samples; i++) if (values[i] < values[low]) low = i;
+                best = low;
+            }
+            return times[best];
         }
 
         static GameObject Lookup(Dictionary<string, GameObject> prefabs, string key) =>
