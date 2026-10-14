@@ -7,9 +7,17 @@ namespace MadrasGethu
     /// The hero: a former North Chennai boxer. Handles movement, the boxing combo system,
     /// block and counter, grabs and throws, environmental finishers and the Gethu meter.
     /// </summary>
-    public class PlayerFighter : Fighter
+    public partial class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle }
+
+        /// <summary>One button prompt for the HUD: a key cap (or mouse button) and what it does.</summary>
+        public struct PromptItem
+        {
+            public string key;     // "LMB", "RMB", "E", "F", "Q", "C", "SPACE"
+            public string label;
+            public bool dim;       // shown greyed out (e.g. not enough Gethu yet)
+        }
 
         [Header("Movement")]
         public float walkSpeed = 1.6f;
@@ -53,6 +61,19 @@ namespace MadrasGethu
         public AttackData flyingKick;      // jump -> attack
         public AttackData runningAttack;   // sprint -> light
         public AttackData dodgeStrike;     // dodge -> attack
+        public AttackData shoulderBarge;   // L H -> H
+        public AttackData bargeHaymaker;   // L H -> H -> H
+        public AttackData airHammer;       // L L H -> H (uppercut launched him)
+        public AttackData chargedHaymaker; // hold RMB
+        public AttackData legSweep;        // back + RMB
+        public AttackData shoulderRush;    // forward + RMB from a distance
+        public AttackData clothesline;     // sprint + RMB
+        public AttackData backElbow;       // LMB with a rowdy right behind you
+
+        [Header("Combo grades")]
+        [Tooltip("Hits needed for Nalla / Semma / Mass / Thalaivaa.")]
+        public int[] gradeHits = { 5, 10, 20, 35 };
+        static readonly string[] GradeNames = { "NALLA!", "SEMMA!", "MASS!", "THALAIVAA!" };
 
         public PlayerState State { get; private set; } = PlayerState.Free;
         public float Gethu { get; private set; }
@@ -61,7 +82,25 @@ namespace MadrasGethu
         public float MassModeFraction => massModeTimer / massModeDuration;
         public int ComboHits { get; private set; }
         public float ComboTimer { get; private set; }
-        public string ContextPrompt { get; private set; }
+        /// <summary>Button prompts to show right now (key caps at the bottom of the screen).</summary>
+        public readonly List<PromptItem> Prompts = new List<PromptItem>();
+        /// <summary>0 = none, 1 = Nalla, 2 = Semma, 3 = Mass, 4 = Thalaivaa.</summary>
+        public int ComboGrade
+        {
+            get
+            {
+                int g = 0;
+                for (int i = 0; i < gradeHits.Length; i++) if (ComboHits >= gradeHits[i]) g = i + 1;
+                return g;
+            }
+        }
+        public string ComboGradeName => ComboGrade > 0 ? GradeNames[Mathf.Min(ComboGrade, GradeNames.Length) - 1] : null;
+        /// <summary>Gethu earned is multiplied by this while the combo is going (x1.25 per grade).</summary>
+        public float GethuMultiplier => 1f + 0.25f * ComboGrade;
+        /// <summary>One of the three Gethu meter segments: the price of a wrestling finisher.</summary>
+        public float GethuBar => maxGethu / 3f;
+        public bool ChargingHaymaker => charging;
+        public float HaymakerCharge => Mathf.Clamp01(chargeTime / ChargeFull);
         public EnemyFighter Grabbed => grabbed;
 
         ThirdPersonCamera cam;
@@ -80,7 +119,10 @@ namespace MadrasGethu
         float dodgeDistanceNow;
         float dodgeDurationNow;
         float lastDodgeEnd = -10f;
-        bool followUpUsed;
+        bool charging;
+        float chargeTime;
+        const float ChargeMin = 0.4f;
+        const float ChargeFull = 1.0f;
         float massModeTimer;
         float grabActionCooldown;
 
@@ -174,6 +216,23 @@ namespace MadrasGethu
             dodgeStrike = new AttackData("Pivot Backfist", FighterPose.Backfist, 15f)
                 { announce = true, startup = 0.14f, recovery = 0.4f, range = 1.9f, arc = 360f, lunge = 0.8f, knockback = 7f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.25f };
 
+            shoulderBarge = new AttackData("Shoulder Barge", FighterPose.ShoulderBarge, 12f)
+                { announce = true, startup = 0.2f, recovery = 0.45f, range = 1.7f, arc = 110f, lunge = 1.6f, knockback = 4f, heavy = true, gethuGain = 9f, hitStop = 0.08f, shake = 0.25f };
+            bargeHaymaker = new AttackData("Kasimedu Haymaker", FighterPose.Haymaker, 24f)
+                { announce = true, startup = 0.26f, recovery = 0.6f, range = 1.8f, lunge = 1.3f, knockback = 11f, launch = 3f, heavy = true, gethuGain = 14f, hitStop = 0.13f, shake = 0.4f };
+            airHammer = new AttackData("Air Hammer", FighterPose.Slam, 20f)
+                { announce = true, startup = 0.22f, recovery = 0.55f, range = 2.0f, arc = 140f, lunge = 1.2f, knockback = 3f, launch = 0.5f, heavy = true, hitsDowned = true, gethuGain = 14f, hitStop = 0.14f, shake = 0.45f };
+            chargedHaymaker = new AttackData("Charged Haymaker", FighterPose.Haymaker, 30f)
+                { announce = true, startup = 0.12f, recovery = 0.6f, range = 1.9f, lunge = 1.6f, knockback = 5f, heavy = true, unblockable = true, dazes = true, gethuGain = 15f, hitStop = 0.16f, shake = 0.5f };
+            legSweep = new AttackData("Leg Sweep", FighterPose.LegSweep, 10f)
+                { announce = true, startup = 0.2f, recovery = 0.5f, range = 2.0f, arc = 360f, lunge = 0.3f, knockback = 2f, launch = 3f, heavy = true, gethuGain = 10f, hitStop = 0.08f, shake = 0.25f };
+            shoulderRush = new AttackData("Shoulder Rush", FighterPose.ShoulderBarge, 14f)
+                { announce = true, startup = 0.32f, recovery = 0.5f, range = 1.7f, arc = 100f, lunge = 4.5f, knockback = 9f, launch = 2f, heavy = true, gethuGain = 10f, hitStop = 0.1f, shake = 0.35f };
+            clothesline = new AttackData("Clothesline", FighterPose.Clothesline, 15f)
+                { announce = true, startup = 0.18f, recovery = 0.5f, range = 1.9f, arc = 120f, lunge = 2.4f, knockback = 3f, launch = 5f, heavy = true, gethuGain = 11f, hitStop = 0.12f, shake = 0.35f };
+            backElbow = new AttackData("Back Elbow", FighterPose.BackElbow, 9f)
+                { announce = true, startup = 0.12f, recovery = 0.35f, range = 1.6f, arc = 120f, lunge = 0.4f, knockback = 4f, gethuGain = 7f, hitStop = 0.08f, shake = 0.18f };
+
             knee = new AttackData("Knee", FighterPose.Knee, 7f)
                 { startup = 0f, recovery = 0.3f, gethuGain = 5f, hitStop = 0.05f, shake = 0.12f };
             grabMiss = new AttackData("Grab Miss", FighterPose.Grab, 0f)
@@ -188,7 +247,7 @@ namespace MadrasGethu
             stateTimer += dt;
             dodgeCooldown -= dt;
             grabActionCooldown -= dt;
-            ContextPrompt = null;
+            Prompts.Clear();
             Visual.SetAnimatorBool("Holding", State == PlayerState.Grab);
             Visual.SetAnimatorBool("Held", State == PlayerState.Held);
 
@@ -226,6 +285,7 @@ namespace MadrasGethu
                 case PlayerState.Parry: UpdateParry(); break;
                 case PlayerState.Held: UpdateHeld(); break;
                 case PlayerState.Finisher: UpdateFinisher(); break;
+                case PlayerState.Wrestle: UpdateWrestle(); break;
                 case PlayerState.Stagger:
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
                     break;
@@ -245,6 +305,7 @@ namespace MadrasGethu
         {
             State = s;
             stateTimer = 0f;
+            charging = false;
         }
 
         Vector3 MoveInputWorld()
@@ -275,6 +336,7 @@ namespace MadrasGethu
             }
 
             if (stateTimer > 0.6f) lightIndex = 0;   // pause too long and the combo string restarts
+            AddFreePrompts();
             if (TryCommonActions(allowAttacks: true)) return;
             if (GameInput.BlockHeld) SetState(PlayerState.Block);
         }
@@ -296,7 +358,7 @@ namespace MadrasGethu
                 return true;
             }
 
-            if (GameInput.GethuPressed && TryActivateGethu()) return true;
+            if (GameInput.GethuPressed && (TryStartFreeFinisher() || TryActivateGethu())) return true;
 
             if (GameInput.GrabPressed)
             {
@@ -328,8 +390,10 @@ namespace MadrasGethu
                 return true;
             }
 
+            bool running = GameInput.Sprint && Motor.MoveVelocity.magnitude > runSpeed * 0.8f;
+
             // Sprint -> light: running knee into whoever is ahead.
-            if (light && GameInput.Sprint && Motor.MoveVelocity.magnitude > runSpeed * 0.8f)
+            if (light && running)
             {
                 StartAttack(runningAttack, null);
                 lightIndex = 0;
@@ -339,23 +403,32 @@ namespace MadrasGethu
             if (heavy)
             {
                 var downed = CombatUtil.FindTarget(this, MoveInputWorld(), 2.2f, includeDowned: true);
-                if (downed != null && downed.IsDowned)
+                AttackData next = State == PlayerState.Attack ? FollowUpFor(currentAttack) : null;
+                Fighter forced = null;
+                if (downed != null && downed.IsDowned && next != airHammer)
                 {
-                    StartAttack(stomp, downed);
+                    next = stomp;
+                    forced = downed;
                 }
-                else if (State == PlayerState.Attack && heavyEnders.Contains(currentAttack) && !followUpUsed)
+                else if (next == null)
                 {
-                    // Heavy ender -> heavy again: Double Hammer.
-                    followUpUsed = true;
-                    StartAttack(heavyFollowUp, null);
+                    next = PickOpeningHeavy(running, out forced);
                 }
-                else
-                {
-                    followUpUsed = false;
-                    StartAttack(heavyEnders[Mathf.Min(lightIndex, heavyEnders.Count - 1)], null);
-                }
+                StartAttack(next, forced);
                 lightIndex = 0;
                 return true;
+            }
+
+            // A rowdy right behind you and nobody in front: elbow him without turning first.
+            if (lightIndex == 0 && MoveUnlocks.Has(MoveId.BackElbow)
+                && CombatUtil.FindTarget(this, transform.forward, 2.4f) == null)
+            {
+                var behind = CombatUtil.FindTarget(this, -transform.forward, 1.8f);
+                if (behind != null)
+                {
+                    StartAttack(backElbow, behind);
+                    return true;
+                }
             }
 
             if (lightIndex >= lightChain.Count) lightIndex = 0;
@@ -393,12 +466,60 @@ namespace MadrasGethu
                 GM.AddPopup(attack.name.ToUpper(), Center + Vector3.up * 1.1f, new Color(1f, 0.85f, 0.35f), 0.75f);
         }
 
+        /// <summary>Heavy pressed during a heavy: which move continues the string (null = none).</summary>
+        AttackData FollowUpFor(AttackData previous)
+        {
+            if (previous == null) return null;
+            if (heavyEnders.Count > 1 && previous == heavyEnders[1] && MoveUnlocks.Has(MoveId.ShoulderBarge)) return shoulderBarge;
+            if (previous == shoulderBarge) return bargeHaymaker;
+            if (heavyEnders.Count > 2 && previous == heavyEnders[2] && MoveUnlocks.Has(MoveId.AirHammer)) return airHammer;
+            if (heavyEnders.Contains(previous)) return heavyFollowUp;
+            return null;
+        }
+
+        /// <summary>A heavy that starts a string: depends on lights before it, the stick direction and running.</summary>
+        AttackData PickOpeningHeavy(bool running, out Fighter forced)
+        {
+            forced = null;
+            if (running && MoveUnlocks.Has(MoveId.Clothesline)) return clothesline;
+
+            if (lightIndex == 0)
+            {
+                Vector3 input = MoveInputWorld();
+                var focus = CombatUtil.FindTarget(this, Vector3.zero, 5.5f);
+                if (focus != null && input.sqrMagnitude > 0.25f)
+                {
+                    Vector3 to = Flat(focus.transform.position - transform.position);
+                    float dot = Vector3.Dot(input.normalized, to.normalized);
+                    // Pulling away from him: sweep his legs (hits everyone around you).
+                    if (dot < -0.5f && to.magnitude < 2.6f && MoveUnlocks.Has(MoveId.LegSweep))
+                    {
+                        forced = focus;
+                        return legSweep;
+                    }
+                    // Pushing at him from out of reach: shoulder rush across the gap.
+                    if (dot > 0.6f && to.magnitude > 2.6f && MoveUnlocks.Has(MoveId.ShoulderRush))
+                    {
+                        forced = focus;
+                        return shoulderRush;
+                    }
+                }
+            }
+            return heavyEnders[Mathf.Min(lightIndex, heavyEnders.Count - 1)];
+        }
+
         void UpdateAttack()
         {
             // A counter is always available, even in the middle of your own punch.
             if (currentAttack != counter && currentAttack != counterUppercut && currentAttack != counterThrow
                 && GameInput.BlockPressed && TryCounter())
                 return;
+
+            // Lone haymaker with RMB still held: wind it up (release to throw it, guard-breaking and dazing).
+            if (!struck && heavyEnders.Count > 0 && currentAttack == heavyEnders[0] && MoveUnlocks.Has(MoveId.ChargedHaymaker))
+            {
+                if (UpdateHaymakerCharge()) return;
+            }
 
             if (!struck && lungeRemaining > 0f)
             {
@@ -427,6 +548,41 @@ namespace MadrasGethu
                 if (currentAttack.heavy) lightIndex = 0;
                 SetState(PlayerState.Free);
             }
+        }
+
+        /// <summary>Returns true while the haymaker is being charged (the attack timeline is paused).</summary>
+        bool UpdateHaymakerCharge()
+        {
+            if (!charging)
+            {
+                if (stateTimer < currentAttack.startup * 0.5f || !GameInput.HeavyHeld) return false;
+                charging = true;
+                chargeTime = 0f;
+                Visual.Play(FighterPose.Windup, ChargeFull + 0.3f);
+            }
+
+            chargeTime += Time.deltaTime;
+            stateTimer -= Time.deltaTime;   // hold the wind-up
+            Motor.SetDesiredVelocity(Vector3.zero);
+            if (attackTarget != null && !attackTarget.IsDead)
+                Motor.FaceDirection(attackTarget.transform.position - transform.position);
+            Prompts.Add(new PromptItem { key = "RMB", label = chargeTime >= ChargeMin ? "Release!" : "Hold..." });
+            if (chargeTime >= ChargeMin && Mathf.Repeat(chargeTime, 0.25f) < Time.deltaTime)
+                FX.Burst(Center + Vector3.up * 0.4f + transform.right * 0.3f, 4, 2f, 0.05f, new Color(1f, 0.8f, 0.3f), new Color(2f, 1.5f, 0.3f), 0.25f, 0f);
+
+            if (GameInput.HeavyHeld && chargeTime < ChargeFull) return true;
+
+            charging = false;
+            if (chargeTime >= ChargeMin)
+            {
+                if (cam != null) cam.FovKick(5f);
+                StartAttack(chargedHaymaker, attackTarget);
+            }
+            else
+            {
+                Visual.Play(currentAttack.pose, currentAttack.startup * 0.5f + 0.2f, currentAttack.startup * 0.5f + currentAttack.recovery);
+            }
+            return true;
         }
 
         void PerformStrike()
@@ -460,9 +616,15 @@ namespace MadrasGethu
 
         void RegisterHits(int hits, float gethu)
         {
+            int gradeBefore = ComboGrade;
             ComboHits += hits;
             ComboTimer = 2f;
-            AddGethu(gethu);
+            AddGethu(gethu * GethuMultiplier);
+            if (ComboGrade > gradeBefore && GM != null)
+            {
+                GM.AddPopup(ComboGradeName, Center + Vector3.up * 1.4f, new Color(1f, 0.75f, 0.15f), 1.3f + 0.15f * ComboGrade);
+                if (ComboGrade >= 3) GM.SlowMo(0.5f, 0.25f);
+            }
         }
 
         public void AddGethu(float amount)
@@ -584,6 +746,7 @@ namespace MadrasGethu
         bool Invulnerable =>
             (State == PlayerState.Dodge && stateTimer < dodgeInvulnerableUntil) ||
             State == PlayerState.Finisher ||
+            State == PlayerState.Wrestle ||
             State == PlayerState.Parry ||
             (State == PlayerState.Attack && !struck &&
              (currentAttack == counter || currentAttack == counterUppercut || currentAttack == counterThrow));
@@ -772,14 +935,15 @@ namespace MadrasGethu
             grabbed.HoldAt(pos, facing);
 
             var spot = FinisherSpot.FindUsable(transform.position);
-            if (spot != null && Gethu >= spot.gethuCost)
-                ContextPrompt = $"Q / RT  —  {spot.finisherName}";
-            else if (spot != null)
-                ContextPrompt = $"Throw him in (E) · Q needs {spot.gethuCost:0} Gethu";
-            else if (Gethu >= maxGethu)
-                ContextPrompt = "Q / RT  —  GETHU SLAM!";
-            else
-                ContextPrompt = "Click: strike · E / RMB: throw · F: shove · aim at a wall to slam";
+            Vector3 aimNow = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
+            WrestleMove wrestle = spot == null ? PickGrabFinisher(aimNow, move) : null;
+            Prompts.Add(new PromptItem { key = "LMB", label = "Strike" });
+            Prompts.Add(new PromptItem { key = "E", label = spot != null ? "Throw him in" : "Throw" });
+            Prompts.Add(new PromptItem { key = "F", label = "Shove" });
+            if (spot != null)
+                Prompts.Add(new PromptItem { key = "Q", label = spot.finisherName, dim = Gethu < spot.gethuCost });
+            else if (wrestle != null)
+                Prompts.Add(new PromptItem { key = "Q", label = wrestle.name, dim = Gethu < wrestle.cost });
 
             if (stateTimer > 4.5f)
             {
@@ -797,7 +961,9 @@ namespace MadrasGethu
             if (GameInput.GethuPressed)
             {
                 if (spot != null && Gethu >= spot.gethuCost) { StartFinisher(spot); return; }
-                if (spot == null && Gethu >= maxGethu) { StartFinisher(null); return; }
+                if (spot == null && wrestle != null && Gethu >= wrestle.cost) { StartGrabFinisher(wrestle, aimNow); return; }
+                if (spot == null && wrestle == null && Gethu >= maxGethu) { StartFinisher(null); return; }
+                if (GM != null) GM.AddPopup("Not enough Gethu", Center + Vector3.up, Color.gray, 0.6f);
             }
 
             Vector3 aim = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
@@ -940,7 +1106,7 @@ namespace MadrasGethu
                 ReleasedByEnemy();
                 return;
             }
-            ContextPrompt = "TAP  E / B  TO BREAK FREE!";
+            Prompts.Add(new PromptItem { key = "E", label = "Tap fast to break free!" });
 
             // Mash to escape. A bear hug is harder to break than a collar grab.
             float perPress = heldBy.kind == EnemyKind.Thadiyan && !HeldFromBehind ? 0.11f : 0.16f;
@@ -1196,6 +1362,7 @@ namespace MadrasGethu
 
         public void Respawn(Vector3 position)
         {
+            if (wrestleMove != null) EndWrestle();
             if (grabbed != null) ReleaseGrab(Vector3.zero, false);
             heldBy = null;
             Motor.SetFrozen(false);

@@ -16,7 +16,7 @@ namespace MadrasGethu
         bool showHelp = true;
         float helpAutoHideAt;
         float displayedHealth = 1f;
-        GUIStyle label, big, huge, small, center;
+        GUIStyle label, big, huge, small, center, keyText;
         float lastScale;
 
         GameManager GM => GameManager.Instance;
@@ -44,6 +44,7 @@ namespace MadrasGethu
             big = new GUIStyle(label) { fontSize = Mathf.RoundToInt(44 * S), alignment = TextAnchor.MiddleCenter };
             huge = new GUIStyle(label) { fontSize = Mathf.RoundToInt(84 * S), alignment = TextAnchor.MiddleCenter };
             center = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter };
+            keyText = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(19 * S) };
         }
 
         void OnGUI()
@@ -59,6 +60,7 @@ namespace MadrasGethu
             DrawWaveInfo();
             DrawBanner();
             DrawPrompt();
+            DrawQte();
             if (showHelp) DrawHelp();
 
             if (Cursor.lockState != CursorLockMode.Locked)
@@ -102,7 +104,8 @@ namespace MadrasGethu
                     $"{held.displayName.ToUpper()}  {pips}   (E: throw)", small, new Color(1f, 0.85f, 0.5f));
             }
 
-            string gethuLabel = p.MassMode ? "GETHU MODE!" : p.GethuFraction >= 1f ? "GETHU FULL · Q / RT" : "GETHU";
+            int bars = Mathf.FloorToInt(p.Gethu / p.GethuBar + 0.001f);
+            string gethuLabel = p.MassMode ? "GETHU MODE!" : p.GethuFraction >= 1f ? "GETHU FULL · Q" : bars > 0 ? $"GETHU · {bars} bar{(bars > 1 ? "s" : "")}" : "GETHU";
             Shadowed(new Rect(x + gw + 10 * S, y - 6 * S, 300 * S, 28 * S), gethuLabel, small, Gold);
         }
 
@@ -113,47 +116,163 @@ namespace MadrasGethu
             float pulse = 1f + Mathf.Clamp01(p.ComboTimer - 1.8f) * 2f;
             var style = new GUIStyle(big) { alignment = TextAnchor.MiddleRight, fontSize = Mathf.RoundToInt(big.fontSize * pulse) };
             Shadowed(new Rect(Screen.width - 430 * S, Screen.height * 0.32f, 400 * S, 60 * S), $"{p.ComboHits} HITS", style, Gold);
+            if (p.ComboGrade > 0)
+            {
+                var gradeStyle = new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = Mathf.RoundToInt((26 + 4 * p.ComboGrade) * S) };
+                Color gc = p.ComboGrade >= 4 ? Color.Lerp(Gold, new Color(1f, 0.3f, 0.2f), Mathf.PingPong(Time.unscaledTime * 4f, 1f))
+                         : p.ComboGrade == 3 ? new Color(1f, 0.55f, 0.15f) : Gold;
+                Shadowed(new Rect(Screen.width - 430 * S, Screen.height * 0.32f + 58 * S, 400 * S, 40 * S),
+                    $"{p.ComboGradeName}   Gethu x{p.GethuMultiplier:0.00}", gradeStyle, gc);
+            }
         }
 
         void DrawPrompt()
         {
             var p = GM.Player;
-            if (p == null) return;
+            if (p == null || p.QteActive) return;
 
             // Grabbed by a rowdy: mash meter.
             if (p.IsHeld)
             {
                 float pulse = 0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 20f);
                 var meter = new Rect(Screen.width * 0.5f - 200 * S, Screen.height * 0.62f, 400 * S, 24 * S);
-                Shadowed(new Rect(0, meter.y - 60 * S, Screen.width, 50 * S), "TAP  E / B  TO BREAK FREE!",
-                    new GUIStyle(big) { fontSize = Mathf.RoundToInt(big.fontSize * 0.75f * pulse) }, new Color(1f, 0.85f, 0.2f));
+                float k = 64 * S * pulse;
+                HudIcons.DrawKey(new Rect(Screen.width * 0.5f - k / 2f, meter.y - k - 46 * S, k, k), "E", Gold, keyText);
+                Shadowed(new Rect(0, meter.y - 44 * S, Screen.width, 40 * S), "TAP FAST TO BREAK FREE!", center, new Color(1f, 0.85f, 0.2f));
                 Bar(meter, 1f, Panel);
                 Bar(meter, p.BreakFreeProgress, new Color(0.4f, 1f, 0.4f));
                 return;
             }
-            if (string.IsNullOrEmpty(p.ContextPrompt))
+            if (p.Prompts.Count == 0) return;
+
+            // A row of key caps with what each does, centred at the bottom of the screen.
+            float h = 40 * S, gap = 26 * S;
+            var labelStyle = new GUIStyle(label) { alignment = TextAnchor.MiddleLeft, fontSize = Mathf.RoundToInt(20 * S) };
+            float total = 0f;
+            foreach (var item in p.Prompts)
+                total += HudIcons.KeyWidth(item.key, h) + 8 * S + labelStyle.CalcSize(new GUIContent(item.label)).x + gap;
+            total -= gap;
+            float x = (Screen.width - total) / 2f, y = Screen.height - 130 * S;
+            Bar(new Rect(x - 16 * S, y - 8 * S, total + 32 * S, h + 16 * S), 1f, new Color(0f, 0f, 0f, 0.4f));
+            foreach (var item in p.Prompts)
             {
-                // Big pulsing reminder when the Gethu meter is full and unused.
-                if (p.GethuFraction >= 1f && !p.MassMode && !p.IsDead)
-                {
-                    float pulse = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f);
-                    var style = new GUIStyle(big) { fontSize = Mathf.RoundToInt(big.fontSize * 0.8f * (0.95f + 0.1f * pulse)) };
-                    var rr = new Rect(0, Screen.height - 170 * S, Screen.width, 60 * S);
-                    Shadowed(rr, "Q / RT  —  GETHU MODE!", style, new Color(1f, 0.75f, 0.15f, pulse));
-                }
-                return;
+                float a = item.dim ? 0.45f : 1f;
+                float kw = HudIcons.KeyWidth(item.key, h);
+                HudIcons.DrawKey(new Rect(x, y, kw, h), item.key, item.key == "Q" ? new Color(1f, 0.6f, 0.15f) : Gold, keyText, a);
+                x += kw + 8 * S;
+                float lw = labelStyle.CalcSize(new GUIContent(item.label)).x;
+                Shadowed(new Rect(x, y, lw + 4 * S, h), item.label, labelStyle, new Color(1f, 1f, 1f, a));
+                x += lw + gap;
             }
-            var r = new Rect(Screen.width * 0.5f - 400 * S, Screen.height - 120 * S, 800 * S, 40 * S);
-            Bar(r, 1f, Panel);
-            Shadowed(r, p.ContextPrompt, center, Gold);
+        }
+
+        /// <summary>Quick-time prompt for wrestling finishers: a ring closes in on the key; press as it meets the gold circle.</summary>
+        void DrawQte()
+        {
+            var p = GM.Player;
+            if (p == null) return;
+            float cx = Screen.width * 0.5f, cy = Screen.height * 0.6f;
+
+            if (p.QteActive)
+            {
+                float prog = p.QteProgress;
+                float baseR = 54 * S;
+                float t = PlayerFighter.QtePerfectAt;
+                float scale = prog <= t ? Mathf.Lerp(2.6f, 1f, prog / t) : Mathf.Lerp(1f, 0.6f, (prog - t) / (1f - t));
+                bool inWindow = Mathf.Abs(prog - t) <= 0.13f;
+
+                HudIcons.Draw(new Rect(cx - baseR * 1.25f, cy - baseR * 1.25f, baseR * 2.5f, baseR * 2.5f), HudIcons.Disc, new Color(0f, 0f, 0f, 0.45f));
+                HudIcons.Draw(new Rect(cx - baseR, cy - baseR, baseR * 2f, baseR * 2f), HudIcons.Ring, Gold);
+                float r = baseR * scale;
+                HudIcons.Draw(new Rect(cx - r, cy - r, r * 2f, r * 2f), HudIcons.Ring,
+                    inWindow ? new Color(0.4f, 1f, 0.5f) : new Color(1f, 1f, 1f, 0.9f));
+
+                string key = p.QteKeyNow == QteKey.Light ? "LMB" : p.QteKeyNow == QteKey.Heavy ? "RMB" : "SPACE";
+                float kh = 58 * S;
+                float kw = HudIcons.KeyWidth(key, kh);
+                HudIcons.DrawKey(new Rect(cx - kw / 2f, cy - kh / 2f, kw, kh), key, Gold, keyText);
+
+                Shadowed(new Rect(0, cy + baseR * 1.3f, Screen.width, 40 * S), p.QteLabelNow, center, Color.white);
+                Shadowed(new Rect(0, cy - baseR * 1.3f - 80 * S, Screen.width, 50 * S), p.WrestleName,
+                    new GUIStyle(big) { fontSize = Mathf.RoundToInt(36 * S) }, Gold);
+                if (p.QteTotal > 1)
+                    Shadowed(new Rect(0, cy + baseR * 1.3f + 34 * S, Screen.width, 30 * S), $"{p.QteNumber} / {p.QteTotal}", new GUIStyle(small) { alignment = TextAnchor.MiddleCenter }, new Color(1f, 1f, 1f, 0.7f));
+            }
+
+            float since = Time.unscaledTime - p.QteResultTime;
+            if (since < 0.6f && !string.IsNullOrEmpty(p.QteResultText))
+            {
+                Color c = p.QteResultText == "MISS" ? new Color(1f, 0.45f, 0.35f) : p.QteResultText == "GOOD" ? new Color(1f, 0.9f, 0.5f) : new Color(0.4f, 1f, 0.5f);
+                c.a = Mathf.Clamp01((0.6f - since) * 3f);
+                Shadowed(new Rect(0, cy - 150 * S - since * 60 * S, Screen.width, 60 * S), p.QteResultText,
+                    new GUIStyle(big) { fontSize = Mathf.RoundToInt(48 * S) }, c);
+            }
         }
 
         // ------------------------------------------------------------------ enemies
+
+        EnemyFighter grabHintTarget;
+
+        /// <summary>The rowdy the hero is facing, close enough to grab (only one gets the hand icon).</summary>
+        EnemyFighter FindGrabHintTarget()
+        {
+            var p = GM.Player;
+            if (p == null || p.IsDead || p.Grabbed != null || p.HeldWeapon != null) return null;
+            if (p.State != PlayerFighter.PlayerState.Free && p.State != PlayerFighter.PlayerState.Attack && p.State != PlayerFighter.PlayerState.Block)
+                return null;
+            EnemyFighter best = null;
+            float bestDist = 3.2f;
+            foreach (var e in GM.AliveEnemies)
+            {
+                if (e == null || e.IsDead || e.IsDowned || e.IsBegging) continue;
+                Vector3 to = e.transform.position - p.transform.position;
+                to.y = 0f;
+                float d = to.magnitude;
+                if (d < bestDist && Vector3.Dot(p.transform.forward, to.normalized) > 0.3f) { bestDist = d; best = e; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Hand icon over the rowdy in front: white = grabbable (E), flashing yellow = dazed (grab now!),
+        /// crossed out = too heavy until staggered. A skull means a wrestling finisher is ready on him.
+        /// </summary>
+        void DrawGrabHint(EnemyFighter e, Vector3 sp)
+        {
+            var p = GM.Player;
+            float size = 34 * S;
+            float x = sp.x + 56 * S, y = Screen.height - sp.y - size * 0.6f;
+            bool can = e.CanBeGrabbed;
+            if (e.IsDazed) size *= 1f + 0.15f * Mathf.Sin(Time.unscaledTime * 12f);
+            var r = new Rect(x, y, size, size);
+            Color handColor = !can ? new Color(0.7f, 0.7f, 0.7f, 0.7f)
+                            : e.IsDazed ? Color.Lerp(Gold, Color.white, Mathf.PingPong(Time.unscaledTime * 5f, 1f))
+                            : new Color(1f, 1f, 1f, 0.9f);
+            HudIcons.Draw(new Rect(r.x + 2, r.y + 2, r.width, r.height), HudIcons.Hand, new Color(0f, 0f, 0f, 0.6f));
+            HudIcons.Draw(r, HudIcons.Hand, handColor);
+            if (!can)
+            {
+                // Red slash: too heavy to grab until you stagger him.
+                var old = GUI.matrix;
+                GUIUtility.RotateAroundPivot(-45f, r.center);
+                Bar(new Rect(r.center.x - size * 0.6f, r.center.y - 2.5f * S, size * 1.2f, 5 * S), 1f, new Color(1f, 0.25f, 0.2f, 0.95f));
+                GUI.matrix = old;
+                return;
+            }
+            float k = 22 * S;
+            HudIcons.DrawKey(new Rect(r.xMax + 4 * S, r.center.y - k / 2f, k, k), "E", Gold, new GUIStyle(keyText) { fontSize = Mathf.RoundToInt(14 * S) });
+            if (e.IsDazed && p != null && p.Gethu >= p.GethuBar)
+            {
+                var skullRect = new Rect(r.xMax + 30 * S, r.y, size, size);
+                HudIcons.Draw(skullRect, HudIcons.Skull, new Color(1f, 0.6f, 0.15f, 0.95f));
+            }
+        }
 
         void DrawEnemyBars()
         {
             var cam = Camera.main;
             if (cam == null) return;
+            grabHintTarget = FindGrabHintTarget();
 
             foreach (var e in GM.AliveEnemies)
             {
@@ -174,9 +293,7 @@ namespace MadrasGethu
                                    : new Color(1f, 0.85f, 0.15f, 0.9f);
                     string key = tele == TelegraphColor.Red ? "F" : "C";
                     string what = tele == TelegraphColor.Red ? "PARRY" : tele == TelegraphColor.Orange ? "DODGE" : "DODGE GRAB";
-                    Bar(box, 1f, boxColor);
-                    var keyStyle = new GUIStyle(center) { fontSize = Mathf.RoundToInt(20 * S * pulse) };
-                    Shadowed(box, key, keyStyle, Color.white);
+                    HudIcons.DrawKey(box, key, boxColor, new GUIStyle(keyText) { fontSize = Mathf.RoundToInt(22 * S * pulse) });
                     Shadowed(new Rect(sp.x - 70 * S, box.yMax, 140 * S, 20 * S), what, new GUIStyle(small) { alignment = TextAnchor.MiddleCenter }, boxColor);
                 }
                 if (e.IsBegging)
@@ -184,6 +301,22 @@ namespace MadrasGethu
                     Shadowed(new Rect(sp.x - 220 * S, Screen.height - sp.y - 40 * S, 440 * S, 26 * S),
                         "E: let him go   ·   Hit him: finish him", new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold },
                         new Color(1f, 0.9f, 0.6f));
+                }
+
+                if (e == grabHintTarget) DrawGrabHint(e, sp);
+                else if (e.IsDowned && GM.Player != null && GM.Player.Gethu >= GM.Player.GethuBar && GM.Player.Grabbed == null)
+                {
+                    Vector3 to = e.transform.position - GM.Player.transform.position;
+                    to.y = 0f;
+                    if (to.magnitude < 2.6f)
+                    {
+                        Vector3 low = cam.WorldToScreenPoint(e.transform.position + Vector3.up * 0.9f);
+                        if (low.z > 0f)
+                        {
+                            float sz = 30 * S * (1f + 0.1f * Mathf.Sin(Time.unscaledTime * 8f));
+                            HudIcons.Draw(new Rect(low.x - sz / 2f, Screen.height - low.y - sz, sz, sz), HudIcons.Skull, new Color(1f, 0.6f, 0.15f, 0.95f));
+                        }
+                    }
                 }
 
                 if (e.IsBoss)
@@ -281,30 +414,32 @@ namespace MadrasGethu
         {
             string[] lines =
             {
-                "CONTROLS                                  (H to hide)",
-                "WASD / L-stick ....... move      Shift / LB ... sprint",
-                "Space / A ............ jump      C, Ctrl / LT . dodge (+direction)",
-                "Left click / X ....... punch     Right click / Y ... heavy",
-                "F / RB ............... block (hold) · PARRY when blue F shows (late = PERFECT)",
-                "C / LT ............... dodge  · ORANGE = unblockable, YELLOW = grab: dodge!",
-                "Grabbed? ............. tap E / B fast to break free",
-                "E / B ................ grab collar → click: knee/headbutt/punch · pick up weapon",
-                "   while holding ...... E / RMB: throw · F: shove · aim at a wall: WALL SLAM",
-                "Q / RT ............... Gethu Mode, or finisher near a marked prop",
+                "CONTROLS (keyboard + mouse)                   H to hide",
+                "WASD move · Shift sprint · Space jump · C / Ctrl dodge (+direction)",
+                "LMB punch · RMB heavy · hold RMB: CHARGED HAYMAKER (dazes, breaks guard)",
+                "F block · tap F when the blue F shows = PARRY (late = PERFECT)",
+                "ORANGE = unblockable, YELLOW = grab: dodge (C). Grabbed? tap E fast",
+                "E grab collar (hand icon) → LMB strike · E throw · F shove · pick up weapons",
+                "Q (costs Gethu) · while holding: WRESTLING FINISHER · near a prop: smash",
                 "",
                 "COMBOS",
-                "L ▸ H .................. Haymaker",
-                "L L ▸ H ................ Kasimedu Kick",
-                "L L L ▸ H .............. Uppercut (launches)",
-                "L L L L ▸ H ............ Royapuram Rush Finisher",
-                "any heavy ▸ H .......... Double Hammer",
-                "Jump ▸ L/H ............. Flying Kick",
-                "Sprint ▸ L ............. Running Knee",
-                "Dodge ▸ L/H ............ Pivot Backfist",
-                "H on a downed rowdy .... Stomp",
-                "Grab ▸ throw into a marked prop = free smash",
+                "RMB ............... Haymaker            LMB RMB ........... Kasimedu Kick",
+                "LMB RMB RMB RMB ... Kick > Shoulder Barge > Kasimedu Haymaker",
+                "LMB LMB RMB RMB ... Uppercut > Air Hammer",
+                "LMB x3 RMB ........ Spinning Backfist   LMB x4 RMB ........ Royapuram Rush",
+                "back + RMB ........ Leg Sweep           forward + RMB (far) Shoulder Rush",
+                "sprint + LMB ...... Running Knee        sprint + RMB ...... Clothesline",
+                "LMB, rowdy behind . Back Elbow          dodge > LMB ....... Pivot Backfist",
+                "heavy > RMB ....... Double Hammer       jump > LMB ........ Flying Kick",
+                "Knocked into a wall: WALL BOUNCE (he staggers back dazed)",
+                "",
+                "WRESTLING (Q, 1 Gethu bar; follow the ring prompts)",
+                "hold, standing still .. Body Slam      hold, moving ...... Dhobi Pachad",
+                "hold from behind ...... German Suplex  hold, facing a wall Spinebuster",
+                "hold, FULL Gethu ...... Powerbomb      sprint at a rowdy . Spear",
+                "rowdy on the ground ... Elbow Drop     combos: NALLA > SEMMA > MASS > THALAIVAA",
             };
-            float w = 700 * S, lh = 22 * S;
+            float w = 760 * S, lh = 22 * S;
             var r = new Rect(30 * S, Screen.height - (lines.Length * lh + 40 * S), w, lines.Length * lh + 20 * S);
             Bar(r, 1f, Panel);
             for (int i = 0; i < lines.Length; i++)

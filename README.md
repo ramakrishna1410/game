@@ -14,6 +14,12 @@ This is the **first playable combat prototype**, built in **Unity 6 (URP)**. All
 - **Grab**: knee strikes, throws into other rowdies, and dragging enemies around
 - **Environmental finishers**: drag a grabbed rowdy to the **tea kadai**, the **fish crates (meen petti)** or a **parked auto** and press Gethu
 - **Gethu meter** (heat): fills as you fight stylishly. Spend it on finishers, or fill it completely for **Gethu Mode** (stronger hits, no flinching, half damage)
+- **Combo specials**: shoulder barge, air hammer, charged haymaker, leg sweep, shoulder rush, clothesline, back elbow and **wall bounces**
+- **Combo grades**: *Nalla → Semma → Mass → Thalaivaa*, each raising the Gethu you earn
+- **Dazed** rowdies (charged haymaker, wall bounce, or worn down): they sway on their feet and can be grabbed, even the Thadiyan
+- **Wrestling finishers with quick-time prompts**: Body Slam, Dhobi Pachad, German Suplex, Powerbomb, Spear, Elbow Drop and Spinebuster. Press as the ring meets the gold circle for **PERFECT**; a miss never cancels the move
+- **Key-cap button prompts**, a **hand icon** over grabbable rowdies (flashing when dazed, crossed out when too heavy) and a **skull** when a finisher is ready
+- Moves are registered for a future **skill tree** (`MoveUnlocks`): everything is unlocked for now
 - **Group AI**: rowdies circle you and take turns attacking, at most 2 at once
 - 3 enemy types: **Rowdy**, **Thadiyan** (big bruiser, can't be grabbed, unblockable slam) and the boss **Kumaran Anna**
 - 3 waves, ending in a boss fight, at a night-time Kasimedu fishing harbour (godowns, boats, sodium lamps)
@@ -44,24 +50,59 @@ The prototype is light. It runs fine on integrated Intel Arc graphics with 16 GB
 
 ## Controls
 
-| Action | Keyboard / Mouse | Gamepad (Xbox) |
+Keyboard and mouse for now (gamepad prompts come later).
+
+| Action | Keys |
+|---|---|
+| Move / Sprint | WASD / Shift |
+| Camera | Mouse |
+| Light attack (combo) | Left click |
+| Heavy attack (combo ender, or **stomp** a downed enemy) | Right click |
+| **Charged haymaker** (dazes, breaks guard) | hold Right click, release |
+| Block (hold) | F |
+| **Parry** (when the blue F shows) | F (tap) |
+| Jump (then click for a **flying kick**) | Space |
+| Dodge: sidestep / backstep when squared up, roll otherwise (direction + key) | C or Ctrl |
+| Grab → strike / throw / shove | E → Left click / E / F |
+| **Gethu**: wrestling finisher while grabbing, prop finisher near a prop, elbow drop on a downed rowdy, spear while sprinting, or Gethu Mode when full | Q |
+| Quick-time prompts during a wrestling finisher | the key shown (Left click, Right click or Space) |
+| Pick up a weapon (stand on it) / throw the weapon you hold | E |
+| Break free when a rowdy grabs you | tap E fast |
+| Spare a begging rowdy (hit him to finish him) | E |
+| Show/hide controls | H |
+| Restart after win/lose | Enter |
+| Free the mouse | Esc |
+
+### Combos
+
+| Input | Move |
+|---|---|
+| RMB | Haymaker (hold for a **Charged Haymaker**) |
+| LMB RMB | Kasimedu Kick |
+| LMB RMB RMB RMB | Kick → Shoulder Barge → Kasimedu Haymaker |
+| LMB LMB RMB | Uppercut (launches) |
+| LMB LMB RMB RMB | Uppercut → Air Hammer |
+| LMB ×3 RMB / LMB ×4 RMB | Spinning Backfist / Royapuram Rush Finisher |
+| any other heavy → RMB | Double Hammer |
+| back + RMB | Leg Sweep (everyone around you) |
+| forward + RMB from out of reach | Shoulder Rush |
+| sprint + LMB / sprint + RMB | Running Knee / Clothesline |
+| LMB with a rowdy right behind you | Back Elbow |
+| dodge → LMB, jump → LMB | Pivot Backfist, Flying Kick |
+
+### Wrestling finishers (Q, costs Gethu)
+
+| When | Finisher | Prompts |
 |---|---|---|
-| Move / Sprint | WASD / Shift | Left stick / LB |
-| Camera | Mouse | Right stick |
-| Light attack (combo) | Left click | X |
-| Heavy attack (combo ender, or **stomp** a downed enemy) | Right click | Y |
-| Block (hold) | F | RB |
-| **Counter** (when an enemy flashes red) | F (tap) | RB (tap) |
-| Jump (then click for a **flying kick**) | Space | A |
-| Dodge: sidestep / backstep when squared up, roll otherwise (direction + key) | C or Ctrl | LT |
-| Grab → knee / throw | E → Left click / E or Right click | B → X / B or Y |
-| **Gethu**: finisher while grabbing near a prop, or Gethu Mode when full | Q | RT |
-| Pick up a weapon (stand on it) / throw the weapon you hold | E | B |
-| Break free when a rowdy grabs you | tap E fast | tap B fast |
-| Spare a begging rowdy (hit him to finish him) | E | B |
-| Show/hide controls | H | View/Back |
-| Restart after win/lose | Enter | Start |
-| Free the mouse | Esc | |
+| Holding him, standing still | Body Slam | LMB lift → RMB slam |
+| Holding him, moving | Dhobi Pachad | LMB → RMB |
+| Holding him from behind | German Suplex | LMB ×3 body shots → RMB |
+| Holding him in front of a wall | Spinebuster | LMB → RMB |
+| Holding him with **full** Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
+| Sprinting at a rowdy | Spear | RMB |
+| Rowdy on the ground | Elbow Drop | Space → LMB |
+
+Each costs one Gethu bar (the Powerbomb costs the full meter). Every **PERFECT** adds damage and a little Gethu; all PERFECT = **FLAWLESS**.
 
 **Enemy warning colours:** 🔵 the blue **F** box means parry; **orange** means unblockable, so dodge (C); **yellow** means a grab, so dodge, or tap E to break free if he catches you.
 
@@ -80,10 +121,11 @@ Assets/MadrasGethu/
     Combat/        Fighter base, FighterMotor (movement), FighterVisual (placeholder body + animation hooks),
                    AttackData/HitInfo, CombatUtil (hit detection, auto-targeting), FX
     Player/        PlayerFighter: combos, block/counter, dodge, grabs, finishers, Gethu meter
+                   PlayerWrestling: wrestling finishers and QTE prompts · MoveUnlocks: skill-tree hooks
     Enemy/         EnemyFighter AI, EnemyProfile (stats per enemy type), EnemyDirector (attack turns)
     World/         KasimeduArenaBuilder (placeholder level), FinisherSpot (tea kadai / crates / auto)
     CameraSystem/  ThirdPersonCamera
-    UI/            GameHUD (health, Gethu, combo counter, banners)
+    UI/            GameHUD (health, Gethu, combo grades, button prompts, QTE ring), HudIcons (key caps, hand, skull)
   Editor/          "Madras Gethu" menu: creates the arena scene
 docs/
   GAME_DESIGN.md        the full Chennai game concept and roadmap
@@ -93,6 +135,8 @@ docs/
 ## Tuning
 
 - Combo moves and damage: `PlayerFighter.BuildDefaultMoves()`
+- Wrestling finishers (timing, poses, damage, QTE keys): `PlayerWrestling.cs`
+- Which moves are unlocked (for the future skill tree): `MoveUnlocks.cs`
 - Enemy stats and moves: `EnemyProfile.cs`
 - How many rowdies attack at once: `EnemyDirector.MaxAttackers`
 - Waves: `GameBootstrap.AddWaves()`

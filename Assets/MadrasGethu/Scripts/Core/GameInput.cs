@@ -122,6 +122,11 @@ namespace MadrasGethu
             (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked && Mouse.current.rightButton.wasPressedThisFrame)
             || PadDown(GamepadButton.North);
 
+        /// <summary>Right mouse held down (charged haymaker).</summary>
+        public static bool HeavyHeld =>
+            (Mouse.current != null && Mouse.current.rightButton.isPressed)
+            || (Gamepad.current != null && Gamepad.current[GamepadButton.North].isPressed);
+
         public static bool ClickPressed => Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
 #else
         public static bool BlockPressed => Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.JoystickButton5);
@@ -138,6 +143,8 @@ namespace MadrasGethu
 
         public static bool HeavyPressed =>
             (Cursor.lockState == CursorLockMode.Locked && Input.GetMouseButtonDown(1)) || Input.GetKeyDown(KeyCode.JoystickButton3);
+
+        public static bool HeavyHeld => Input.GetMouseButton(1) || Input.GetKey(KeyCode.JoystickButton3);
 
         public static bool ClickPressed => Input.GetMouseButtonDown(0);
 #endif

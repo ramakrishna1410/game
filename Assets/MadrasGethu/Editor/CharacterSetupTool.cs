@@ -105,7 +105,17 @@ namespace MadrasGethu.EditorTools
                 T("WeaponSwing", 1f, new[] { "weaponswing", "swordslash", "batswing", "stickswing", "onehandswing" }, "Haymaker", "Hook"),
                 T("WeaponSmash", 1f, new[] { "weaponsmash", "overheadsmash", "greatswordslash", "twohandsmash" }, "Slam", "Haymaker"),
                 T("ThrowObject", 1f, new[] { "throwobject", "throwing", "grenadethrow", "toss" }, "Throw", "Haymaker"),
+                // Hero combo specials and wrestling finishers (put them in Animations/ or Animations/Hero)
+                T("ShoulderBarge", 1.2f, new[] { "shoulderbarge", "shoulderhit", "shoulderbash" }, "Push", "Haymaker"),
+                T("LegSweep", 1.2f, new[] { "legsweep", "sweep", "sweepfall", "spinsweep" }, "Kick", "Stomp"),
+                T("Clothesline", 1.1f, new[] { "clothesline", "lariat", "armswing" }, "Haymaker", "Hook"),
+                T("BackElbow", 1.3f, new[] { "backelbow", "elbowstrike", "elbow", "elbowpunch" }, "Backfist", "Hook"),
+                T("Lift", 1f, new[] { "lift", "lifting", "liftup", "boxlifting", "liftingheavy" }, "PickUp", "Throw"),
+                T("Suplex", 1f, new[] { "suplex", "germansuplex", "backflip", "bridge" }, "Throw", "Slam"),
+                T("Spear", 1f, new[] { "spear", "footballtackle", "speartackle" }, "Charge", "Push"),
+                T("ElbowDrop", 1f, new[] { "elbowdrop", "legdrop", "jumpdown" }, "Stomp", "Slam"),
 
+                new Slot { name = "Dazed", kind = SlotKind.HoldBool, boolParameter = "Dazed", aliases = new[] { "dazed", "dizzy", "dizzyidle", "stunned" }, fallbacks = new[] { "StaggerBack", "Flinch" } },
                 new Slot { name = "Beg", kind = SlotKind.HoldBool, boolParameter = "Begging", aliases = new[] { "beg", "begging", "pleading", "kneelbeg", "kneeling" }, fallbacks = new[] { "Flinch" } },
                 new Slot { name = "Block", kind = SlotKind.HoldBool, boolParameter = "Blocking", aliases = new[] { "block", "blocking", "centerblock", "bodyblock" }, fallbacks = new[] { "Guard" } },
                 new Slot { name = "Grab", kind = SlotKind.HoldBool, boolParameter = "Holding", aliases = new[] { "grab", "grabbing", "hold", "holding" }, fallbacks = new[] { "Guard" } },

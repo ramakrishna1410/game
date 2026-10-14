@@ -35,6 +35,17 @@ You switch styles mid-fight, as in Yakuza 0.
 - **Counters and dodges** on red-flash telegraphs. *(Prototype.)*
 - **Group AI**: rowdies take turns attacking. *(Prototype.)*
 - **Enemy archetypes**: rowdy, Thadiyan (bruiser) and boss *(prototype)*, then a knife rowdy, a lathi (stick) rowdy, a bike gang and a Silambam master.
+- **Wrestling finishers with QTE prompts** (the start of Malyutham): body slam, dhobi pachad, German suplex, powerbomb, spear, elbow drop, spinebuster. *(Prototype.)*
+- **Combo grades**: Nalla, Semma, Mass, Thalaivaa, multiplying Gethu. *(Prototype.)*
+
+## Skill tree (planned, Spider-Man style)
+Earn XP from fights and missions, spend skill points in three branches. Every move already has an ID in `MoveUnlocks`, so a skill only needs to call `MoveUnlocks.Unlock(...)`. Everything is unlocked in the prototype.
+
+| Branch | Example skills |
+|---|---|
+| **Kuthu (strikes)** | Charged Haymaker, Shoulder Barge chain, Air Hammer, Back Elbow, longer combo window |
+| **Malyutham (grapples)** | Dhobi Pachad, German Suplex, Powerbomb, Spinebuster, faster break-free, wider QTE timing |
+| **Theru (street)** | Leg Sweep, Shoulder Rush, Spear, Clothesline, Wall Bounce, weapon durability, cheaper finishers |
 
 ## Side content (later)
 - **Gaana karaoke** (the Yakuza karaoke equivalent)
@@ -52,8 +63,10 @@ You switch styles mid-fight, as in Yakuza 0.
 | Milestone | Content |
 |---|---|
 | **M1: Combat prototype** ✅ | Controller, camera, boxing combos, block/counter/dodge, grabs, environmental finishers, Gethu, 3 enemy types, waves |
+| M1.5: Combat depth ✅ | Collar-grab IK, two-timing parry, enemy-only moves, weapons, combo specials, wrestling finishers with QTE, button prompts |
 | M2: Real characters | Mixamo characters and animations, hit sounds, gaana BGM, bloom and post-processing, a proper uGUI HUD |
 | M3: Second style | Silambam with a staff weapon and weapon pickups; switching styles |
 | M4: Explorable street | A Royapuram lane with NPC crowds, shops, a food stall that heals, and story triggers |
 | M5: First mission | Cutscene, a chase, a boss at Kasimedu, plus save/load |
 | M6: Side activities | Gaana karaoke, carrom, more of the district |
+| M7: Progression | Skill tree, XP, gamepad button icons |

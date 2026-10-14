@@ -21,7 +21,10 @@ namespace MadrasGethu
         RowdySwing, RowdyKick, RowdyShove, RowdyGrab, BearHug, Charge, GroundPound, Roar,
         // Weapons and objects (hero and enemies)
         PickUp, WeaponSwing, WeaponSmash, ThrowObject,
-        Beg
+        Beg,
+        // Hero combo specials and wrestling finishers
+        ShoulderBarge, LegSweep, Clothesline, BackElbow,
+        Lift, Suplex, Spear, ElbowDrop
     }
 
     /// <summary>What kind of threat an enemy attack is, which decides how the hero must answer it.</summary>
@@ -49,6 +52,7 @@ namespace MadrasGethu
         public bool heavy;          // breaks guard-less armour, causes bigger reactions
         public bool unblockable;
         public bool hitsDowned;     // can hit enemies lying on the ground (stomps, finishers)
+        public bool dazes;          // leaves the target standing but dazed (open to grabs and finishers)
     }
 
     /// <summary>One move in a combo string. Times are in seconds.</summary>
@@ -70,6 +74,7 @@ namespace MadrasGethu
         public bool unblockable;
         public bool hitsDowned;
         public bool announce;             // show the move's name on screen (specials and finishers)
+        public bool dazes;                // hero: a clean hit leaves him dazed
         public AttackKind kind;           // enemies: how the hero has to respond
         public bool feint;                // enemies: fake attack that punishes an early parry
         public float weight = 1f;         // enemies: how often this move is picked
@@ -102,6 +107,7 @@ namespace MadrasGethu
                 heavy = heavy,
                 unblockable = unblockable,
                 hitsDowned = hitsDowned,
+                dazes = dazes,
             };
         }
     }

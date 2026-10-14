@@ -293,6 +293,47 @@ namespace MadrasGethu
             tumbleTimer = duration;
         }
 
+        bool carried;
+        Quaternion carryRotation;
+
+        /// <summary>
+        /// Wrestling finishers: tilt the whole body around its hips (lifted across the shoulders, upside down
+        /// for a powerbomb, ...). Rotation is in this fighter's local space. Call ClearCarry to stand back up.
+        /// </summary>
+        public void SetCarry(Quaternion localRotation)
+        {
+            carried = true;
+            carryRotation = localRotation;
+        }
+
+        public void ClearCarry()
+        {
+            if (!carried) return;
+            carried = false;
+            if (body == null) return;
+            body.localRotation = Quaternion.identity;
+            body.localPosition = Vector3.zero;
+        }
+
+        public bool IsCarried => carried;
+
+        void ApplyHipRotation(Quaternion rot)
+        {
+            Vector3 hipPoint = Vector3.up * 0.9f;
+            body.localRotation = rot;
+            body.localPosition = hipPoint - rot * hipPoint;
+        }
+
+        /// <summary>Cuts a tumble short (e.g. bounced off a wall back onto his feet).</summary>
+        public void StopTumble()
+        {
+            if (tumbleTimer <= 0f) return;
+            tumbleTimer = 0f;
+            if (body == null) return;
+            body.localRotation = Quaternion.identity;
+            body.localPosition = Vector3.zero;
+        }
+
         /// <summary>Rotates the whole body around its hips for a tumble; returns true while tumbling.</summary>
         bool UpdateTumble(float dt)
         {
@@ -402,6 +443,13 @@ namespace MadrasGethu
             UpdateMaterials(dt);
             UpdateLocomotion(dt);
 
+            if (carried)
+            {
+                tumbleTimer = 0f;
+                ApplyHipRotation(carryRotation);
+                if (animator != null) SetAnimatorBool("Blocking", false);
+                return;
+            }
             bool tumbling = UpdateTumble(dt);
 
             if (animator != null)
@@ -418,6 +466,9 @@ namespace MadrasGethu
             if (pose == FighterPose.Dodge || pose == FighterPose.Roll) lean = 25f;
             if (pose == FighterPose.DodgeBack) lean = -15f;
             if (pose == FighterPose.StaggerBack) lean = -22f;
+            if (pose == FighterPose.Suplex) lean = -70f;
+            if (pose == FighterPose.Spear || pose == FighterPose.ShoulderBarge) lean = 35f;
+            if (pose == FighterPose.ElbowDrop) lean = 50f;
             var bodyTarget = Quaternion.Euler(-90f * lie + lean * (1f - lie), 0f, 0f);
             body.localRotation = Quaternion.Slerp(body.localRotation, bodyTarget, k);
 
@@ -511,6 +562,24 @@ namespace MadrasGethu
                 case FighterPose.StaggerBack:
                 case FighterPose.Flinch:
                     aL = new Vector3(-30f, 0f, -35f); aR = new Vector3(-30f, 0f, 35f); break;
+                case FighterPose.ShoulderBarge:
+                case FighterPose.Spear:
+                    aL = new Vector3(-50f, 30f, 0f); aR = new Vector3(-70f, -20f, 0f); twist = 60f; break;
+                case FighterPose.LegSweep:
+                    lR = new Vector3(-20f, 0f, 70f); lL = new Vector3(-60f, 0f, 0f);
+                    aL = new Vector3(-30f, 0f, -50f); aR = new Vector3(-30f, 0f, 50f); twist = 90f; break;
+                case FighterPose.Clothesline:
+                    aR = new Vector3(-90f, -90f, 0f); aL = new Vector3(-30f, 0f, -30f); twist = -30f; break;
+                case FighterPose.BackElbow:
+                    aR = new Vector3(-40f, 0f, 60f); aL = guardL; reachR = -0.2f; twist = -60f; break;
+                case FighterPose.Lift:
+                    aL = new Vector3(-170f, 15f, 0f); aR = new Vector3(-170f, -15f, 0f);
+                    lL = new Vector3(-15f, 0f, 0f); lR = new Vector3(-15f, 0f, 0f); break;
+                case FighterPose.Suplex:
+                    aL = new Vector3(-180f, 10f, 0f); aR = new Vector3(-180f, -10f, 0f); break;
+                case FighterPose.ElbowDrop:
+                    aR = new Vector3(-20f, 0f, 90f); aL = new Vector3(-150f, 0f, -30f);
+                    lL = new Vector3(-60f, 0f, 0f); lR = new Vector3(-30f, 0f, 0f); break;
                 case FighterPose.Knockdown:
                 case FighterPose.Dead:
                     aL = new Vector3(-170f, 0f, -20f); aR = new Vector3(-170f, 0f, 20f);

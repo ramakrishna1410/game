@@ -96,6 +96,26 @@ The hero's hands are placed on the rowdy's collar by IK whatever the Grab animat
 | `Grab.fbx` | Grab / holding | Guard |
 | `Windup.fbx` | Taunt / charge-up (rowdy wind-up) | none |
 
+### Combo specials and wrestling finishers (optional; stand-ins are used if missing)
+Put these in `Art/Animations/` (or `Art/Animations/Hero/`). The rowdy's body is lifted, flipped and slammed by the game itself, so the hero's animation only has to look like he's lifting or driving down.
+
+| Save as | Search Mixamo for | Stand-in if missing |
+|---|---|---|
+| `ShoulderBarge.fbx` | Shoulder Hit / Shoulder Bash | Push |
+| `LegSweep.fbx` | Leg Sweep | Kick |
+| `Clothesline.fbx` | Clothesline / Lariat (or a wide arm swing) | Haymaker |
+| `BackElbow.fbx` | Elbow Strike / Elbow Punch | Backfist |
+| `Lift.fbx` | Lifting (Box Lifting) | PickUp |
+| `Suplex.fbx` | Back Flip / Bridge (arching backwards) | Throw |
+| `Spear.fbx` | Football Tackle | Charge |
+| `ElbowDrop.fbx` | Elbow Drop / Jump Down | Stomp |
+
+For enemies, into `Art/Animations/Rowdy/`:
+
+| Save as | Search Mixamo for | Used for |
+|---|---|---|
+| `Dazed.fbx` | Dizzy Idle / Stunned | swaying, seeing stars (open to grabs and finishers) |
+
 > Exact Mixamo names vary. Pick whatever looks closest. Only the **file name** matters.
 > The tool also recognises Mixamo's own names (e.g. `Boxing Idle.fbx`, `Hook Punch.fbx`), but renaming to the first column is safest.
 

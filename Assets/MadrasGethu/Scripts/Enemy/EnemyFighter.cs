@@ -21,7 +21,7 @@ namespace MadrasGethu
         enum AIState
         {
             Approach, Wait, Engage, CloseIn, Windup, Recover, Stagger, Down, GetUp, Grabbed, Dead,
-            Charging, HoldingHero, ThrowingObject, SeekWeapon, Begging, Fleeing, Roaring,
+            Charging, HoldingHero, ThrowingObject, SeekWeapon, Begging, Fleeing, Roaring, Dazed,
         }
 
         public EnemyKind kind;
@@ -88,13 +88,21 @@ namespace MadrasGethu
         public bool IsGrabbed => state == AIState.Grabbed;
         public bool IsBegging => state == AIState.Begging;
         public bool IsFleeing => state == AIState.Fleeing;
+        public bool IsDazed => state == AIState.Dazed;
+        /// <summary>The hero can grab him now (Thadiyan included) and use a wrestling finisher.</summary>
+        public bool IsOpen => state == AIState.Dazed || state == AIState.Stagger;
         public override bool IsDowned => state == AIState.Down || state == AIState.GetUp;
         public override bool CanBeTargeted => !IsDead && state != AIState.Grabbed;
         public bool IsBoss => kind == EnemyKind.Boss;
 
         public bool CanBeGrabbed =>
             !IsDead && !IsDowned && state != AIState.Grabbed && state != AIState.HoldingHero &&
-            (Profile.grabbable || state == AIState.Stagger);
+            (Profile.grabbable || state == AIState.Stagger || state == AIState.Dazed);
+
+        // Dazed and wall bounces
+        bool dazedOnce;
+        float wallBounceTimer;
+        float dazeWobble;
 
         float MoodSpeed => !IsBoss && HealthFraction < 0.3f ? 0.7f : phaseTwo ? 1.15f : 1f;
         float MoodCooldown => !IsBoss && HealthFraction < 0.3f ? 1.4f : phaseTwo ? 0.7f : 1f;
@@ -128,6 +136,7 @@ namespace MadrasGethu
             Visual.SetAnimatorBool("Held", state == AIState.Grabbed);
             Visual.SetAnimatorBool("Holding", state == AIState.HoldingHero);
             Visual.SetAnimatorBool("Begging", state == AIState.Begging);
+            Visual.SetAnimatorBool("Dazed", state == AIState.Dazed);
             if (state == AIState.Dead) return;
             float dt = Time.deltaTime;
             stateTimer -= dt;
@@ -139,6 +148,11 @@ namespace MadrasGethu
             {
                 thrownTimer -= dt;
                 HitOthersWhileThrown();
+            }
+            if (wallBounceTimer > 0f)
+            {
+                wallBounceTimer -= dt;
+                CheckWallBounce();
             }
 
             if (!hurtShouted && !IsBoss && HealthFraction < 0.3f)
@@ -299,6 +313,17 @@ namespace MadrasGethu
 
                 case AIState.Grabbed:
                     break;
+
+                case AIState.Dazed:
+                {
+                    // Seeing stars: sways on the spot, can't fight back.
+                    dazeWobble += dt;
+                    Vector3 sway = transform.right * Mathf.Sin(dazeWobble * 3.1f) * 0.35f + transform.forward * Mathf.Sin(dazeWobble * 1.7f) * 0.2f;
+                    Motor.SetDesiredVelocity(sway);
+                    if (Visual.IsPlaceholder && Mathf.Repeat(dazeWobble, 0.9f) < dt) Visual.Flinch(0.6f);
+                    if (stateTimer <= 0f) ResumeStance();
+                    break;
+                }
             }
         }
 
@@ -859,6 +884,25 @@ namespace MadrasGethu
                 return HitResult.Hit;
             }
 
+            // A clean charged haymaker: knocked silly on his feet.
+            if (hit.dazes && hit.launch <= 0f && state != AIState.Down)
+            {
+                Motor.FaceDirection(-hit.direction, true);
+                Motor.AddImpulse(hit.direction * hit.knockback);
+                Daze(2.8f);
+                return HitResult.Hit;
+            }
+
+            // Already dazed: smaller hits keep him reeling (big ones still put him down).
+            if (state == AIState.Dazed && hit.launch <= 0f && !(hit.heavy && hit.knockback >= 8f))
+            {
+                Visual.Flinch(1f);
+                Visual.Play(FighterPose.Flinch, 0.3f, 0.35f);
+                Motor.AddImpulse(hit.direction * hit.knockback * 0.5f);
+                stateTimer = Mathf.Max(0.5f, stateTimer - 0.25f);
+                return HitResult.Hit;
+            }
+
             if (state == AIState.HoldingHero)
             {
                 var p = Player;
@@ -871,6 +915,19 @@ namespace MadrasGethu
             if (hit.launch > 0f || (hit.heavy && hit.knockback >= 8f))
             {
                 KnockDown(hit.direction * hit.knockback + Vector3.up * hit.launch, 1.6f);
+                // Sent flying by the hero: a wall in the way bounces him back, dazed.
+                if (hit.attacker is PlayerFighter && hit.knockback >= 6f && MoveUnlocks.Has(MoveId.WallBounce))
+                    wallBounceTimer = 0.7f;
+                return HitResult.Hit;
+            }
+
+            // Worn down: a heavy blow leaves him dazed once (wide open for a wrestling finisher).
+            if (hit.heavy && !dazedOnce && !IsBoss && HealthFraction < 0.35f && hit.attacker is PlayerFighter)
+            {
+                dazedOnce = true;
+                Motor.FaceDirection(-hit.direction, true);
+                Motor.AddImpulse(hit.direction * hit.knockback * 0.5f);
+                Daze(2.6f);
                 return HitResult.Hit;
             }
 
@@ -965,6 +1022,7 @@ namespace MadrasGethu
             ReleaseToken();
             EnemyDirector.Disengage(this);   // frees the slot so a waiting rowdy steps in
             if (state == AIState.Grabbed) Motor.SetFrozen(false);
+            Visual.ClearCarry();
             if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
             if (seekTarget != null) reservedWeapons.Remove(seekTarget);
             Disarm();
@@ -1016,6 +1074,7 @@ namespace MadrasGethu
         {
             if (state != AIState.Grabbed) return;
             Motor.SetFrozen(false);
+            Visual.ClearCarry();
             if (knockDown)
             {
                 KnockDown(push, 1.8f);
@@ -1038,6 +1097,7 @@ namespace MadrasGethu
             direction.y = 0f;
             direction.Normalize();
             if (state == AIState.Grabbed) Motor.SetFrozen(false);
+            Visual.ClearCarry();
             Motor.FaceDirection(-direction, true);
             thrower = by;
             launchKind = kind;
@@ -1091,6 +1151,65 @@ namespace MadrasGethu
             stateTimer = 0.45f;
             Visual.Play(FighterPose.StaggerBack, 0.45f, 0.5f);
             Motor.AddLunge(pushDirection, 0.5f);
+        }
+
+        /// <summary>Knocked silly: stands swaying, can't attack, and can be grabbed (even the Thadiyan).</summary>
+        public void Daze(float seconds)
+        {
+            if (IsDead || state == AIState.Grabbed || state == AIState.Begging || state == AIState.Fleeing) return;
+            if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
+            ReleaseToken();
+            currentCombo = null;
+            feinting = false;
+            poiseHits = 0;
+            Visual.SetTelegraph(false);
+            Visual.SetLying(false);
+            Visual.StopTumble();
+            state = AIState.Dazed;
+            stateTimer = IsBoss ? seconds * 0.6f : seconds;
+            dazeWobble = 0f;
+            Visual.Play(FighterPose.StaggerBack, 0.6f, 0.6f);
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddPopup("DAZED!", Center + Vector3.up * 1.1f, new Color(1f, 0.95f, 0.4f), 1f);
+        }
+
+        /// <summary>Keeps a downed rowdy on the ground a little longer (elbow drop, leg drop).</summary>
+        public void PinDown(float seconds)
+        {
+            if (state == AIState.Down) stateTimer = Mathf.Max(stateTimer, seconds);
+        }
+
+        /// <summary>Knocked flying into a wall: he bounces off it and staggers back, dazed, into the hero's reach.</summary>
+        void CheckWallBounce()
+        {
+            if (state != AIState.Down) { wallBounceTimer = 0f; return; }
+            Vector3 v = Flat(Motor.Velocity);
+            if (v.magnitude < 3f) return;
+            Vector3 dir = v.normalized;
+            if (!Physics.SphereCast(Center, 0.3f, dir, out var hit, radius + 0.35f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return;
+            if (hit.collider.GetComponentInParent<Fighter>() != null) return;
+            if (hit.collider.GetComponentInParent<FinisherSpot>() != null) return;   // props break instead
+            if (Mathf.Abs(hit.normal.y) > 0.5f || hit.collider.bounds.size.y < 1.2f) return;
+
+            wallBounceTimer = 0f;
+            thrownTimer = 0f;
+            Motor.ClearImpulse();
+            Vector3 back = Flat(Vector3.Reflect(v, hit.normal)).normalized;
+            ApplyDamage(6f, new HitInfo { attacker = Player, damage = 6f, direction = -dir, heavy = true }, HitResult.Hit);
+            FX.Dust(hit.point + Vector3.up * 0.2f, 14);
+            FX.HitSpark(hit.point, true);
+            if (IsDead) return;
+            Daze(2.4f);
+            Motor.FaceDirection(-back, true);
+            Motor.AddLunge(back, 1.2f);
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.AddPopup("WALL BOUNCE!", Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 1.2f);
+                GameManager.Instance.Shake(0.3f);
+                GameManager.Instance.HitStop(0.08f);
+            }
+            if (Player != null) Player.AddGethu(8f);
         }
 
         /// <summary>Seconds until this rowdy's telegraphed hit lands (huge when not attacking).</summary>
