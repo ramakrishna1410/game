@@ -113,8 +113,26 @@ namespace MadrasGethu
             slowReleaseSpeed = 1f / Mathf.Max(0.05f, seconds);
         }
 
+        // Posture on its own (no hands on anyone): the rowdy bent over at the waist with his feet planted.
+        bool postureOnly;
+        float postureWeight;
+
+        /// <summary>Bend at the waist / crouch with the feet staying where they are, hands free (being pushed into an ice box).</summary>
+        public void SetPosture(float bodyDrop, float bodyLean)
+        {
+            if (target != null) return;   // gripping someone already uses the posture
+            if (!postureOnly && postureWeight <= 0f) feetPinned = false;
+            postureOnly = true;
+            drop = bodyDrop;
+            lean = bodyLean;
+        }
+
+        public void ClearPosture() => postureOnly = false;
+
         void Update()
         {
+            postureWeight = Mathf.MoveTowards(postureWeight, postureOnly ? 1f : 0f, 6f * Time.deltaTime);
+            if (!postureOnly && postureWeight <= 0f && target == null && weight <= 0f) { drop = lean = 0f; }
             float speed = targetWeight <= 0f && slowReleaseSpeed > 0f ? slowReleaseSpeed : blendSpeed;
             weight = Mathf.MoveTowards(weight, targetWeight, speed * Time.deltaTime);
             if (targetWeight > 0f || weight <= 0f) slowReleaseSpeed = 0f;
@@ -124,6 +142,35 @@ namespace MadrasGethu
         void OnAnimatorIK(int layerIndex)
         {
             if (animator == null || !animator.isHuman) return;
+            if (target == null && postureWeight > 0.001f)
+            {
+                if (layerIndex == 0)
+                {
+                    if (!feetPinned)
+                    {
+                        feetPinned = true;
+                        footLLocal = transform.InverseTransformPoint(animator.GetIKPosition(AvatarIKGoal.LeftFoot));
+                        footRLocal = transform.InverseTransformPoint(animator.GetIKPosition(AvatarIKGoal.RightFoot));
+                        footLRotLocal = Quaternion.Inverse(transform.rotation) * animator.GetIKRotation(AvatarIKGoal.LeftFoot);
+                        footRRotLocal = Quaternion.Inverse(transform.rotation) * animator.GetIKRotation(AvatarIKGoal.RightFoot);
+                    }
+                    float w = postureWeight;
+                    animator.bodyPosition += Vector3.up * drop * w;
+                    animator.bodyRotation = Quaternion.AngleAxis(lean * w, transform.right) * animator.bodyRotation;
+                    animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, w);
+                    animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, w);
+                    animator.SetIKRotationWeight(AvatarIKGoal.LeftFoot, w);
+                    animator.SetIKRotationWeight(AvatarIKGoal.RightFoot, w);
+                    animator.SetIKPosition(AvatarIKGoal.LeftFoot, transform.TransformPoint(footLLocal));
+                    animator.SetIKPosition(AvatarIKGoal.RightFoot, transform.TransformPoint(footRLocal));
+                    animator.SetIKRotation(AvatarIKGoal.LeftFoot, transform.rotation * footLRotLocal);
+                    animator.SetIKRotation(AvatarIKGoal.RightFoot, transform.rotation * footRRotLocal);
+                }
+                animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
+                animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
+                animator.SetLookAtWeight(0f);
+                return;
+            }
             if (target == null || weight <= 0.001f)
             {
                 animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 0f);

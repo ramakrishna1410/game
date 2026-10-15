@@ -398,6 +398,17 @@ namespace MadrasGethu
             if (handIK != null) handIK.FreeRightHand(seconds);
         }
 
+        /// <summary>Bent at the waist / crouched with the feet planted, no hands on anyone (call every frame while it changes).</summary>
+        public void SetPosture(float drop, float lean)
+        {
+            if (handIK != null) handIK.SetPosture(drop, lean);
+        }
+
+        public void ClearPosture()
+        {
+            if (handIK != null) handIK.ClearPosture();
+        }
+
         /// <summary>Both hands off him for a moment; the crouch / lean posture stays (punching down from the mount).</summary>
         public void FreeHands(float seconds)
         {
@@ -439,6 +450,7 @@ namespace MadrasGethu
         public void ClearCarry()
         {
             CarryWalks = false;
+            ClearPosture();
             if (!carried) return;
             carried = false;
             if (body == null) return;
@@ -529,7 +541,7 @@ namespace MadrasGethu
                 body.localRotation = Quaternion.identity;
                 body.localPosition = Vector3.zero;
                 ragdoll.RestorePose();
-                if (handIK != null) handIK.SetGrip(null, false);
+                if (handIK != null) { handIK.SetGrip(null, false); handIK.ClearPosture(); }
                 // Detach from the character root, so the root can follow the body without dragging the bones.
                 transform.SetParent(null, true);
             }

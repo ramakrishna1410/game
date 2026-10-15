@@ -45,6 +45,8 @@ namespace MadrasGethu
         public float? lid;              // ice box lid: 0 shut .. 1 open
         public bool splash;             // Kadal Throw: he hits the water at the end of this step
         public bool letGo;              // hands come off him (he's flying away) but he still follows the path
+        public float? victimLean;       // he bends at the waist with his feet planted (degrees, + = forward)
+        public float? victimDrop;       // and bends his knees (metres, negative)
     }
 
     public class WrestleMove
@@ -67,6 +69,9 @@ namespace MadrasGethu
         public bool ignoreRoom;         // moves to a spot on purpose (jetty edge, ice box): no wall clamping
         public bool mountAfter;         // rugby tackle: stay on top of him for the ground and pound
         public FinisherSpot sea;        // Kadal Throw: the jetty edge
+        public float startVictimYaw;    // he starts turned this far from the move's facing (turned round during the first step)
+        public bool keepProp;           // the prop survives the finisher (ice box: lid slams, box stays)
+        public Vector3? releasePush;    // hero-local push when he's let go limp (default: away from the hero, down)
         public readonly List<WrestleStep> steps = new List<WrestleStep>();
 
         public WrestleMove Step(WrestleStep s)
@@ -112,6 +117,7 @@ namespace MadrasGethu
         float stepYawFrom, curYaw, stepBodyPitchFrom, curBodyPitch;
         float stepVictimYawFrom, curVictimYaw;
         float stepLidFrom, curLid;
+        float stepVLeanFrom, curVLean, stepVDropFrom, curVDrop;
         readonly HashSet<Fighter> swept = new HashSet<Fighter>();
         bool wrestleReleased;   // he's been slammed and let go (later steps only move the hero)
         float roomAhead, roomBehind;
@@ -421,28 +427,41 @@ namespace MadrasGethu
             }.Step(lift).Step(walk).Step(heave).Step(flight).Step(fall);
         }
 
-        // Ice Box Slam: walk him to the fish market ice box, push his head in, and slam the lid on him. Twice.
+        // Ice Box Slam: walk him to the fish market ice box, bend him over it with his head in the open box
+        // (his feet stay on the road), and slam the lid down on his head. Twice. He slumps off it, the box stays.
         WrestleMove IceBoxSlam(FinisherSpot spot)
         {
             float d = Mathf.Max(1.3f, Flat(spot.transform.position - transform.position).magnitude);
-            Vector3 headIn = new Vector3(0f, 0.82f, d - 0.72f);
-            var walk = Pose(Shot(With(S(QteKey.None, null, 0.45f, FighterPose.Grab), new Vector3(0f, 0.95f, d - 0.95f), 10f, 0f), CamShot.Side), -0.05f, 10f);
+            Vector3 atBox = new Vector3(0f, 0.95f, d - 0.88f);   // his hips (standing) just in front of the box
+            var walk = Pose(Shot(With(S(QteKey.None, null, 0.45f, FighterPose.Grab), atBox, 0f, 0f), CamShot.Side), -0.05f, 10f);
             walk.hero = new Vector3(0f, 0f, d - 1.5f);
             walk.lid = 1f;
-            var push = Pose(Shot(With(S(QteKey.Light, "HEAD IN", 0.3f, FighterPose.Grab), headIn, 100f, 0f), CamShot.Side), -0.25f, 35f);
+            walk.victimLean = 15f;
+            walk.victimYaw = 0f;   // spun round to face the box as you walk him to it
+            var push = Pose(Shot(S(QteKey.Light, "HEAD IN", 0.3f, FighterPose.Grab), CamShot.Side), -0.25f, 35f);
             push.lid = 1f;
-            var slam1 = Pose(Shot(Impact(With(S(QteKey.Heavy, "SLAM THE LID", 0.16f, FighterPose.Grab), headIn, 102f, 0f), 14f), CamShot.Side), -0.3f, 40f);
+            push.victimLean = 85f;      // folded over the rim, head down inside the box
+            push.victimDrop = -0.3f;
+            var slam1 = Pose(Shot(Impact(S(QteKey.Heavy, "SLAM THE LID", 0.16f, FighterPose.Grab), 14f), CamShot.Side), -0.3f, 40f);
             slam1.lid = 0f;
             slam1.keepHold = true;
-            var reopen = Pose(Shot(With(S(QteKey.None, null, 0.25f, FighterPose.Grab), headIn, 100f, 0f), CamShot.Side), -0.25f, 35f);
+            slam1.victimLean = 92f;
+            var reopen = Pose(Shot(S(QteKey.None, null, 0.25f, FighterPose.Grab), CamShot.Side), -0.25f, 35f);
             reopen.lid = 0.9f;
-            var slam2 = Pose(Shot(Impact(With(S(QteKey.Heavy, "AGAIN!", 0.16f, FighterPose.Grab), headIn, 104f, 0f), 30f), CamShot.GroundImpact), -0.35f, 45f);
+            reopen.victimLean = 85f;
+            var slam2 = Pose(Shot(Impact(S(QteKey.Heavy, "AGAIN!", 0.16f, FighterPose.Grab), 30f), CamShot.GroundImpact), -0.35f, 45f);
             slam2.lid = 0f;
+            slam2.victimLean = 95f;
+            var bounce = S(QteKey.None, null, 0.35f, FighterPose.Grab);   // he slides off; the lid bounces up
+            bounce.lid = 0.35f;
+            bounce.shot = CamShot.GroundImpact;
             return new WrestleMove
             {
                 name = "ICE BOX SLAM", id = MoveId.IceBoxSlam, cost = spot.gethuCost, grip = GripKind.Headlock,
-                victimFacesAway = true, ignoreRoom = true, prop = spot,
-            }.Step(walk).Step(push).Step(slam1).Step(reopen).Step(slam2);
+                victimFacesAway = true, ignoreRoom = true, prop = spot, keepProp = true,
+                startVictimYaw = grabFromBehind ? 0f : 180f,
+                releasePush = new Vector3(0f, -1.5f, -1.2f),   // slumps back off the box onto the road
+            }.Step(walk).Step(push).Step(slam1).Step(reopen).Step(slam2).Step(bounce);
         }
 
         /// <summary>Q at a prop: smash (tea kadai, crates, auto), the sea (jetty edge) or the ice box.</summary>
@@ -682,8 +701,9 @@ namespace MadrasGethu
             curPitch = 0f;
             curDrop = curLean = 0f;
             curYaw = curBodyPitch = 0f;
-            curVictimYaw = 0f;
+            curVictimYaw = move.startVictimYaw;
             curLid = 0f;
+            curVLean = curVDrop = 0f;
             swept.Clear();
             wrestleReleased = false;
             qtePerfects = qteMisses = qteDone = 0;
@@ -721,6 +741,8 @@ namespace MadrasGethu
             stepBodyPitchFrom = curBodyPitch;
             stepVictimYawFrom = curVictimYaw;
             stepLidFrom = curLid;
+            stepVLeanFrom = curVLean;
+            stepVDropFrom = curVDrop;
             wrestleStepTimer = 0f;
             if (st.qte != QteKey.None)
             {
@@ -784,6 +806,8 @@ namespace MadrasGethu
             curBodyPitch = st.bodyPitch ?? stepBodyPitchFrom;
             curVictimYaw = st.victimYaw ?? stepVictimYawFrom;
             curLid = st.lid ?? stepLidFrom;
+            curVLean = st.victimLean ?? stepVLeanFrom;
+            curVDrop = st.victimDrop ?? stepVDropFrom;
             FinishWrestleStep(st);
             if (State == PlayerState.Wrestle) AdvanceWrestleStep();
         }
@@ -829,6 +853,9 @@ namespace MadrasGethu
             float victimYaw = Mathf.Lerp(stepVictimYawFrom, st.victimYaw ?? stepVictimYawFrom, e);
             wrestleVictim.HoldAt(hipWorld - Vector3.up * 0.9f, turn * wrestleVictimRotation * Quaternion.AngleAxis(victimYaw, Vector3.up));
             wrestleVictim.Visual.SetCarry(Quaternion.Euler(pitch, 0f, 0f));
+            float vLean = Mathf.Lerp(stepVLeanFrom, st.victimLean ?? stepVLeanFrom, e);
+            float vDrop = Mathf.Lerp(stepVDropFrom, st.victimDrop ?? stepVDropFrom, e);
+            if (Mathf.Abs(vLean) > 0.5f || Mathf.Abs(vDrop) > 0.01f) wrestleVictim.Visual.SetPosture(vDrop, vLean);
         }
 
         static void ShotLayout(CamShot shot, out Vector3 offset, out float lookHeight, out float fov, out float roll)
@@ -979,6 +1006,8 @@ namespace MadrasGethu
             if (st.keepHold && move.carry)
             {
                 // First slam of a double slam: he hits the ground but you don't let go.
+                if (move.prop != null && move.keepProp)
+                    FX.Burst(move.prop.SlamPoint, 10, 2.5f, 0.05f, new Color(0.8f, 0.92f, 1f), new Color(0.5f, 0.7f, 1f), 0.5f, -9f);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = damage, direction = dir, unblockable = true, hitsDowned = true });
                 victim.Visual.Flinch(1f);
                 RegisterHits(1, 0f);
@@ -997,7 +1026,8 @@ namespace MadrasGethu
             if (move.carry && victim.Visual.CanRagdoll)
             {
                 // He goes limp from exactly the pose he hit the ground in, and physics takes it from there.
-                victim.ReleaseFromGrab(dir * 1.5f + Vector3.down * 3f, knockDown: true);
+                Vector3 push = move.releasePush.HasValue ? wrestleRotation * move.releasePush.Value : dir * 1.5f + Vector3.down * 3f;
+                victim.ReleaseFromGrab(push, knockDown: true);
             }
             else if (move.carry)
             {
@@ -1018,7 +1048,11 @@ namespace MadrasGethu
             RegisterHits(1, 0f);
             NotifyMoveLanded(move.name);
 
-            if (move.prop != null)
+            if (move.prop != null && move.keepProp)
+            {
+                FX.Burst(move.prop.SlamPoint, 14, 3f, 0.05f, new Color(0.8f, 0.92f, 1f), new Color(0.5f, 0.7f, 1f), 0.6f, -9f);   // ice chips
+            }
+            else if (move.prop != null)
             {
                 move.prop.Break(fwd);
                 if (victim.Visual.IsRagdoll) victim.Visual.StartRagdoll(fwd * 3f + Vector3.down);
