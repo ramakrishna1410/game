@@ -155,19 +155,19 @@ namespace MadrasGethu
             return m.Step(Pose(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.65f, FighterPose.Grab), new Vector3(0f, 0.35f, -0.85f), -180f, 0.9f), 34f), CamShot.Side), -0.55f, -65f));
         }
 
+        // Real powerbomb: head under his chest, hands on his thighs, stand up with him sitting on your
+        // shoulders facing you, rise once more, then sit out and drive him down on his back in front of you.
         WrestleMove Powerbomb()
         {
-            var jump = Pose(With(S(QteKey.Jump, "HIGHER", 0.3f, FighterPose.Grab), new Vector3(0f, 2.45f, 0.25f), -125f, 0f), 0.05f, -5f);
-            jump.hero = new Vector3(0f, 0.4f, 0f);
-            jump.shot = CamShot.LowHero;
-            var drive = Pose(Impact(With(S(QteKey.Heavy, "DRIVE HIM DOWN", 0.25f, FighterPose.Grab), new Vector3(0f, 0.35f, 1.0f), -90f, 0f), 45f), -0.5f, 45f);
-            drive.hero = new Vector3(0f, 0f, 0.2f);
+            var tuck = Pose(Shot(With(S(QteKey.None, null, 0.35f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.35f), 35f, 0f), CamShot.Side), -0.4f, 40f);
+            var lift = Pose(Shot(With(S(QteKey.Light, "LIFT", 0.65f, FighterPose.Grab), new Vector3(0f, 1.55f, 0.22f), -12f, 0.1f), CamShot.Side), 0f, 0f);
+            var higher = Pose(Shot(With(S(QteKey.Jump, "HIGHER", 0.3f, FighterPose.Grab), new Vector3(0f, 1.8f, 0.25f), -25f, 0f), CamShot.LowHero), 0.05f, -8f);
+            higher.hero = new Vector3(0f, 0.15f, 0f);
+            var drive = Pose(Impact(With(S(QteKey.Heavy, "DRIVE HIM DOWN", 0.3f, FighterPose.Grab), new Vector3(0f, 0.35f, 1.0f), -95f, 0.15f), 45f), -0.6f, 45f);
+            drive.hero = new Vector3(0f, 0f, 0.15f);
             drive.shot = CamShot.GroundImpact;
             return new WrestleMove { name = "POWERBOMB", id = MoveId.Powerbomb, cost = maxGethu, shockwave = true, grip = GripKind.Thighs }
-                .Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.8f, 0.45f), 20f, 0f), CamShot.Side), -0.35f, 30f))
-                .Step(Pose(Shot(With(S(QteKey.Light, "LIFT", 0.6f, FighterPose.Grab), new Vector3(0f, 1.95f, 0.2f), -110f, 0.1f), CamShot.Side), 0.05f, -5f))
-                .Step(jump)
-                .Step(drive);
+                .Step(tuck).Step(lift).Step(higher).Step(drive);
         }
 
         WrestleMove Spear()
@@ -648,7 +648,6 @@ namespace MadrasGethu
                 QteResultText = "MISS";
                 c = new Color(1f, 0.45f, 0.35f);
             }
-            if (GM != null) GM.AddPopup(QteResultText, Center + Vector3.up * 1.0f, c, 0.9f);
             BeginStepMotion(wrestleMove.steps[wrestleStep]);
         }
 
@@ -783,7 +782,7 @@ namespace MadrasGethu
             wrestleMove = null;
             wrestleVictim = null;
             qteActive = false;
-            Visual.SetGrip(null, false);   // hands off, stand back up (IK blends out)
+            Visual.ReleaseGripSlowly(0.45f);   // let go and straighten up gradually after the slam
             lightBufferedUntil = heavyBufferedUntil = 0f;
             if (cam != null) cam.EndCinematic(0.6f);
 

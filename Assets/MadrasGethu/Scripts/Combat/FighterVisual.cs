@@ -362,6 +362,12 @@ namespace MadrasGethu
             if (handIK != null) handIK.SetGrapple(target, grip, drop, lean);
         }
 
+        /// <summary>Lets go of a wrestling grip gradually (posture and hands blend out over the time).</summary>
+        public void ReleaseGripSlowly(float seconds)
+        {
+            if (handIK != null) handIK.ReleaseSlowly(seconds);
+        }
+
         /// <summary>Takes the right hand off the collar for a moment so a punch can be thrown.</summary>
         public void FreeRightHand(float seconds)
         {

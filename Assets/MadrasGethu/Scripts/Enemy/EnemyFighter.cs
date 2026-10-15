@@ -986,7 +986,7 @@ namespace MadrasGethu
             }
 
             // Worn down: a heavy blow leaves him dazed once (wide open for a wrestling finisher).
-            if (hit.heavy && !dazedOnce && !IsBoss && HealthFraction < 0.35f && hit.attacker is PlayerFighter)
+            if (hit.heavy && !dazedOnce && !IsBoss && state != AIState.Down && HealthFraction < 0.35f && hit.attacker is PlayerFighter)
             {
                 dazedOnce = true;
                 Motor.FaceDirection(-hit.direction, true);
@@ -1247,7 +1247,7 @@ namespace MadrasGethu
         /// <summary>Knocked silly: stands swaying, can't attack, and can be grabbed (even the Thadiyan).</summary>
         public void Daze(float seconds)
         {
-            if (IsDead || state == AIState.Grabbed || state == AIState.Begging || state == AIState.Fleeing) return;
+            if (IsDead || IsDowned || state == AIState.Grabbed || state == AIState.Begging || state == AIState.Fleeing) return;
             if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
             ReleaseToken();
             currentCombo = null;

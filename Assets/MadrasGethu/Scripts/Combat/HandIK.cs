@@ -65,9 +65,20 @@ namespace MadrasGethu
         /// <summary>Lets the right hand go for a moment (a punch while holding him by the collar).</summary>
         public void FreeRightHand(float seconds) => freeRightUntil = Time.time + seconds;
 
+        float slowReleaseSpeed;
+
+        /// <summary>Lets go over a short time (after a slam the hero straightens up instead of popping up).</summary>
+        public void ReleaseSlowly(float seconds)
+        {
+            targetWeight = 0f;
+            slowReleaseSpeed = 1f / Mathf.Max(0.05f, seconds);
+        }
+
         void Update()
         {
-            weight = Mathf.MoveTowards(weight, targetWeight, blendSpeed * Time.deltaTime);
+            float speed = targetWeight <= 0f && slowReleaseSpeed > 0f ? slowReleaseSpeed : blendSpeed;
+            weight = Mathf.MoveTowards(weight, targetWeight, speed * Time.deltaTime);
+            if (targetWeight > 0f || weight <= 0f) slowReleaseSpeed = 0f;
             if (weight <= 0f && targetWeight <= 0f) target = null;
         }
 
