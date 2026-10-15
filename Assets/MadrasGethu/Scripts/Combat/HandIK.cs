@@ -92,9 +92,14 @@ namespace MadrasGethu
             if (grip == GripKind.Collar) GetGripPoints(target, fromBehind, out left, out right, out head);
             else GetBodyGrip(target, grip, transform, out left, out right, out head);
 
+            // With an upper-body layer, OnAnimatorIK runs once per layer: body and feet on the base layer,
+            // hands and head on the top layer (which is applied last, so its hand pose would win anyway).
+            bool baseLayer = layerIndex == 0;
+            bool topLayer = layerIndex == animator.layerCount - 1;
+
             // Posture: crouch / rise and lean the whole upper body; legs bend to keep the feet where they were.
             bool posture = grip != GripKind.Collar || Mathf.Abs(drop) > 0.001f || Mathf.Abs(lean) > 0.001f;
-            if (posture)
+            if (baseLayer && posture)
             {
                 if (!feetPinned)
                 {
@@ -115,7 +120,7 @@ namespace MadrasGethu
                 animator.SetIKRotation(AvatarIKGoal.LeftFoot, transform.rotation * footLRotLocal);
                 animator.SetIKRotation(AvatarIKGoal.RightFoot, transform.rotation * footRRotLocal);
             }
-            else
+            else if (baseLayer)
             {
                 animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 0f);
                 animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
@@ -129,6 +134,7 @@ namespace MadrasGethu
             if (toTarget.sqrMagnitude < 0.0001f) toTarget = transform.forward;
             Quaternion palms = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
 
+            if (!topLayer) return;
             float rightWeight = Time.time < freeRightUntil ? 0f : weight;
             animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, weight);
             animator.SetIKPositionWeight(AvatarIKGoal.RightHand, rightWeight);

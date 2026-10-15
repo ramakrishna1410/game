@@ -298,6 +298,7 @@ namespace MadrasGethu
         const float WalkReference = 1.4f;
         const float RunReference = 4.5f;
         FighterMotor motor;
+        Vector3 lastRootPosition, draggedVelocity;
 
         /// <summary>
         /// Locomotion is driven automatically from the character's real movement (see UpdateLocomotion),
@@ -326,6 +327,17 @@ namespace MadrasGethu
         {
             if (motor == null) motor = GetComponentInParent<FighterMotor>();
             Vector3 v = motor != null ? motor.MoveVelocity : Vector3.zero;
+            // Moved by someone else (dragged by the collar): read the speed from how far he actually moved,
+            // so his legs step along instead of sliding. Not while lifted off his feet.
+            Vector3 rootPos = ownerRoot != null ? ownerRoot.position : transform.position;
+            if (motor != null && motor.Frozen && dt > 0f)
+            {
+                Vector3 moved = (rootPos - lastRootPosition) / dt;
+                moved.y = 0f;
+                draggedVelocity = Vector3.Lerp(draggedVelocity, moved, 1f - Mathf.Exp(-10f * dt));
+                v = carried || draggedVelocity.magnitude < 0.35f ? Vector3.zero : draggedVelocity;
+            }
+            lastRootPosition = rootPos;
             v.y = 0f;
             float m = v.magnitude;
             speed01 = Mathf.Clamp01(m / 6f);

@@ -606,7 +606,9 @@ namespace MadrasGethu.EditorTools
             }
 
             // Hold states driven by bools: block, holding someone, being held.
-            foreach (var slot in slots.Where(s => s.kind == SlotKind.HoldBool && s.clip != null))
+            // (Holding, being held and blocking only move the arms: they go on the upper-body layer below,
+            // so the legs keep walking while you drag someone or step with your guard up.)
+            foreach (var slot in slots.Where(s => s.kind == SlotKind.HoldBool && s.clip != null && !UpperBodyHolds.Contains(s.name)))
             {
                 var state = sm.AddState(slot.name);
                 state.motion = slot.clip;
@@ -650,9 +652,31 @@ namespace MadrasGethu.EditorTools
                 SetQuick(up2, 0.25f);
             }
 
-            // Hand IK (collar grip) only runs on layers with IK Pass enabled.
+            // Upper-body layer: arms and head only, over whatever the legs are doing.
+            controller.AddLayer("Upper Body");
+            var upper = controller.layers[1].stateMachine;
+            var empty = upper.AddState("Empty");
+            upper.defaultState = empty;
+            foreach (var slot in slots.Where(s => s.kind == SlotKind.HoldBool && s.clip != null && UpperBodyHolds.Contains(s.name)))
+            {
+                var state = upper.AddState(slot.name);
+                state.motion = slot.clip;
+                var enter = empty.AddTransition(state);
+                enter.AddCondition(AnimatorConditionMode.If, 0f, slot.boolParameter);
+                SetQuick(enter, 0.12f);
+                var exit = state.AddTransition(empty);
+                exit.AddCondition(AnimatorConditionMode.IfNot, 0f, slot.boolParameter);
+                SetQuick(exit, 0.12f);
+            }
+
+            // Hand IK runs on layers with IK Pass enabled: the base layer (crouch, lean, planted feet) and the
+            // upper-body layer (hands on the collar / body), which is applied last.
             var layers = controller.layers;
             layers[0].iKPass = true;
+            layers[1].iKPass = true;
+            layers[1].defaultWeight = 1f;
+            layers[1].blendingMode = AnimatorLayerBlendingMode.Override;
+            layers[1].avatarMask = UpperBodyMask(Path.GetDirectoryName(controllerPath).Replace('\\', '/'));
             controller.layers = layers;
 
             LayoutStates(sm);
@@ -694,6 +718,30 @@ namespace MadrasGethu.EditorTools
             if (walk != null) tree.AddChild(walk, 0.35f);
             if (run != null) tree.AddChild(run, 0.8f);
             else if (walk != null) tree.AddChild(walk, 0.8f);
+        }
+
+        static readonly string[] UpperBodyHolds = { "Grab", "Held", "Block" };
+
+        /// <summary>Arms, hands and head only (no hips, spine or legs). Saved next to the controllers.</summary>
+        static AvatarMask UpperBodyMask(string folder)
+        {
+            string path = folder + "/UpperBody.mask";
+            var mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(path);
+            if (mask == null)
+            {
+                mask = new AvatarMask();
+                AssetDatabase.CreateAsset(mask, path);
+            }
+            for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
+            {
+                var part = (AvatarMaskBodyPart)i;
+                bool on = part == AvatarMaskBodyPart.Head || part == AvatarMaskBodyPart.LeftArm || part == AvatarMaskBodyPart.RightArm
+                          || part == AvatarMaskBodyPart.LeftFingers || part == AvatarMaskBodyPart.RightFingers
+                          || part == AvatarMaskBodyPart.LeftHandIK || part == AvatarMaskBodyPart.RightHandIK;
+                mask.SetHumanoidBodyPartActive(part, on);
+            }
+            EditorUtility.SetDirty(mask);
+            return mask;
         }
 
         static void SetQuick(AnimatorStateTransition t, float duration)
