@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace MadrasGethu
 {
+    /// <summary>Strikes done procedurally while holding someone (no animation file needed).</summary>
+    public enum GrabStrikeKind { None, Knee, Headbutt }
+
     /// <summary>Where the hero's hands go on the other man's body.</summary>
     public enum GripKind { Collar, Waist, ChestAndThigh, Thighs }
 
@@ -28,6 +31,10 @@ namespace MadrasGethu
         Vector3 footLLocal, footRLocal;
         Quaternion footLRotLocal, footRRotLocal;
         float freeRightUntil;          // right hand off the collar while it throws a punch
+
+        // Knee / headbutt while holding: a quick out-and-back curve applied with IK.
+        GrabStrikeKind strikeKind;
+        float strikeStart, strikeDuration;
 
         void Awake() => animator = GetComponent<Animator>();
 
@@ -60,6 +67,27 @@ namespace MadrasGethu
             grip = kind;
             drop = bodyDrop;
             lean = bodyLean;
+        }
+
+        /// <summary>Knee to the stomach or headbutt, done with IK so the feet stay planted and the hands keep their grip.</summary>
+        public void Strike(GrabStrikeKind kind, float duration)
+        {
+            strikeKind = kind;
+            strikeStart = Time.time;
+            strikeDuration = Mathf.Max(0.1f, duration);
+        }
+
+        /// <summary>0..1..0 over the strike: fast out (40%), slower back.</summary>
+        float StrikeAmount
+        {
+            get
+            {
+                if (strikeKind == GrabStrikeKind.None) return 0f;
+                float t = (Time.time - strikeStart) / strikeDuration;
+                if (t >= 1f) { strikeKind = GrabStrikeKind.None; return 0f; }
+                float c = t < 0.4f ? t / 0.4f : 1f - (t - 0.4f) / 0.6f;
+                return c * c * (3f - 2f * c);
+            }
         }
 
         /// <summary>Lets the right hand go for a moment (a punch while holding him by the collar).</summary>
@@ -139,6 +167,8 @@ namespace MadrasGethu
                 animator.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
             }
 
+            if (baseLayer) ApplyStrike();
+
             // Palms face into the grip: towards the target's spine.
             Vector3 toTarget = target.transform.position - transform.position;
             toTarget.y = 0f;
@@ -157,7 +187,32 @@ namespace MadrasGethu
             animator.SetIKRotation(AvatarIKGoal.RightHand, palms * Quaternion.Euler(0f, 0f, -90f));
 
             animator.SetLookAtWeight(weight * 0.8f, 0.15f, 0.9f, 0f, 0.6f);
+            if (strikeKind == GrabStrikeKind.Headbutt)
+                animator.SetLookAtWeight(weight * 0.8f, 0.4f, 1f, 0f, 0.6f);
             animator.SetLookAtPosition(head);
+        }
+
+        void ApplyStrike()
+        {
+            float c = StrikeAmount;
+            if (c <= 0f) return;
+            if (strikeKind == GrabStrikeKind.Knee)
+            {
+                // Right knee drives up into his stomach; a slight lean back for balance.
+                Vector3 raised = transform.TransformPoint(new Vector3(0.12f, 0.6f, 0.45f));
+                Vector3 planted = animator.GetIKPosition(AvatarIKGoal.RightFoot);
+                animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 1f);
+                animator.SetIKPosition(AvatarIKGoal.RightFoot, Vector3.Lerp(planted, raised, c));
+                animator.SetIKHintPositionWeight(AvatarIKHint.RightKnee, c);
+                animator.SetIKHintPosition(AvatarIKHint.RightKnee, transform.TransformPoint(new Vector3(0.15f, 0.9f, 0.8f)));
+                animator.bodyRotation = Quaternion.AngleAxis(-8f * c, transform.right) * animator.bodyRotation;
+            }
+            else if (strikeKind == GrabStrikeKind.Headbutt)
+            {
+                // Head and chest snap forward into his face, a little dip, then back.
+                animator.bodyRotation = Quaternion.AngleAxis(28f * c, transform.right) * animator.bodyRotation;
+                animator.bodyPosition += transform.forward * 0.1f * c + Vector3.down * 0.05f * c;
+            }
         }
 
         /// <summary>

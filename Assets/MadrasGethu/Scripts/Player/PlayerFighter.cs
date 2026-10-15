@@ -1040,10 +1040,21 @@ namespace MadrasGethu
                 grabStrikePose = grabStrikeIndex % 3 == 0 ? FighterPose.Knee
                                : grabStrikeIndex % 3 == 1 ? FighterPose.Headbutt : FighterPose.Cross;
                 grabStrikeIndex++;
-                pendingGrabStrike = Visual.PlayTimed(grabStrikePose, 0.18f, 0.25f);
-                grabStrikeTimer = pendingGrabStrike + 0.25f;
-                grabActionCooldown = grabStrikeTimer + 0.02f;
-                if (grabStrikePose == FighterPose.Cross) Visual.FreeRightHand(grabStrikeTimer);
+                if (grabStrikePose == FighterPose.Cross)
+                {
+                    // A real punch: the right hand lets go of the collar and the punch animation plays.
+                    pendingGrabStrike = Visual.PlayTimed(grabStrikePose, 0.18f, 0.25f);
+                    grabStrikeTimer = pendingGrabStrike + 0.25f;
+                    Visual.FreeRightHand(grabStrikeTimer);
+                    grabActionCooldown = grabStrikeTimer + 0.02f;
+                }
+                else
+                {
+                    // Knee / headbutt: done on the spot with both hands still on his collar.
+                    const float strikeTime = 0.42f;
+                    pendingGrabStrike = Visual.GrabStrike(grabStrikePose == FighterPose.Knee ? GrabStrikeKind.Knee : GrabStrikeKind.Headbutt, strikeTime);
+                    grabActionCooldown = strikeTime + 0.02f;
+                }
             }
         }
 

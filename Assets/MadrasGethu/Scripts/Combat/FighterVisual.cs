@@ -368,6 +368,21 @@ namespace MadrasGethu
             if (handIK != null) handIK.ReleaseSlowly(seconds);
         }
 
+        /// <summary>
+        /// Knee or headbutt while holding someone. Real models do it with IK (feet planted, hands keep the
+        /// grip); the placeholder body uses its pose. Returns when it connects.
+        /// </summary>
+        public float GrabStrike(GrabStrikeKind kind, float duration)
+        {
+            if (handIK != null)
+            {
+                handIK.Strike(kind, duration);
+                return duration * 0.4f;
+            }
+            Play(kind == GrabStrikeKind.Knee ? FighterPose.Knee : FighterPose.Headbutt, duration, duration);
+            return duration * 0.4f;
+        }
+
         /// <summary>Takes the right hand off the collar for a moment so a punch can be thrown.</summary>
         public void FreeRightHand(float seconds)
         {
