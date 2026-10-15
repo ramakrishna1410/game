@@ -193,16 +193,27 @@ namespace MadrasGethu
                 .Step(tuck).Step(lift).Step(higher).Step(drive);
         }
 
-        WrestleMove Spear()
+        // Spear: sprint at him, drive a shoulder into his stomach (he folds over it), keep driving with
+        // the arms wrapped round him, and crash down together, the hero landing on top of him.
+        // distance: how far ahead he is when Q is pressed (the hero runs to him; he isn't pulled in).
+        WrestleMove Spear(float distance)
         {
-            var run = Pose(With(S(QteKey.None, null, 0.28f, FighterPose.Spear), new Vector3(0f, 1.0f, 1.7f), -30f, 0f), -0.3f, 35f);
-            run.hero = new Vector3(0f, 0f, 1.0f);
+            float d = Mathf.Max(0.8f, distance);
+            var run = Pose(S(QteKey.None, null, Mathf.Clamp(d / 6.5f, 0.12f, 0.5f), FighterPose.Spear), -0.3f, 35f);
+            run.hero = new Vector3(0f, 0f, d - 0.6f);
             run.shot = CamShot.OverShoulder;
             run.anim = true;
-            var hit = Pose(Impact(With(S(QteKey.Heavy, "SPEAR", 0.22f, FighterPose.Spear), new Vector3(0f, 0.35f, 2.8f), -90f, 0f), 28f), -0.5f, 50f);
-            hit.hero = new Vector3(0f, 0f, 1.9f);
-            hit.shot = CamShot.GroundImpact;
-            return new WrestleMove { name = "SPEAR", id = MoveId.Spear, cost = GethuBar, grip = GripKind.Waist }.Step(run).Step(hit);
+            var contact = Pose(With(S(QteKey.Heavy, "SPEAR", 0.18f, FighterPose.Grab), new Vector3(0f, 1.05f, d + 0.2f), 55f, 0f), -0.35f, 50f);
+            contact.hero = new Vector3(0f, 0f, d - 0.2f);
+            contact.shot = CamShot.Side;
+            var drive = Pose(With(S(QteKey.None, null, 0.28f, FighterPose.Grab), new Vector3(0f, 0.95f, d + 1.4f), 25f, 0.1f), -0.4f, 55f);
+            drive.hero = new Vector3(0f, 0f, d + 0.85f);
+            drive.shot = CamShot.Side;
+            var crash = Pose(Impact(With(S(QteKey.None, null, 0.18f, FighterPose.Grab), new Vector3(0f, 0.35f, d + 1.85f), -90f, 0f), 28f), -0.7f, 60f);
+            crash.hero = new Vector3(0f, -0.2f, d + 1.3f);
+            crash.shot = CamShot.GroundImpact;
+            return new WrestleMove { name = "SPEAR", id = MoveId.Spear, cost = GethuBar, grip = GripKind.Waist }
+                .Step(run).Step(contact).Step(drive).Step(crash);
         }
 
         // Elbow drop: leap up, then the whole body comes down on him with the elbow in his chest,
@@ -364,9 +375,10 @@ namespace MadrasGethu
             if (target != null && Gethu >= GethuBar)
             {
                 Motor.FaceDirection(target.transform.position - transform.position, instant: true);
+                float gap = Flat(target.transform.position - transform.position).magnitude;
                 target.EnterGrabbed(false);
                 Gethu -= GethuBar;
-                StartWrestle(Spear(), target);
+                StartWrestle(Spear(gap), target);
                 return true;
             }
             return false;
@@ -464,7 +476,7 @@ namespace MadrasGethu
             wrestleSide = 1f;
             if (cam != null && Vector3.Dot(cam.transform.position - transform.position, Vector3.Cross(Vector3.up, fwd)) < 0f)
                 wrestleSide = -1f;
-            roomAhead = Room(fwd, 4f);
+            roomAhead = Room(fwd, 8f);
             roomBehind = Room(-fwd, 3f);
 
             curHip = Quaternion.Inverse(wrestleRotation) * (victim.transform.position + Vector3.up * 0.9f - wrestleOrigin);
