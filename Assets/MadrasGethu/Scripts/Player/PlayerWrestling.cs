@@ -628,25 +628,21 @@ namespace MadrasGethu
             qteDone++;
             lightBufferedUntil = heavyBufferedUntil = 0f;
             QteResultTime = Time.unscaledTime;
-            Color c;
             if (grade == 2)
             {
                 qtePerfects++;
                 QteResultText = "PERFECT!";
-                c = new Color(0.4f, 1f, 0.5f);
                 AddGethu(4f);
                 if (GM != null) GM.HitStop(0.04f);
             }
             else if (grade == 1)
             {
                 QteResultText = "GOOD";
-                c = new Color(1f, 0.9f, 0.5f);
             }
             else
             {
                 qteMisses++;
                 QteResultText = "MISS";
-                c = new Color(1f, 0.45f, 0.35f);
             }
             BeginStepMotion(wrestleMove.steps[wrestleStep]);
         }
