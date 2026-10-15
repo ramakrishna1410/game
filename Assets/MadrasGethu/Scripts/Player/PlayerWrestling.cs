@@ -34,6 +34,9 @@ namespace MadrasGethu
         public float damage;            // dealt at the end of the step (a small strike, or the impact)
         public bool impact;             // he hits the ground (or the wall) at the end of this step
         public CamShot shot = CamShot.Side;
+        public float? drop;             // hero's body height change (metres, negative = crouch) at the end of the step
+        public float? lean;             // hero's upper-body lean (degrees, + = bend forward, - = arch back)
+        public bool anim;               // play the hero's own animation for this step (knee, jump...); otherwise hold + IK
     }
 
     public class WrestleMove
@@ -45,6 +48,11 @@ namespace MadrasGethu
         public bool victimFacesAway;    // German suplex: he's held from behind
         public bool shockwave;          // powerbomb knocks down everyone nearby
         public bool wall;               // spinebuster: the impact is against a wall
+        public GripKind grip = GripKind.Waist;   // where the hero's hands hold him
+        public bool cinematic = true;   // close-up camera (quick throws stay on the normal camera)
+        public FinisherSpot prop;       // smashed into a tea kadai / crates / auto
+        public bool throwAtEnd;         // let go and throw him at the end (no slam)
+        public float throwDamage;
         public readonly List<WrestleStep> steps = new List<WrestleStep>();
 
         public WrestleMove Step(WrestleStep s)
@@ -86,6 +94,7 @@ namespace MadrasGethu
         float stepPitchFrom;
         Vector3 curHip, curHero;
         float curPitch;
+        float stepDropFrom, stepLeanFrom, curDrop, curLean;
         float roomAhead, roomBehind;
         float wrestleSide = 1f;   // which side of the hero the camera works from (keeps it on the side it was on)
         bool qteActive;
@@ -111,56 +120,66 @@ namespace MadrasGethu
             return new WrestleStep { qte = key, qteLabel = label, duration = duration, heroPose = pose };
         }
 
+        // Every lift has the same physical rhythm: crouch and get the hands in, drive up with the legs,
+        // a beat at the top, then drop him fast and follow him down.
+
         WrestleMove BodySlam()
         {
-            return new WrestleMove { name = "BODY SLAM", id = MoveId.BodySlam, cost = GethuBar }
-                .Step(Shot(With(S(QteKey.Light, "LIFT", 0.45f, FighterPose.Lift), new Vector3(0f, 1.75f, 0.2f), -90f, 0.1f), CamShot.LowHero))
-                .Step(Shot(Impact(With(S(QteKey.Heavy, "SLAM", 0.28f, FighterPose.Slam), new Vector3(0f, 0.3f, 1.1f), -90f, 0.35f), 30f), CamShot.GroundImpact));
+            return new WrestleMove { name = "BODY SLAM", id = MoveId.BodySlam, cost = GethuBar, grip = GripKind.ChestAndThigh }
+                .Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.5f), 0f, 0f), CamShot.LowHero), -0.3f, 25f))
+                .Step(Pose(Shot(With(S(QteKey.Light, "LIFT", 0.6f, FighterPose.Grab), new Vector3(0f, 1.65f, 0.18f), -90f, 0.15f), CamShot.LowHero), 0.05f, -8f))
+                .Step(Pose(With(S(QteKey.None, null, 0.2f, FighterPose.Grab), new Vector3(0f, 1.72f, 0.18f), -92f, 0f), 0.05f, -10f))
+                .Step(Pose(Shot(Impact(With(S(QteKey.Heavy, "SLAM", 0.3f, FighterPose.Grab), new Vector3(0f, 0.35f, 0.95f), -90f, 0.1f), 30f), CamShot.GroundImpact), -0.45f, 40f));
         }
 
         WrestleMove DhobiPachad()
         {
-            return new WrestleMove { name = "DHOBI PACHAD", id = MoveId.DhobiPachad, cost = GethuBar }
-                .Step(Shot(With(S(QteKey.Light, "OVER THE SHOULDER", 0.35f, FighterPose.Lift), new Vector3(0f, 1.6f, 0.25f), -70f, 0f), CamShot.LowHero))
-                .Step(Shot(Impact(With(S(QteKey.Heavy, "BEAT HIM DOWN", 0.42f, FighterPose.Throw), new Vector3(0f, 0.3f, -1.2f), -270f, 0.9f), 32f), CamShot.Side));
+            return new WrestleMove { name = "DHOBI PACHAD", id = MoveId.DhobiPachad, cost = GethuBar, grip = GripKind.ChestAndThigh }
+                .Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.45f), 10f, 0f), CamShot.LowHero), -0.3f, 25f))
+                .Step(Pose(Shot(With(S(QteKey.Light, "OVER THE SHOULDER", 0.5f, FighterPose.Grab), new Vector3(0.15f, 1.6f, 0.1f), -80f, 0.1f), CamShot.Side), 0f, 0f))
+                .Step(Pose(Shot(Impact(With(S(QteKey.Heavy, "BEAT HIM DOWN", 0.42f, FighterPose.Grab), new Vector3(0f, 0.35f, -1.1f), -250f, 0.6f), 32f), CamShot.Side), -0.35f, 35f));
         }
 
         WrestleMove GermanSuplex()
         {
-            var m = new WrestleMove { name = "GERMAN SUPLEX", id = MoveId.GermanSuplex, cost = GethuBar, victimFacesAway = true };
+            var m = new WrestleMove { name = "GERMAN SUPLEX", id = MoveId.GermanSuplex, cost = GethuBar, victimFacesAway = true, grip = GripKind.Waist };
             for (int i = 0; i < 3; i++)
             {
-                var shot = With(S(QteKey.Light, "BODY SHOT", 0.22f, FighterPose.Knee), new Vector3(0f, 0.9f, 0.5f), 0f, 0f);
+                var shot = With(S(QteKey.Light, "BODY SHOT", 0.3f, FighterPose.Knee), new Vector3(0f, 0.9f, 0.5f), 0f, 0f);
                 shot.damage = 5f;
                 shot.shot = CamShot.Front;
-                m.Step(shot);
+                shot.anim = true;
+                m.Step(Pose(shot, 0f, 5f));
             }
-            return m.Step(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.5f, FighterPose.Suplex), new Vector3(0f, 0.35f, -0.9f), -180f, 1.1f), 34f), CamShot.Side));
+            m.Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.4f), 0f, 0f), CamShot.Side), -0.3f, 10f));
+            return m.Step(Pose(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.65f, FighterPose.Grab), new Vector3(0f, 0.35f, -0.85f), -180f, 0.9f), 34f), CamShot.Side), -0.55f, -65f));
         }
 
         WrestleMove Powerbomb()
         {
-            var jump = With(S(QteKey.Jump, "HIGHER", 0.3f, FighterPose.Jump), new Vector3(0f, 2.6f, 0.3f), -125f, 0f);
-            jump.hero = new Vector3(0f, 0.5f, 0f);
+            var jump = Pose(With(S(QteKey.Jump, "HIGHER", 0.3f, FighterPose.Grab), new Vector3(0f, 2.45f, 0.25f), -125f, 0f), 0.05f, -5f);
+            jump.hero = new Vector3(0f, 0.4f, 0f);
             jump.shot = CamShot.LowHero;
-            var drive = Impact(With(S(QteKey.Heavy, "DRIVE HIM DOWN", 0.22f, FighterPose.Slam), new Vector3(0f, 0.3f, 1.05f), -90f, 0f), 45f);
+            var drive = Pose(Impact(With(S(QteKey.Heavy, "DRIVE HIM DOWN", 0.25f, FighterPose.Grab), new Vector3(0f, 0.35f, 1.0f), -90f, 0f), 45f), -0.5f, 45f);
             drive.hero = new Vector3(0f, 0f, 0.2f);
             drive.shot = CamShot.GroundImpact;
-            return new WrestleMove { name = "POWERBOMB", id = MoveId.Powerbomb, cost = maxGethu, shockwave = true }
-                .Step(Shot(With(S(QteKey.Light, "LIFT", 0.45f, FighterPose.Lift), new Vector3(0f, 2.0f, 0.25f), -110f, 0.1f), CamShot.Side))
+            return new WrestleMove { name = "POWERBOMB", id = MoveId.Powerbomb, cost = maxGethu, shockwave = true, grip = GripKind.Thighs }
+                .Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.8f, 0.45f), 20f, 0f), CamShot.Side), -0.35f, 30f))
+                .Step(Pose(Shot(With(S(QteKey.Light, "LIFT", 0.6f, FighterPose.Grab), new Vector3(0f, 1.95f, 0.2f), -110f, 0.1f), CamShot.Side), 0.05f, -5f))
                 .Step(jump)
                 .Step(drive);
         }
 
         WrestleMove Spear()
         {
-            var run = With(S(QteKey.None, null, 0.28f, FighterPose.Spear), new Vector3(0f, 1.0f, 1.7f), -30f, 0f);
+            var run = Pose(With(S(QteKey.None, null, 0.28f, FighterPose.Spear), new Vector3(0f, 1.0f, 1.7f), -30f, 0f), -0.3f, 35f);
             run.hero = new Vector3(0f, 0f, 1.0f);
             run.shot = CamShot.OverShoulder;
-            var hit = Impact(With(S(QteKey.Heavy, "SPEAR", 0.2f, FighterPose.Spear), new Vector3(0f, 0.3f, 2.8f), -90f, 0f), 28f);
+            run.anim = true;
+            var hit = Pose(Impact(With(S(QteKey.Heavy, "SPEAR", 0.22f, FighterPose.Spear), new Vector3(0f, 0.35f, 2.8f), -90f, 0f), 28f), -0.5f, 50f);
             hit.hero = new Vector3(0f, 0f, 1.9f);
             hit.shot = CamShot.GroundImpact;
-            return new WrestleMove { name = "SPEAR", id = MoveId.Spear, cost = GethuBar }.Step(run).Step(hit);
+            return new WrestleMove { name = "SPEAR", id = MoveId.Spear, cost = GethuBar, grip = GripKind.Waist }.Step(run).Step(hit);
         }
 
         WrestleMove ElbowDrop(Vector3 victimLocal)
@@ -169,21 +188,54 @@ namespace MadrasGethu
             var jump = S(QteKey.Jump, "JUMP", 0.4f, FighterPose.Jump);
             jump.hero = new Vector3(victimLocal.x, 1.2f, z - 0.6f);
             jump.shot = CamShot.Side;
+            jump.anim = true;
             var drop = Impact(S(QteKey.Light, "ELBOW", 0.18f, FighterPose.ElbowDrop), 26f);
             drop.hero = new Vector3(victimLocal.x, 0f, z - 0.5f);
             drop.shot = CamShot.Overhead;
+            drop.anim = true;
             return new WrestleMove { name = "ELBOW DROP", id = MoveId.ElbowDrop, cost = GethuBar, carry = false }.Step(jump).Step(drop);
         }
 
         WrestleMove Spinebuster(float wallDistance)
         {
             float d = Mathf.Max(1.0f, wallDistance);
-            var drive = Impact(With(S(QteKey.Heavy, "INTO THE WALL", 0.3f, FighterPose.Spear), new Vector3(0f, 1.1f, d - 0.35f), -75f, 0f), 36f);
+            var drive = Pose(Impact(With(S(QteKey.Heavy, "INTO THE WALL", 0.35f, FighterPose.Grab), new Vector3(0f, 1.1f, d - 0.35f), -75f, 0f), 36f), -0.15f, 30f);
             drive.hero = new Vector3(0f, 0f, Mathf.Max(0f, d - 1.0f));
             drive.shot = CamShot.Side;
-            return new WrestleMove { name = "SPINEBUSTER", id = MoveId.Spinebuster, cost = GethuBar, wall = true }
-                .Step(Shot(With(S(QteKey.Light, "LIFT", 0.35f, FighterPose.Lift), new Vector3(0f, 1.5f, 0.45f), -50f, 0f), CamShot.LowHero))
+            return new WrestleMove { name = "SPINEBUSTER", id = MoveId.Spinebuster, cost = GethuBar, wall = true, grip = GripKind.Waist }
+                .Step(Pose(Shot(With(S(QteKey.None, null, 0.25f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.45f), 0f, 0f), CamShot.LowHero), -0.3f, 25f))
+                .Step(Pose(Shot(With(S(QteKey.Light, "LIFT", 0.45f, FighterPose.Grab), new Vector3(0f, 1.45f, 0.45f), -40f, 0f), CamShot.LowHero), 0f, 0f))
                 .Step(drive);
+        }
+
+        /// <summary>Tea kadai / fish crates / auto: lift him, carry him over and smash him into it.</summary>
+        WrestleMove PropSlam(FinisherSpot spot)
+        {
+            float d = Flat(spot.SlamPoint - transform.position).magnitude;
+            var smash = Pose(Impact(With(S(QteKey.Heavy, "SMASH", 0.38f, FighterPose.Grab), new Vector3(0f, 0.9f, d - 0.2f), -90f, 0.2f), spot.damage), -0.3f, 35f);
+            smash.hero = new Vector3(0f, 0f, Mathf.Max(0f, d - 1.3f));
+            smash.shot = CamShot.Side;
+            return new WrestleMove { name = spot.finisherName.TrimEnd('!'), id = MoveId.BodySlam, cost = spot.gethuCost, grip = GripKind.ChestAndThigh, prop = spot }
+                .Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.5f), 0f, 0f), CamShot.LowHero), -0.3f, 25f))
+                .Step(Pose(Shot(With(S(QteKey.Light, "LIFT", 0.55f, FighterPose.Grab), new Vector3(0f, 1.6f, 0.25f), -80f, 0.1f), CamShot.LowHero), 0.05f, -5f))
+                .Step(smash);
+        }
+
+        /// <summary>The ordinary throw (E): swing him round by the collar and let go. No Gethu, no prompts.</summary>
+        WrestleMove ThrowMove(float damage)
+        {
+            var swing = Pose(With(S(QteKey.None, null, 0.24f, FighterPose.Grab), new Vector3(0.45f, 0.95f, 0.35f), 0f, 0f), -0.15f, 10f);
+            var release = Pose(With(S(QteKey.None, null, 0.16f, FighterPose.Throw), new Vector3(0.1f, 1.0f, 0.95f), 10f, 0f), 0f, 20f);
+            release.anim = true;
+            return new WrestleMove { name = "THROW", cost = 0f, grip = GripKind.Collar, cinematic = false, throwAtEnd = true, throwDamage = damage }
+                .Step(swing).Step(release);
+        }
+
+        static WrestleStep Pose(WrestleStep s, float drop, float lean)
+        {
+            s.drop = drop;
+            s.lean = lean;
+            return s;
         }
 
         static WrestleStep With(WrestleStep s, Vector3 hip, float pitch, float arc)
@@ -209,24 +261,43 @@ namespace MadrasGethu
 
         // ------------------------------------------------------------------ choosing a finisher
 
-        /// <summary>The wrestling finisher Q would do right now while holding someone (null = none).</summary>
+        /// <summary>
+        /// The wrestling finisher Q does right now while holding someone (null = none). Chosen by the keys
+        /// held with Q, never by chance:
+        ///   from behind ........ German Suplex
+        ///   Shift + Q .......... Powerbomb (full Gethu)
+        ///   W + Q at a wall .... Spinebuster
+        ///   S + Q .............. Dhobi Pachad
+        ///   Q .................. Body Slam
+        /// </summary>
         WrestleMove PickGrabFinisher(Vector3 aim, Vector3 move)
         {
             if (grabbed == null) return null;
-            // Powerbomb: Shift + Q with a full meter (a deliberate choice, never automatic).
-            if (!grabFromBehind && GameInput.Sprint && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
-            // Spinebuster: only when you are pushing him towards a wall.
-            if (MoveUnlocks.Has(MoveId.Spinebuster) && !grabFromBehind && move.sqrMagnitude > 0.25f
-                && FindWall(grabbed.Center, aim, 2.6f, out var wallHit))
+            if (grabFromBehind) return MoveUnlocks.Has(MoveId.GermanSuplex) ? GermanSuplex() : null;
+            Vector2 keys = GameInput.Move;
+            if (GameInput.Sprint && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
+            if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out var wallHit))
                 return Spinebuster(Flat(wallHit.point - transform.position).magnitude);
-            if (grabFromBehind && MoveUnlocks.Has(MoveId.GermanSuplex)) return GermanSuplex();
-            if (!grabFromBehind)
+            if (keys.y < -0.5f && MoveUnlocks.Has(MoveId.DhobiPachad)) return DhobiPachad();
+            return MoveUnlocks.Has(MoveId.BodySlam) ? BodySlam() : null;
+        }
+
+        /// <summary>Key caps for the finishers available while holding him.</summary>
+        void AddGrabFinisherPrompts(Vector3 aim)
+        {
+            if (grabbed == null) return;
+            bool dim = Gethu < GethuBar;
+            if (grabFromBehind)
             {
-                // Dragging him around: swing him over your shoulder. Standing still: lift and slam.
-                if (move.sqrMagnitude > 0.25f && MoveUnlocks.Has(MoveId.DhobiPachad)) return DhobiPachad();
-                if (MoveUnlocks.Has(MoveId.BodySlam)) return BodySlam();
+                if (MoveUnlocks.Has(MoveId.GermanSuplex)) Prompts.Add(new PromptItem { key = "Q", label = "German Suplex", dim = dim });
+                return;
             }
-            return null;
+            if (MoveUnlocks.Has(MoveId.BodySlam)) Prompts.Add(new PromptItem { key = "Q", label = "Body Slam", dim = dim });
+            if (MoveUnlocks.Has(MoveId.DhobiPachad)) Prompts.Add(new PromptItem { key = "S+Q", label = "Dhobi Pachad", dim = dim });
+            if (MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out _))
+                Prompts.Add(new PromptItem { key = "W+Q", label = "Spinebuster", dim = dim });
+            if (MoveUnlocks.Has(MoveId.Powerbomb) && Gethu >= maxGethu)
+                Prompts.Add(new PromptItem { key = "SHIFT+Q", label = "Powerbomb" });
         }
 
         void StartGrabFinisher(WrestleMove move, Vector3 aim)
@@ -366,6 +437,7 @@ namespace MadrasGethu
             curHip = Quaternion.Inverse(wrestleRotation) * (victim.transform.position + Vector3.up * 0.9f - wrestleOrigin);
             curHero = Vector3.zero;
             curPitch = 0f;
+            curDrop = curLean = 0f;
             qtePerfects = qteMisses = qteDone = 0;
             qteActive = false;
 
@@ -375,7 +447,7 @@ namespace MadrasGethu
             SetState(PlayerState.Wrestle);
             lightIndex = 0;
             lightBufferedUntil = heavyBufferedUntil = 0f;
-            if (GM != null)
+            if (GM != null && move.cinematic)
             {
                 GM.AddPopup(move.name, Center + Vector3.up * 1.3f, new Color(1f, 0.75f, 0.15f), 1.4f);
                 GM.SlowMo(0.4f, 0.3f);
@@ -395,12 +467,13 @@ namespace MadrasGethu
             stepHipFrom = curHip;
             stepHeroFrom = curHero;
             stepPitchFrom = curPitch;
+            stepDropFrom = curDrop;
+            stepLeanFrom = curLean;
             wrestleStepTimer = 0f;
             if (st.qte != QteKey.None)
             {
                 qteActive = true;
                 qteStart = Time.unscaledTime;
-                if (wrestleMove.carry) Visual.Play(FighterPose.Grab, 999f);   // keep hold of him while waiting
             }
             else
             {
@@ -410,7 +483,20 @@ namespace MadrasGethu
 
         void BeginStepMotion(WrestleStep st)
         {
-            Visual.Play(st.heroPose, st.duration + 0.15f, st.duration + 0.1f);
+            // Lifts and slams are done with the hands locked on him (IK) over the holding stance;
+            // only steps with a real move of their own (knee, jump, run) play an animation.
+            if (st.anim) Visual.Play(st.heroPose, st.duration + 0.15f, st.duration + 0.1f);
+        }
+
+        /// <summary>The hero should stand in his holding stance right now (no step animation playing).</summary>
+        bool WrestleHoldsStance
+        {
+            get
+            {
+                if (wrestleMove == null || !wrestleMove.carry) return false;
+                var st = wrestleMove.steps[Mathf.Clamp(wrestleStep, 0, wrestleMove.steps.Count - 1)];
+                return qteActive || !st.anim;
+            }
         }
 
         void UpdateWrestle()
@@ -440,6 +526,8 @@ namespace MadrasGethu
             curHip = st.hip ?? stepHipFrom;
             curHero = st.hero ?? stepHeroFrom;
             curPitch = st.pitch ?? stepPitchFrom;
+            curDrop = st.drop ?? stepDropFrom;
+            curLean = st.lean ?? stepLeanFrom;
             FinishWrestleStep(st);
             if (State == PlayerState.Wrestle) AdvanceWrestleStep();
         }
@@ -457,6 +545,10 @@ namespace MadrasGethu
             transform.rotation = wrestleRotation;
 
             if (!wrestleMove.carry) return;
+            // Hands stay on his body and the hero's own body crouches, drives up and follows him down.
+            float drop = Mathf.Lerp(stepDropFrom, st.drop ?? stepDropFrom, e);
+            float lean = Mathf.Lerp(stepLeanFrom, st.lean ?? stepLeanFrom, e);
+            Visual.SetGrapple(wrestleVictim, wrestleMove.grip, drop, lean);
             Vector3 hip = Vector3.Lerp(stepHipFrom, st.hip ?? stepHipFrom, e) + Vector3.up * st.arc * lift;
             hip.z = Mathf.Clamp(hip.z, -(roomBehind - 0.3f), roomAhead - 0.3f);
             float pitch = Mathf.Lerp(stepPitchFrom, st.pitch ?? stepPitchFrom, e);
@@ -484,7 +576,7 @@ namespace MadrasGethu
         /// </summary>
         void UpdateWrestleCamera(WrestleStep st, float t, bool waiting)
         {
-            if (cam == null || wrestleVictim == null) return;
+            if (cam == null || wrestleVictim == null || !wrestleMove.cinematic) return;
             Vector3 victimPoint = wrestleMove.carry ? wrestleVictim.transform.position + Vector3.up * 0.9f
                                                     : wrestleVictim.transform.position + Vector3.up * 0.3f;
             Vector3 focus = Vector3.Lerp(transform.position + Vector3.up * 1.1f, victimPoint, 0.5f);
@@ -568,6 +660,17 @@ namespace MadrasGethu
                 WrestleImpact(st);
                 return;
             }
+            if (wrestleMove.throwAtEnd && wrestleStep == wrestleMove.steps.Count - 1 && victim != null)
+            {
+                // Let go at the end of the swing: he flies off and the ragdoll takes over.
+                Vector3 dir = wrestleRotation * Vector3.forward;
+                Visual.SetGrip(null, false);
+                victim.Launch(this, dir, EnemyFighter.LaunchKind.Throw);
+                victim.ReceiveHit(new HitInfo { attacker = this, damage = wrestleMove.throwDamage, direction = dir, hitsDowned = true });
+                RegisterHits(1, 8f);
+                if (GM != null) { GM.Shake(0.2f); GM.AddPopup("THROW!", victim.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.8f); }
+                return;
+            }
             if (st.damage <= 0f || victim == null) return;
 
             // A blow while holding him (never the killing one: that's for the slam).
@@ -614,7 +717,12 @@ namespace MadrasGethu
             RegisterHits(1, 0f);
             NotifyMoveLanded(move.name);
 
-            if (move.wall)
+            if (move.prop != null)
+            {
+                move.prop.Break(fwd);
+                if (victim.Visual.IsRagdoll) victim.Visual.StartRagdoll(fwd * 3f + Vector3.down);
+            }
+            else if (move.wall)
             {
                 Vector3 wallPoint = impactPoint + fwd * 0.4f + Vector3.up * 1.1f;
                 FX.Dust(wallPoint, 18);
@@ -675,6 +783,7 @@ namespace MadrasGethu
             wrestleMove = null;
             wrestleVictim = null;
             qteActive = false;
+            Visual.SetGrip(null, false);   // hands off, stand back up (IK blends out)
             lightBufferedUntil = heavyBufferedUntil = 0f;
             if (cam != null) cam.EndCinematic(0.6f);
 

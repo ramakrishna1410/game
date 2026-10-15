@@ -122,15 +122,17 @@ Keyboard and mouse for now (gamepad prompts come later).
 
 | When | Finisher | Prompts |
 |---|---|---|
-| Holding him, standing still | Body Slam | LMB lift → RMB slam |
-| Holding him, moving | Dhobi Pachad | LMB → RMB |
-| Holding him from behind | German Suplex | LMB ×3 body shots → RMB |
-| Holding him, pushing towards a wall | Spinebuster | LMB → RMB |
+| Holding him, **Q** | Body Slam | LMB lift → RMB slam |
+| Holding him, **S + Q** | Dhobi Pachad | LMB → RMB |
+| Holding him from behind, **Q** | German Suplex | LMB ×3 body shots → RMB |
+| Holding him facing a wall, **W + Q** | Spinebuster | LMB → RMB |
 | Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
 | Sprinting at a rowdy | Spear | RMB |
 | Rowdy on the ground | Elbow Drop | Space → LMB |
 
-Each costs one Gethu bar (the Powerbomb costs the full meter). Every **PERFECT** adds damage and a little Gethu; all PERFECT = **FLAWLESS**.
+Each costs one Gethu bar (the Powerbomb costs the full meter). Near a tea kadai, fish crates or the auto, **Q** lifts him and smashes him into it.
+
+During every lift Maaran's hands stay locked on the rowdy (IK) and his body crouches, drives up, arches or follows him down; the rowdy goes limp (ragdoll) on landing. **E** while holding swings him round by the collar and throws him. Every **PERFECT** adds damage and a little Gethu; all PERFECT = **FLAWLESS**.
 
 **Enemy warning colours:** 🔵 the blue **F** box means parry; **orange** means unblockable, so dodge (C); **yellow** means a grab, so dodge, or tap E to break free if he catches you.
 

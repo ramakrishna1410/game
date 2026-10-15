@@ -263,7 +263,10 @@ namespace MadrasGethu
             dodgeCooldown -= dt;
             grabActionCooldown -= dt;
             Prompts.Clear();
-            Visual.SetAnimatorBool("Holding", State == PlayerState.Grab);
+            grabStrikeTimer -= dt;
+            // Holding stance: while gripping (not mid-strike) and during wrestling lifts.
+            Visual.SetAnimatorBool("Holding", (State == PlayerState.Grab && grabStrikeTimer <= 0f)
+                                              || (State == PlayerState.Wrestle && WrestleHoldsStance));
             Visual.SetAnimatorBool("Held", State == PlayerState.Held);
 
             if (ComboTimer > 0f)
@@ -952,6 +955,8 @@ namespace MadrasGethu
             pos += transform.right * Mathf.Sin(Time.time * 7f) * 0.03f;
             grabbed.HoldAt(pos, facing);
 
+            UpdatePendingGrabStrike();
+
             var spot = FinisherSpot.FindUsable(transform.position);
             Vector3 aimNow = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
             WrestleMove wrestle = spot == null ? PickGrabFinisher(aimNow, move) : null;
@@ -960,10 +965,8 @@ namespace MadrasGethu
             Prompts.Add(new PromptItem { key = "F", label = "Shove" });
             if (spot != null)
                 Prompts.Add(new PromptItem { key = "Q", label = spot.finisherName, dim = Gethu < spot.gethuCost });
-            else if (wrestle != null)
-                Prompts.Add(new PromptItem { key = "Q", label = wrestle.name, dim = Gethu < wrestle.cost });
-            if (spot == null && !grabFromBehind && Gethu >= maxGethu && !GameInput.Sprint && MoveUnlocks.Has(MoveId.Powerbomb))
-                Prompts.Add(new PromptItem { key = "SHIFT+Q", label = "Powerbomb" });
+            else
+                AddGrabFinisherPrompts(aimNow);
 
             if (stateTimer > 4.5f)
             {
@@ -980,8 +983,18 @@ namespace MadrasGethu
 
             if (GameInput.GethuPressed)
             {
-                if (spot != null && Gethu >= spot.gethuCost) { StartFinisher(spot); return; }
-                if (spot == null && wrestle != null && Gethu >= wrestle.cost) { StartGrabFinisher(wrestle, aimNow); return; }
+                if (spot != null && Gethu >= spot.gethuCost)
+                {
+                    StartGrabFinisher(PropSlam(spot), Flat(spot.SlamPoint - transform.position).normalized);
+                    return;
+                }
+                if (spot == null && wrestle != null && Gethu >= wrestle.cost)
+                {
+                    // Turn to him first (S+Q turns you round while dragging him).
+                    Vector3 toHim = Flat(grabbed.transform.position - transform.position);
+                    StartGrabFinisher(wrestle, toHim.sqrMagnitude > 0.01f ? toHim.normalized : transform.forward);
+                    return;
+                }
                 if (spot == null && wrestle == null && Gethu >= maxGethu) { StartFinisher(null); return; }
                 if (GM != null) GM.AddPopup("Not enough Gethu", Center + Vector3.up, Color.gray, 0.6f);
             }
@@ -1010,39 +1023,52 @@ namespace MadrasGethu
                 heavyBufferedUntil = 0f;
                 if (TryWallSlam(aim)) return;
 
+                // A real throw: swing him round by the collar, then let go.
                 var victim = grabbed;
+                float throwDamage = grabFromBehind ? 16f : 10f;
                 LetGo();
                 Motor.FaceDirection(aim, instant: true);
-                Visual.Play(FighterPose.Throw, 0.4f, 0.7f);
-                victim.Launch(this, aim, EnemyFighter.LaunchKind.Throw);
-                victim.ReceiveHit(new HitInfo { attacker = this, damage = grabFromBehind ? 16f : 10f, direction = aim, hitsDowned = true });
-                RegisterHits(1, 8f);
-                if (GM != null) { GM.Shake(0.2f); GM.AddPopup(grabFromBehind ? "SUPLEX THROW!" : "THROW!", victim.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.8f); }
-                SetState(PlayerState.Stagger);
-                stateTimer = 0.1f;
+                StartWrestle(ThrowMove(throwDamage), victim);
                 return;
             }
 
-            // Strike cycle while holding: knee -> headbutt -> punch to the face.
-            if (Time.time < lightBufferedUntil)
+            // Strike cycle while holding: knee -> headbutt -> punch to the face. The hit lands on the
+            // animation's contact frame, and the punching hand lets go of the collar for the punch.
+            if (Time.time < lightBufferedUntil && pendingGrabStrike < 0f)
             {
                 lightBufferedUntil = 0f;
-                FighterPose strike = grabStrikeIndex % 3 == 0 ? FighterPose.Knee
-                                   : grabStrikeIndex % 3 == 1 ? FighterPose.Headbutt : FighterPose.Cross;
-                float damage = strike == FighterPose.Headbutt ? 9f : strike == FighterPose.Cross ? 8f : 7f;
+                grabStrikePose = grabStrikeIndex % 3 == 0 ? FighterPose.Knee
+                               : grabStrikeIndex % 3 == 1 ? FighterPose.Headbutt : FighterPose.Cross;
                 grabStrikeIndex++;
-                grabActionCooldown = 0.38f;
-                Visual.Play(strike, 0.3f, 0.42f);
-                float mult = MassMode ? massModeDamageMultiplier : 1f;
-                var hit = knee.ToHit(this, transform.forward, mult);
-                hit.damage = damage * mult;
-                grabbed.ReceiveHit(hit);
-                grabbed.Visual.Play(FighterPose.Flinch, 0.3f, 0.35f);
-                FX.HitSpark(grabbed.Center + Vector3.up * (strike == FighterPose.Knee ? -0.2f : 0.35f), false);
-                RegisterHits(1, knee.gethuGain);
-                if (GM != null) { GM.HitStop(knee.hitStop); GM.Shake(knee.shake); }
-                if (grabbed != null && grabbed.IsDead) ReleaseGrab(Vector3.zero, false);
+                pendingGrabStrike = Visual.PlayTimed(grabStrikePose, 0.18f, 0.25f);
+                grabStrikeTimer = pendingGrabStrike + 0.25f;
+                grabActionCooldown = grabStrikeTimer + 0.02f;
+                if (grabStrikePose == FighterPose.Cross) Visual.FreeRightHand(grabStrikeTimer);
             }
+        }
+
+        // Strike while holding someone: the hit waits for the animation's contact frame.
+        float pendingGrabStrike = -1f;
+        float grabStrikeTimer;
+        FighterPose grabStrikePose;
+
+        void UpdatePendingGrabStrike()
+        {
+            if (pendingGrabStrike < 0f || grabbed == null) return;
+            pendingGrabStrike -= Time.deltaTime;
+            if (pendingGrabStrike > 0f) return;
+            pendingGrabStrike = -1f;
+
+            float damage = grabStrikePose == FighterPose.Headbutt ? 9f : grabStrikePose == FighterPose.Cross ? 8f : 7f;
+            float mult = MassMode ? massModeDamageMultiplier : 1f;
+            var hit = knee.ToHit(this, transform.forward, mult);
+            hit.damage = damage * mult;
+            grabbed.ReceiveHit(hit);
+            grabbed.Visual.Play(FighterPose.Flinch, 0.3f, 0.35f);
+            FX.HitSpark(grabbed.Center + Vector3.up * (grabStrikePose == FighterPose.Knee ? -0.2f : 0.35f), false);
+            RegisterHits(1, knee.gethuGain);
+            if (GM != null) { GM.HitStop(knee.hitStop); GM.Shake(knee.shake); }
+            if (grabbed != null && grabbed.IsDead) ReleaseGrab(Vector3.zero, false);
         }
 
         /// <summary>Wall right in the throw direction: run him into it head first.</summary>

@@ -344,6 +344,18 @@ namespace MadrasGethu
             if (animatorParams.Contains("MoveZ")) animator.SetFloat("MoveZ", local.z, damp, dt);
         }
 
+        /// <summary>Wrestling grip and posture (hands on his body, crouch / lean), via IK. Real models only.</summary>
+        public void SetGrapple(Fighter target, GripKind grip, float drop, float lean)
+        {
+            if (handIK != null) handIK.SetGrapple(target, grip, drop, lean);
+        }
+
+        /// <summary>Takes the right hand off the collar for a moment so a punch can be thrown.</summary>
+        public void FreeRightHand(float seconds)
+        {
+            if (handIK != null) handIK.FreeRightHand(seconds);
+        }
+
         /// <summary>Hands on someone's collar (front) or shoulders (behind); null lets go.</summary>
         public void SetGrip(Fighter target, bool fromBehind)
         {

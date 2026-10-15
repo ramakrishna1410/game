@@ -610,10 +610,15 @@ namespace MadrasGethu.EditorTools
             {
                 var state = sm.AddState(slot.name);
                 state.motion = slot.clip;
-                var enter = sm.AddAnyStateTransition(state);
-                enter.AddCondition(AnimatorConditionMode.If, 0f, slot.boolParameter);
-                enter.canTransitionToSelf = false;
-                SetQuick(enter, 0.1f);
+                // Entered only from standing / fight stance, never from Any State: otherwise the held pose
+                // would cancel a punch, knee or flinch on its first frame while the bool is still on.
+                // One-shot moves end back in the stance, and from there the hold state resumes.
+                foreach (var from in new[] { locomotion, stance })
+                {
+                    var enter = from.AddTransition(state);
+                    enter.AddCondition(AnimatorConditionMode.If, 0f, slot.boolParameter);
+                    SetQuick(enter, 0.1f);
+                }
                 AddExitByCondition(state, stance, locomotion, slot.boolParameter);
             }
 
