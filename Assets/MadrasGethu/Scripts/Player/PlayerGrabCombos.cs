@@ -74,7 +74,8 @@ namespace MadrasGethu
         bool rushWaiting;
         float rushWaitUntil;
         int rushTaps;
-        bool rapid;
+        float rushUppercutAt;                // a click after the hooks: uppercut, unless another click follows quickly
+        bool rapid, rapidUsed;
         int rapidCount;
         float rapidLastPunch, rapidLastTap;
         const int RapidFacePunches = 6, RapidMaxPunches = 12;
@@ -267,7 +268,8 @@ namespace MadrasGethu
             rushWaiting = c.id == MoveId.RoyapuramRush;
             rushWaitUntil = float.MaxValue;
             rushTaps = 0;
-            rapid = false;
+            rushUppercutAt = float.MaxValue;
+            rapid = rapidUsed = false;
             rapidCount = 0;
             pendingGrabStrike = -1f;
             if (c.cost > 0f) Gethu = Mathf.Max(0f, Gethu - c.cost);
@@ -428,14 +430,13 @@ namespace MadrasGethu
                 victim.Visual.ClearCarry();
                 victim.ReleaseFromGrab(impulse, knockDown: true);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = b.damage * mult, direction = fwd, unblockable = true, hitsDowned = true, heavy = true });
-                NotifyMoveLanded(combo.name);
-                if (rapid) NotifyMoveLanded("Machine Gun Kuthu");
+                NotifyMoveLanded(rapidUsed ? "Machine Gun Kuthu" : combo.name);
                 if (GM != null)
                 {
                     GM.HitStop(0.12f);
                     GM.SlowMo(0.3f, 0.4f);
                     GM.Shake(0.45f, 0.3f);
-                    GM.AddPopup(combo.name + "!", contact + Vector3.up * 1.0f, new Color(1f, 0.7f, 0.15f), 1.4f);
+                    GM.AddPopup((rapidUsed ? "MACHINE GUN KUTHU" : combo.name) + "!", contact + Vector3.up * 1.0f, new Color(1f, 0.7f, 0.15f), 1.4f);
                 }
                 if (cam != null) cam.ZoomPunch(7f);
             }
@@ -469,11 +470,11 @@ namespace MadrasGethu
             bool hooksDone = combo.beats.TrueForAll(b => b.landed);
             if (hooksDone && rushWaitUntil == float.MaxValue) rushWaitUntil = comboTime + 0.45f;
 
-            // Tapping fast through the hooks: straight into the rapid punches.
-            if (rushTaps >= 3 && MoveUnlocks.Has(MoveId.MachineGunKuthu))
+            // Still tapping after the two clicks that started the rush: straight into the rapid punches.
+            if (rushTaps >= 2 && MoveUnlocks.Has(MoveId.MachineGunKuthu))
             {
                 rushWaiting = false;
-                rapid = true;
+                rapid = rapidUsed = true;
                 rapidCount = 0;
                 rapidLastPunch = comboTime - 1f;
                 rapidLastTap = comboTime;
@@ -481,14 +482,19 @@ namespace MadrasGethu
                 return;
             }
             if (!hooksDone) return;
-            if (l)
+            if (l && rushUppercutAt == float.MaxValue)
             {
-                // The third click: let go with the uppercut.
+                // A third click: the uppercut, unless it turns out to be the start of fast tapping.
+                rushUppercutAt = comboTime + 0.2f;
+                return;
+            }
+            if (comboTime >= rushUppercutAt)
+            {
                 rushWaiting = false;
                 combo.Add(RushUppercut(comboTime + 0.28f));
                 return;
             }
-            if (comboTime > rushWaitUntil)
+            if (rushUppercutAt == float.MaxValue && comboTime > rushWaitUntil)
             {
                 // No third click: keep holding him.
                 rushWaiting = false;
