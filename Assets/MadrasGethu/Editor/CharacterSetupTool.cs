@@ -69,7 +69,7 @@ namespace MadrasGethu.EditorTools
                 T("Haymaker", 1.3f, new[] { "haymaker", "bigpunch", "punchcombo" }, "Hook", "Cross"),
                 T("Uppercut", 1.4f, new[] { "uppercut" }, "Hook", "Cross"),
                 T("Backfist", 1.4f, new[] { "backfist", "spinningbackfist", "spinbackfist" }, "Hook", "Haymaker"),
-                T("Kick", 1.4f, new[] { "kick", "mmakick", "frontkick", "roundhousekick", "legkick" }),
+                T("Kick", 1.4f, new[] { "kick", "mmakick", "legkick" }, "FrontKick", "Roundhouse"),
                 T("Stomp", 1.3f, new[] { "stomp", "stomping" }, "Kick"),
                 T("Knee", 1.5f, new[] { "knee", "kneestrike", "kneekick" }, "Kick"),
                 T("Throw", 1.3f, new[] { "throw", "judothrow", "grabthrow" }, "Haymaker", "Hook"),
@@ -85,7 +85,7 @@ namespace MadrasGethu.EditorTools
                 T("Push", 1f, new[] { "push", "shove", "pushing", "twohandpush" }, "Haymaker", "Cross"),
                 T("Headbutt", 1f, new[] { "headbutt", "headbutting" }, "Cross", "Jab"),
                 T("Jump", 1f, new[] { "jump", "jumping", "standingjump", "jumpinplace" }),
-                T("FlyingKick", 1f, new[] { "flyingkick", "jumpkick", "dropkick", "jumpattack", "flyingknee" }, "Kick"),
+                T("FlyingKick", 1f, new[] { "flyingkick", "jumpkick", "dropkick", "jumpattack" }, "Kick"),
                 T("Flinch", 1.3f, new[] { "flinch", "hitreaction", "reaction", "headhit", "hit", "takinghit" }),
                 T("Windup", 1f, new[] { "windup", "chargeup" }),
                 T("Taunt", 1f, new[] { "taunt", "taunting", "comeon", "challenge" }),
@@ -114,6 +114,11 @@ namespace MadrasGethu.EditorTools
                 T("Lift", 1f, new[] { "lift", "lifting", "liftup", "boxlifting", "liftingheavy" }, "PickUp", "Throw"),
                 T("Suplex", 1f, new[] { "suplex", "germansuplex", "backflip", "bridge" }, "Throw", "Slam"),
                 T("Spear", 1f, new[] { "spear", "footballtackle", "speartackle" }, "Charge", "Push"),
+                // Grab strike combos
+                T("FrontKick", 1.2f, new[] { "frontkick", "frontsnapkick", "snapkick", "straightkick" }, "Kick"),
+                T("Roundhouse", 1.2f, new[] { "roundhouse", "roundhousekick", "highkick", "headkick" }, "Kick"),
+                T("PushKick", 1.1f, new[] { "pushkick", "teep", "frontpushkick", "stompkick" }, "FrontKick", "Kick"),
+                T("FlyingKnee", 1f, new[] { "flyingknee", "jumpingknee", "jumpknee", "flyingkneestrike" }, "Knee", "FlyingKick"),
                 T("ElbowDrop", 1f, new[] { "elbowdrop", "legdrop", "jumpdown" }, "Stomp", "Slam"),
 
                 new Slot { name = "Dazed", kind = SlotKind.HoldBool, boolParameter = "Dazed", aliases = new[] { "dazed", "dizzy", "dizzyidle", "stunned" }, fallbacks = new[] { "StaggerBack", "Flinch" } },
@@ -893,8 +898,9 @@ namespace MadrasGethu.EditorTools
                 case "BearHug": case "WeaponSwing": case "Clothesline": case "BackElbow": case "ShoulderBarge": case "Spear":
                     return Reach.Hands;
                 case "Kick": case "RowdyKick": case "FlyingKick": case "LegSweep":
+                case "FrontKick": case "Roundhouse": case "PushKick":
                     return Reach.Feet;
-                case "Knee": return Reach.Knees;
+                case "Knee": case "FlyingKnee": return Reach.Knees;
                 case "Uppercut": return Reach.HandUp;
                 case "Slam": case "GroundPound": case "WeaponSmash": case "ElbowDrop": return Reach.SmashHands;
                 case "Stomp": return Reach.SmashFeet;

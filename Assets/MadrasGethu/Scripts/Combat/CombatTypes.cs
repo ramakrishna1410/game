@@ -24,7 +24,9 @@ namespace MadrasGethu
         Beg,
         // Hero combo specials and wrestling finishers
         ShoulderBarge, LegSweep, Clothesline, BackElbow,
-        Lift, Suplex, Spear, ElbowDrop
+        Lift, Suplex, Spear, ElbowDrop,
+        // Grab strike combos
+        FrontKick, Roundhouse, PushKick, FlyingKnee
     }
 
     /// <summary>What kind of threat an enemy attack is, which decides how the hero must answer it.</summary>

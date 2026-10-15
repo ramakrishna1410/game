@@ -10,6 +10,8 @@ namespace MadrasGethu
         ShoulderBarge, AirHammer, ChargedHaymaker, LegSweep, ShoulderRush, Clothesline, BackElbow, WallBounce,
         // Wrestling finishers
         BodySlam, DhobiPachad, GermanSuplex, Powerbomb, Spear, ElbowDrop, Spinebuster,
+        // Grab strike combos
+        RoyapuramRush, MachineGunKuthu, KasimeduKickStorm, ThalaivarSpecial, Jallikattu, GethuMassCombo,
     }
 
     /// <summary>

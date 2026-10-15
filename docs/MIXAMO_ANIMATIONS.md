@@ -111,6 +111,21 @@ Put these in `Art/Animations/` (or `Art/Animations/Hero/`). The rowdy's body is 
 | `Spear.fbx` | Football Tackle | Charge |
 | `ElbowDrop.fbx` | Elbow Drop / Jump Down | Stomp |
 
+### Grab combo kicks (strongly recommended)
+The grab combos use these. Without them they borrow `Kick.fbx`, which looks wrong if your Kick is a jumping kick.
+Exact Mixamo names change; search the words below and pick one that stays on the ground (except the flying knee). Tick **In Place** when offered.
+
+| Save as | Search Mixamo for | Used in |
+|---|---|---|
+| `FrontKick.fbx` | "Front Kick" / "Snap Kick" | Kasimedu Kick Storm, Gethu Mass Combo |
+| `Roundhouse.fbx` | "Roundhouse Kick" / "Mma Kick" (high kick) | Kasimedu Kick Storm |
+| `PushKick.fbx` | "Push Kick" / a front kick that shoves | Jallikattu |
+| `FlyingKnee.fbx` | "Flying Knee" / "Jumping Knee" | Jallikattu |
+| `Knee.fbx` | "Knee Strike" (standing) | Gethu Mass Combo (the combo knees are also done in code) |
+| `Backfist.fbx` | "Spinning Backfist" / any backhand (the game adds the spin) | Thalaivar Special |
+| `Uppercut.fbx`, `Haymaker.fbx`, `Hook.fbx`, `BodyBlow.fbx` | see the Combat table above | Royapuram Rush, Machine Gun Kuthu |
+| `FlyingKick.fbx` | "Drop Kick" / "Flying Kick" | Gethu Mass Combo dropkick |
+
 For enemies, into `Art/Animations/Rowdy/`:
 
 | Save as | Search Mixamo for | Used for |

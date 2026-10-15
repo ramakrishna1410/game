@@ -91,7 +91,7 @@ Keyboard and mouse for now (gamepad prompts come later).
 | **Parry** (when the blue F shows) | F (tap) |
 | Jump (then click for a **flying kick**) | Space |
 | Dodge: sidestep / backstep when squared up, roll otherwise (direction + key) | C or Ctrl |
-| Grab → strike / throw / shove | E → Left click / E / F |
+| Grab → combos / throw / shove / drag fast | E → LMB/RMB clicks / E / F / Shift |
 | **Gethu**: wrestling finisher while grabbing, prop finisher near a prop, elbow drop on a downed rowdy, spear while sprinting, or Gethu Mode when full | Q |
 | Quick-time prompts during a wrestling finisher | the key shown (Left click, Right click or Space) |
 | Pick up a weapon (stand on it) / throw the weapon you hold | E |
@@ -117,6 +117,20 @@ Keyboard and mouse for now (gamepad prompts come later).
 | sprint + LMB / sprint + RMB | Running Knee / Clothesline |
 | LMB with a rowdy right behind you | Back Elbow |
 | dodge → LMB, jump → LMB | Pivot Backfist, Flying Kick |
+
+### Grab combos (grab with E, then click, no QTE)
+
+| Clicks after the grab | Combo |
+|---|---|
+| LMB LMB (LMB) | **Royapuram Rush**: two punches holding his collar; the third click lets go with an uppercut that lifts him off his feet |
+| keep tapping LMB fast | **Machine Gun Kuthu**: rapid punches to the face holding the collar, then both fists into the body; RMB finishes (haymaker / uppercut) |
+| RMB RMB | **Kasimedu Kick Storm**: shove, front kick to the stomach, roundhouse to the head |
+| LMB RMB | **Thalaivar Special**: headbutt, knee to the gut, spinning backfist |
+| RMB LMB | **Jallikattu**: push kick, run in, flying knee to the face |
+| LMB + RMB together (full Gethu) | **Gethu Mass Combo**: jab, cross, body kick, hook, knee, dropkick |
+| one click on its own | a single punch (LMB) or knee (RMB), and you keep hold of him |
+
+Hold **Shift** while dragging someone to hurry him along (to a tea kadai or the auto). Throwing is **E** only.
 
 ### Wrestling finishers (Q, costs Gethu)
 

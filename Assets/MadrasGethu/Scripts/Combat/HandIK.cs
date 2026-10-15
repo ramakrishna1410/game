@@ -119,6 +119,7 @@ namespace MadrasGethu
                 animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
                 animator.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 0f);
                 animator.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
+                if (layerIndex == 0) ApplyStrike();   // a knee in a combo works without holding anyone
                 animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
                 animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
                 animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);

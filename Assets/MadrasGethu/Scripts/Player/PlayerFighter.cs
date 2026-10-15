@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public partial class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle, Combo }
 
         /// <summary>One button prompt for the HUD: a key cap (or mouse button) and what it does.</summary>
         public struct PromptItem
@@ -154,7 +154,6 @@ namespace MadrasGethu
         public Weapon HeldWeapon { get; private set; }
         bool grabFromBehind;
         Vector3 grabPullStart;
-        int grabStrikeIndex;
         const float GrabPullTime = 0.18f;
 
         // Parry
@@ -266,7 +265,8 @@ namespace MadrasGethu
             grabStrikeTimer -= dt;
             // Holding stance: while gripping (not mid-strike) and during wrestling lifts.
             Visual.SetAnimatorBool("Holding", (State == PlayerState.Grab && grabStrikeTimer <= 0f)
-                                              || (State == PlayerState.Wrestle && WrestleHoldsStance));
+                                              || (State == PlayerState.Wrestle && WrestleHoldsStance)
+                                              || (State == PlayerState.Combo && ComboHoldsStance));
             Visual.SetAnimatorBool("Held", State == PlayerState.Held);
 
             if (ComboTimer > 0f)
@@ -305,6 +305,7 @@ namespace MadrasGethu
                 case PlayerState.Held: UpdateHeld(); break;
                 case PlayerState.Finisher: UpdateFinisher(); break;
                 case PlayerState.Wrestle: UpdateWrestle(); break;
+                case PlayerState.Combo: UpdateGrabCombo(); break;
                 case PlayerState.Stagger:
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
                     break;
@@ -322,6 +323,7 @@ namespace MadrasGethu
 
         void SetState(PlayerState s)
         {
+            if (s != PlayerState.Grab) codeFirst = '\0';   // a half-entered combo code doesn't carry over
             State = s;
             stateTimer = 0f;
             charging = false;
@@ -768,6 +770,7 @@ namespace MadrasGethu
             (State == PlayerState.Dodge && stateTimer < dodgeInvulnerableUntil) ||
             State == PlayerState.Finisher ||
             State == PlayerState.Wrestle ||
+            State == PlayerState.Combo ||
             State == PlayerState.Parry ||
             (State == PlayerState.Attack && !struck &&
              (currentAttack == counter || currentAttack == counterUppercut || currentAttack == counterThrow));
@@ -912,7 +915,6 @@ namespace MadrasGethu
                 grabbed = target;
                 grabbed.EnterGrabbed(grabFromBehind);
                 grabPullStart = target.transform.position;
-                grabStrikeIndex = 0;
                 Motor.FaceDirection(toEnemy, instant: true);
                 SetState(PlayerState.Grab);
                 grabActionCooldown = GrabPullTime + 0.05f;
@@ -943,7 +945,8 @@ namespace MadrasGethu
 
             // Drag him around (towards a tea kadai or a wall, for instance).
             Vector3 move = MoveInputWorld();
-            Motor.SetDesiredVelocity(move * dragSpeed);
+            // Shift: hurry him along (towards a tea kadai or the auto) instead of the slow drag.
+            Motor.SetDesiredVelocity(move * (GameInput.Sprint ? dragSprintSpeed : dragSpeed));
             if (move.sqrMagnitude > 0.01f) Motor.FaceDirection(move);
 
             // Reach and yank him in, then keep him at arm's length by the collar.
@@ -960,7 +963,9 @@ namespace MadrasGethu
             var spot = FinisherSpot.FindUsable(transform.position);
             Vector3 aimNow = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
             WrestleMove wrestle = spot == null ? PickGrabFinisher(aimNow, move) : null;
-            Prompts.Add(new PromptItem { key = "LMB", label = "Strike" });
+            Prompts.Add(new PromptItem { key = "LMB", label = "Punch" });
+            Prompts.Add(new PromptItem { key = "RMB", label = "Kick" });
+            Prompts.Add(new PromptItem { key = "SHIFT", label = "Drag fast" });
             Prompts.Add(new PromptItem { key = "E", label = spot != null ? "Throw him in" : "Throw" });
             Prompts.Add(new PromptItem { key = "F", label = "Shove" });
             if (spot != null)
@@ -1018,9 +1023,8 @@ namespace MadrasGethu
             }
 
             // Throw, or a wall slam if there's a wall right where you're aiming.
-            if (GameInput.GrabPressed || Time.time < heavyBufferedUntil)
+            if (GameInput.GrabPressed)
             {
-                heavyBufferedUntil = 0f;
                 if (TryWallSlam(aim)) return;
 
                 // A real throw: swing him round by the collar, then let go.
@@ -1032,30 +1036,8 @@ namespace MadrasGethu
                 return;
             }
 
-            // Strike cycle while holding: knee -> headbutt -> punch to the face. The hit lands on the
-            // animation's contact frame, and the punching hand lets go of the collar for the punch.
-            if (Time.time < lightBufferedUntil && pendingGrabStrike < 0f)
-            {
-                lightBufferedUntil = 0f;
-                grabStrikePose = grabStrikeIndex % 3 == 0 ? FighterPose.Knee
-                               : grabStrikeIndex % 3 == 1 ? FighterPose.Headbutt : FighterPose.Cross;
-                grabStrikeIndex++;
-                if (grabStrikePose == FighterPose.Cross)
-                {
-                    // A real punch: the right hand lets go of the collar and the punch animation plays.
-                    pendingGrabStrike = Visual.PlayTimed(grabStrikePose, 0.18f, 0.25f);
-                    grabStrikeTimer = pendingGrabStrike + 0.25f;
-                    Visual.FreeRightHand(grabStrikeTimer);
-                    grabActionCooldown = grabStrikeTimer + 0.02f;
-                }
-                else
-                {
-                    // Knee / headbutt: done on the spot with both hands still on his collar.
-                    const float strikeTime = 0.42f;
-                    pendingGrabStrike = Visual.GrabStrike(grabStrikePose == FighterPose.Knee ? GrabStrikeKind.Knee : GrabStrikeKind.Headbutt, strikeTime);
-                    grabActionCooldown = strikeTime + 0.02f;
-                }
-            }
+            // Clicks while holding him: grab strike combos (see PlayerGrabCombos.cs).
+            if (pendingGrabStrike < 0f) UpdateGrabComboInput();
         }
 
         // Strike while holding someone: the hit waits for the animation's contact frame.
@@ -1445,6 +1427,8 @@ namespace MadrasGethu
         public void Respawn(Vector3 position)
         {
             if (wrestleMove != null) EndWrestle();
+            if (combo != null) EndStrikeCombo();
+            codeFirst = '\0';
             if (cam != null) cam.EndCinematic(0f);
             if (grabbed != null) ReleaseGrab(Vector3.zero, false);
             heldBy = null;
