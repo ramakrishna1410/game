@@ -271,6 +271,16 @@ namespace MadrasGethu
             }
         }
 
+        public Vector3 HeadPosition => head != null ? head.position : transform.position;
+
+        /// <summary>Punched while lying there: the head snaps to the side.</summary>
+        public void HeadJolt(Vector3 velocity)
+        {
+            if (!Active || parts.Count < 3) return;
+            parts[2].rb.AddForce(velocity, ForceMode.VelocityChange);
+            stillTime = 0f;
+        }
+
         /// <summary>Hit while lying there (stomp): a jolt to the torso.</summary>
         public void Jolt(Vector3 velocity)
         {

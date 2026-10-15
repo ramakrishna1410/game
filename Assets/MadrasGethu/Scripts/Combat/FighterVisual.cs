@@ -502,6 +502,15 @@ namespace MadrasGethu
         /// <summary>Ragdoll at rest (always true without a ragdoll).</summary>
         public bool RagdollSettled => ragdoll == null || !ragdoll.Active || ragdoll.Settled;
         public Vector3 RagdollVelocity => ragdoll != null ? ragdoll.Velocity : Vector3.zero;
+        /// <summary>Head of the limp body (or roughly where the head is when standing).</summary>
+        public Vector3 RagdollHead => ragdoll != null && ragdoll.Active ? ragdoll.HeadPosition : transform.position + Vector3.up * 1.6f;
+
+        /// <summary>A punch to the face of a limp body: the head snaps aside.</summary>
+        public void RagdollHeadJolt(Vector3 velocity)
+        {
+            if (ragdoll != null && ragdoll.Active) ragdoll.HeadJolt(velocity);
+        }
+
         public Vector3 RagdollCenter => ragdoll != null && ragdoll.Active ? ragdoll.Hips.position : transform.position + Vector3.up;
 
         /// <summary>

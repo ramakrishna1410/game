@@ -303,21 +303,21 @@ namespace MadrasGethu
             run.hero = new Vector3(0f, 0f, d - 0.65f);
             run.shot = CamShot.OverShoulder;
             run.anim = true;
-            var hit = Pose(With(S(QteKey.None, null, 0.16f, FighterPose.Grab), new Vector3(0f, 0.95f, d + 0.15f), 50f, 0f), -0.45f, 55f);
+            // Shoulder in his stomach: he folds over your back.
+            var hit = Pose(With(S(QteKey.None, null, 0.16f, FighterPose.Grab), new Vector3(0f, 1.0f, d + 0.1f), 35f, 0f), -0.45f, 55f);
             hit.hero = new Vector3(0f, 0f, d - 0.25f);
             hit.shot = CamShot.Side;
-            var drive = Pose(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.85f, d + 1.0f), 10f, 0.15f), -0.45f, 60f);
-            drive.hero = new Vector3(0f, 0f, d + 0.45f);
+            // Keep driving: his feet leave the road and he tips over backwards.
+            var drive = Pose(With(S(QteKey.None, null, 0.24f, FighterPose.Grab), new Vector3(0f, 1.15f, d + 0.9f), -35f, 0.1f), -0.35f, 50f);
+            drive.hero = new Vector3(0f, 0f, d + 0.4f);
             drive.shot = CamShot.Side;
-            var crash = Pose(Impact(With(S(QteKey.None, null, 0.2f, FighterPose.Grab), new Vector3(0f, 0.28f, d + 1.6f), -90f, 0f), 12f), -0.7f, 55f);
-            crash.hero = new Vector3(0f, -0.25f, d + 1.0f);
-            crash.keepHold = true;
+            // Both go down, you land on top of him. He goes limp; you get on top of him (PlayerStreetMoves.cs).
+            var crash = Pose(Impact(With(S(QteKey.None, null, 0.2f, FighterPose.Grab), new Vector3(0f, 0.3f, d + 1.6f), -90f, 0f), 12f), -0.7f, 55f);
+            crash.hero = new Vector3(0f, -0.3f, d + 1.05f);
+            crash.bodyPitch = 35f;
             crash.shot = CamShot.GroundImpact;
-            var mount = Pose(S(QteKey.None, null, 0.35f, FighterPose.Grab), -0.55f, 22f);
-            mount.hero = new Vector3(0f, 0f, d + 1.5f);
-            mount.shot = CamShot.Side;
             return new WrestleMove { name = "RUGBY TACKLE", id = MoveId.RugbyTackle, cost = 0f, grip = GripKind.Waist, mountAfter = true }
-                .Step(run).Step(hit).Step(drive).Step(crash).Step(mount);
+                .Step(run).Step(hit).Step(drive).Step(crash);
         }
 
         // Trip & Stomp: hook his leg from the outside (osoto gari), drop him flat on his back, stamp on him.
@@ -381,19 +381,23 @@ namespace MadrasGethu
                 .Step(grab).Step(lift).Step(top).Step(slam);
         }
 
-        // DDT: his head locked under your arm, fall straight back and spike his head into the road.
+        // DDT: he's bent over with his head locked under your arm (his feet still on the road), you fall
+        // straight back and spike his head into the road; his legs go up over him.
         WrestleMove DDT()
         {
-            var headlock = Pose(Shot(With(S(QteKey.Light, "HEADLOCK", 0.35f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.85f), 65f, 0f), CamShot.Side), -0.05f, 15f);
-            var fall = Pose(Shot(Impact(With(S(QteKey.Jump, "FALL BACK", 0.32f, FighterPose.Grab), new Vector3(0f, 0.55f, 0.5f), 112f, 0f), 30f), CamShot.GroundImpact), 0f, 0f);
-            fall.hero = new Vector3(0f, -0.45f, -0.35f);
-            fall.bodyPitch = -65f;
-            var getUp = S(QteKey.None, null, 0.45f, FighterPose.Grab);
+            // Leaning in from his planted feet: head at your chest, under the right arm.
+            var headlock = Pose(Shot(With(S(QteKey.Light, "HEADLOCK", 0.35f, FighterPose.Grab), new Vector3(0f, 0.66f, 0.78f), 43f, 0f), CamShot.Side), -0.1f, 25f);
+            var fall = Pose(Shot(Impact(With(S(QteKey.Jump, "FALL BACK", 0.3f, FighterPose.Grab), new Vector3(0f, 0.6f, 0.5f), 125f, 0f), 30f), CamShot.GroundImpact), 0f, 0f);
+            fall.hero = new Vector3(0f, -0.55f, -0.3f);
+            fall.bodyPitch = -85f;
+            var lie = S(QteKey.None, null, 0.35f, FighterPose.Grab);   // a beat on your back
+            lie.shot = CamShot.Side;
+            var getUp = S(QteKey.None, null, 0.5f, FighterPose.Grab);
             getUp.hero = new Vector3(0f, 0f, -0.35f);
             getUp.bodyPitch = 0f;
             getUp.shot = CamShot.Side;
             return new WrestleMove { name = "DDT", id = MoveId.DDT, cost = GethuBar, grip = GripKind.Headlock }
-                .Step(headlock).Step(fall).Step(getUp);
+                .Step(headlock).Step(fall).Step(lie).Step(getUp);
         }
 
         // Kadal Throw: lift him at the jetty edge and heave him into the harbour. Splash.
@@ -1066,7 +1070,7 @@ namespace MadrasGethu
         {
             var victim = wrestleVictim;
             // Rugby tackle: he's on his back and you're on top of him. Stay there.
-            if (wrestleMove != null && wrestleMove.mountAfter && victim != null && !victim.IsDead && victim.IsGrabbed)
+            if (wrestleMove != null && wrestleMove.mountAfter && victim != null && !victim.IsDead && (victim.IsDowned || victim.IsGrabbed))
             {
                 StartMount(victim);
                 return;

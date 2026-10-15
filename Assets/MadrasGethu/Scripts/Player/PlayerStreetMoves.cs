@@ -108,55 +108,81 @@ namespace MadrasGethu
         }
 
         EnemyFighter mountVictim;
-        Vector3 mountHip;
-        Quaternion mountVictimRotation;
         float mountGroundY;
         int mountPunches;
         float mountNextPunch, mountPunchLands = -1f, mountLastInput, mountFinishAt = -1f;
+        float mountTime, mountStartPitch, mountPunchLean;
+        Vector3 mountFrom;
+        bool mountLeft;
         const int MountMaxPunches = 10;
+        const float MountSettle = 0.3f;   // getting from the tackle onto his hips
 
+        /// <summary>After the tackle: he lies limp on his back (ragdoll), you straddle his hips.</summary>
         void StartMount(EnemyFighter victim)
         {
             mountVictim = victim;
-            mountHip = victim.transform.position + Vector3.up * 0.9f;
-            mountVictimRotation = victim.transform.rotation;
             mountGroundY = wrestleOrigin.y;
             mountPunches = 0;
-            mountNextPunch = Time.time + 0.1f;
+            mountNextPunch = Time.time + MountSettle;
             mountPunchLands = -1f;
             mountFinishAt = -1f;
             mountLastInput = Time.time;
+            mountTime = 0f;
+            mountStartPitch = curBodyPitch;
+            mountFrom = transform.position;
+            mountPunchLean = 0f;
             wrestleMove = null;
             wrestleVictim = null;
             qteActive = false;
             lightBufferedUntil = heavyBufferedUntil = 0f;
+            victim.PinDown(2f);
             SetState(PlayerState.Mount);
+        }
+
+        Vector3 MountHips(EnemyFighter v)
+        {
+            Vector3 p = v.Visual.IsRagdoll ? v.Visual.RagdollCenter : v.transform.position + Vector3.up * 0.25f;
+            return p;
         }
 
         void UpdateMount()
         {
             var victim = mountVictim;
-            if (victim == null || victim.IsDead || !victim.IsGrabbed)
+            if (victim == null || victim.IsDead)
             {
                 EndMount();
                 return;
             }
+            mountTime += Time.deltaTime;
+            victim.PinDown(1.5f);   // he stays down while you're on him
 
-            // He squirms on his back under you; you sit on his hips, hands free to punch.
-            float squirm = Mathf.Sin(Time.time * 6f) * 3f;
-            victim.HoldAt(mountHip - Vector3.up * 0.9f, mountVictimRotation);
-            victim.Visual.SetCarry(Quaternion.Euler(-90f + squirm, 0f, 0f));
-            Visual.SetGrapple(victim, GripKind.Waist, -0.55f, 25f);
+            // Straddle his hips, facing his head; settle from the tackle (lying on him) up onto your knees.
+            Vector3 hips = MountHips(victim);
+            Vector3 head = victim.Visual.RagdollHead;
+            Vector3 toHead = Flat(head - hips);
+            if (toHead.sqrMagnitude < 0.01f) toHead = transform.forward;
+            Vector3 seat = new Vector3(hips.x, mountGroundY, hips.z) - toHead.normalized * 0.05f;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(mountTime / MountSettle));
+            Motor.Teleport(Vector3.Lerp(mountFrom, seat, k));
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toHead.normalized), k);
+            float pitch = Mathf.Lerp(mountStartPitch, 0f, k);
+            if (Mathf.Abs(pitch) > 0.5f) Visual.SetCarry(Quaternion.Euler(pitch, 0f, 0f));
+            else Visual.ClearCarry();
+
+            // Kneeling over him; every punch leans the body down into it.
+            mountPunchLean = Mathf.MoveTowards(mountPunchLean, 0f, Time.deltaTime * 90f);
+            Visual.SetGrapple(victim, GripKind.Waist, -0.62f, 30f + mountPunchLean);
             Visual.FreeHands(0.2f);
-            MountCamera();
+            MountCamera(hips);
 
-            Vector3 head = mountHip + Flat(mountHip - transform.position).normalized * 0.6f;
             if (mountPunchLands >= 0f && Time.time >= mountPunchLands)
             {
                 mountPunchLands = -1f;
                 float dmg = Mathf.Min(5f * (MassMode ? massModeDamageMultiplier : 1f), Mathf.Max(0f, victim.Health - 1f));
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = dmg, direction = transform.forward, unblockable = true, hitsDowned = true });
-                victim.Visual.Flinch(1f);
+                // His head snaps away from the fist.
+                Vector3 side = transform.right * (mountLeft ? 1f : -1f);
+                victim.Visual.RagdollHeadJolt(side * 2.2f + Vector3.down * 1.2f);
                 FX.HitSpark(head, false);
                 RegisterHits(1, 3f);
                 if (GM != null) { GM.HitStop(0.04f); GM.Shake(0.12f); }
@@ -167,6 +193,7 @@ namespace MadrasGethu
                 if (Time.time < mountFinishAt) return;
                 float dmg = 20f * (MassMode ? massModeDamageMultiplier : 1f);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = dmg, direction = transform.forward, heavy = true, unblockable = true, hitsDowned = true });
+                victim.Visual.RagdollHeadJolt(Vector3.down * 3f);
                 FX.HitSpark(head, true);
                 FX.Dust(head, 10);
                 RegisterHits(1, 10f);
@@ -191,44 +218,46 @@ namespace MadrasGethu
                 mountPunchLands = Time.time + t;
                 mountNextPunch = Time.time + Mathf.Max(0.22f, t + 0.08f);
                 mountPunches++;
+                mountLeft = !mountLeft;
+                mountPunchLean = 18f;
                 mountLastInput = Time.time;
             }
             bool finish = GameInput.HeavyPressed || (mountPunches >= MountMaxPunches && mountPunchLands < 0f);
-            if (finish && mountPunchLands < 0f)
+            if (finish && mountPunchLands < 0f && mountTime >= MountSettle)
             {
                 // Both fists together, straight down.
                 mountFinishAt = Time.time + Visual.PlayTimed(FighterPose.Slam, 0.3f, 0.4f, 1.6f, 0.4f);
+                mountPunchLean = 30f;
                 return;
             }
             lightBufferedUntil = heavyBufferedUntil = 0f;
             if (Time.time - mountLastInput > 3f) EndMount();   // nothing more to give: get up
         }
 
-        void MountCamera()
+        void MountCamera(Vector3 hips)
         {
-            if (cam == null || mountVictim == null) return;
-            Vector3 fwd = Flat(mountHip - transform.position);
-            fwd = fwd.sqrMagnitude > 0.01f ? fwd.normalized : transform.forward;
+            if (cam == null) return;
+            Vector3 fwd = transform.forward;
             Vector3 side = Vector3.Cross(Vector3.up, fwd);
             if (Vector3.Dot(cam.transform.position - transform.position, side) < 0f) side = -side;
-            Vector3 mid = Vector3.Lerp(transform.position, mountHip, 0.5f) + Vector3.up * 0.4f;
-            cam.SetCinematicFraming(mid + side * 2.6f + Vector3.up * 0.9f, mid, 46f, 0f, mid, 1.4f);
+            Vector3 mid = Vector3.Lerp(transform.position + Vector3.up * 0.8f, hips, 0.5f) + fwd * 0.2f;
+            cam.SetCinematicFraming(mid + side * 2.6f + Vector3.up * 0.9f - fwd * 0.4f, mid, 46f, 0f, mid, 1.4f);
         }
 
         void EndMount()
         {
             var victim = mountVictim;
             mountVictim = null;
-            if (victim != null && !victim.IsDead && victim.IsGrabbed)
+            if (victim != null && !victim.IsDead)
             {
-                if (!victim.Visual.CanRagdoll)
+                if (victim.IsGrabbed)   // no ragdoll on this body: put him down lying
                 {
                     victim.Visual.ClearCarry();
                     Vector3 p = victim.transform.position;
                     p.y = mountGroundY;
                     victim.HoldAt(p, victim.transform.rotation);
+                    victim.ReleaseFromGrab(Vector3.down, knockDown: true);
                 }
-                victim.ReleaseFromGrab(Vector3.down, knockDown: true);
                 victim.PinDown(1.2f);
             }
             Visual.ReleaseGripSlowly(0.4f);
