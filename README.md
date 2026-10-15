@@ -17,7 +17,7 @@ This is the **first playable combat prototype**, built in **Unity 6 (URP)**. All
 - **Combo specials**: shoulder barge, air hammer, charged haymaker, leg sweep, shoulder rush, clothesline, back elbow and **wall bounces**
 - **Combo grades**: *Nalla → Semma → Mass → Thalaivaa*, each raising the Gethu you earn
 - **Dazed** rowdies (charged haymaker, wall bounce, or worn down): they sway on their feet and can be grabbed, even the Thadiyan
-- **Wrestling finishers with quick-time prompts**: Body Slam, Dhobi Pachad, German Suplex, Powerbomb, Spear, Elbow Drop and Spinebuster. Press as the ring meets the gold circle for **PERFECT**; a miss never cancels the move
+- **Wrestling finishers with quick-time prompts**: Body Slam, Kasimedu Spin Drop, German Suplex, Powerbomb, Spear, Elbow Drop and Spinebuster. Press as the ring meets the gold circle for **PERFECT**; a miss never cancels the move
 - **Key-cap button prompts**, a **hand icon** over grabbable rowdies (flashing when dazed, crossed out when too heavy) and a **skull** when a finisher is ready
 - Moves are registered for a future **skill tree** (`MoveUnlocks`): everything is unlocked for now
 - **Group AI**: rowdies circle you and take turns attacking, at most 2 at once
@@ -137,7 +137,7 @@ Hold **Shift** while dragging someone to hurry him along (to a tea kadai or the 
 | When | Finisher | Prompts |
 |---|---|---|
 | Holding him, **Q** | Body Slam (scoop him across your chest, quarter turn, slam) | LMB scoop → RMB slam |
-| Holding him, **S + Q** | Dhobi Pachad (swing him over your head and beat him down, twice) | LMB → RMB → LMB → RMB |
+| Holding him, **S + Q** | Kasimedu Spin Drop (duck under, carry him across both shoulders, spin once, drop him face-first) | LMB → LMB → RMB |
 | Holding him from behind, **Q** | German Suplex (waist lock, hip lifts, bridge back) | LMB ×3 hip lifts → RMB |
 | Holding him facing a wall, **W + Q** | Spinebuster | LMB → RMB |
 | Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |

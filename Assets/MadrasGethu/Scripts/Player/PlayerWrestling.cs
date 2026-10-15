@@ -41,6 +41,7 @@ namespace MadrasGethu
         public float? yaw;              // hero turns this many degrees (from his starting facing) and carries him round
         public float? bodyPitch;        // hero's whole body tilts forward (elbow drop: falling onto him)
         public bool keepHold;           // impact without letting go (first slam of a double slam)
+        public float? victimYaw;        // victim turns on his own (degrees from facing the hero): 90 = lying across the shoulders
     }
 
     public class WrestleMove
@@ -78,7 +79,7 @@ namespace MadrasGethu
 
     /// <summary>
     /// Wrestling finishers with quick-time prompts (Sleeping Dogs / Yakuza heat actions):
-    /// Body Slam, Dhobi Pachad, German Suplex, Powerbomb, Spear, Elbow Drop and the wall Spinebuster.
+    /// Body Slam, Kasimedu Spin Drop, German Suplex, Powerbomb, Spear, Elbow Drop and the wall Spinebuster.
     /// A shrinking ring shows when to press. PERFECT adds damage and refunds Gethu; a miss never cancels the move.
     /// </summary>
     public partial class PlayerFighter
@@ -100,6 +101,7 @@ namespace MadrasGethu
         float curPitch;
         float stepDropFrom, stepLeanFrom, curDrop, curLean;
         float stepYawFrom, curYaw, stepBodyPitchFrom, curBodyPitch;
+        float stepVictimYawFrom, curVictimYaw;
         bool wrestleReleased;   // he's been slammed and let go (later steps only move the hero)
         float roomAhead, roomBehind;
         float wrestleSide = 1f;   // which side of the hero the camera works from (keeps it on the side it was on)
@@ -145,18 +147,24 @@ namespace MadrasGethu
                 .Step(tuck).Step(scoop).Step(turn).Step(slam);
         }
 
-        // Dhobi Pachad, the washerman's beat: collar and belt, swing him back over your head and beat him
-        // face-down on the road like washing on a stone. Then pick him up and do it again.
-        WrestleMove DhobiPachad()
+        // Kasimedu Spin Drop: duck under him and take him across both shoulders (belly down, head on one
+        // side, legs on the other), spin once with him up there, then dump him forward off the shoulders
+        // face-first on the road and go down to a knee with him.
+        WrestleMove SpinDrop()
         {
-            var tuck = Pose(Shot(With(S(QteKey.None, null, 0.25f, FighterPose.Grab), new Vector3(0f, 0.9f, 0.45f), 0f, 0f), CamShot.Wide), -0.25f, 15f);
-            var swingUp = Pose(Shot(With(S(QteKey.Light, "SWING HIM UP", 0.55f, FighterPose.Grab), new Vector3(0f, 2.05f, -0.1f), -150f, 0.2f), CamShot.Wide), 0.05f, -18f);
-            var beat = Pose(Shot(Impact(With(S(QteKey.Heavy, "BEAT HIM DOWN", 0.28f, FighterPose.Grab), new Vector3(0f, 0.4f, 1.0f), -270f, 0.3f), 16f), CamShot.GroundImpact), -0.45f, 45f);
-            beat.keepHold = true;
-            var again = Pose(Shot(With(S(QteKey.Light, "PICK HIM UP", 0.5f, FighterPose.Grab), new Vector3(0f, 2.0f, -0.05f), -150f, 0.2f), CamShot.Wide), 0.05f, -18f);
-            var finish = Pose(Shot(Impact(With(S(QteKey.Heavy, "AGAIN!", 0.28f, FighterPose.Grab), new Vector3(0f, 0.35f, 1.05f), -270f, 0.3f), 22f), CamShot.GroundImpact), -0.5f, 48f);
-            return new WrestleMove { name = "DHOBI PACHAD", id = MoveId.DhobiPachad, cost = GethuBar, grip = GripKind.Waist }
-                .Step(tuck).Step(swingUp).Step(beat).Step(again).Step(finish);
+            var tuck = Pose(Shot(With(S(QteKey.None, null, 0.25f, FighterPose.Grab), new Vector3(0f, 0.9f, 0.42f), 10f, 0f), CamShot.Side), -0.3f, 25f);
+            var duck = Pose(Shot(With(S(QteKey.Light, "DUCK UNDER", 0.35f, FighterPose.Grab), new Vector3(0f, 1.15f, 0.2f), 60f, 0f), CamShot.Side), -0.55f, 40f);
+            duck.victimYaw = 90f;
+            var lift = Pose(Shot(With(S(QteKey.Light, "LIFT", 0.55f, FighterPose.Grab), new Vector3(0f, 1.68f, -0.12f), 90f, 0.1f), CamShot.LowHero), 0f, 0f);
+            var spin = Pose(With(S(QteKey.None, null, 0.85f, FighterPose.Grab), new Vector3(0f, 1.7f, -0.12f), 90f, 0f), 0f, -3f);
+            spin.yaw = 300f;
+            spin.shot = CamShot.Wide;
+            var drop = Pose(Impact(With(S(QteKey.Heavy, "SPIN DROP", 0.3f, FighterPose.Grab), new Vector3(0f, 0.3f, 1.0f), 95f, 0.15f), 34f), -0.6f, 45f);
+            drop.yaw = 360f;
+            drop.victimYaw = 180f;   // he comes off the front of the shoulders, head first, away from the hero
+            drop.shot = CamShot.GroundImpact;
+            return new WrestleMove { name = "SPIN DROP", id = MoveId.SpinDrop, cost = GethuBar, grip = GripKind.ChestAndThigh }
+                .Step(tuck).Step(duck).Step(lift).Step(spin).Step(drop);
         }
 
         // German suplex: lock both arms round his waist from behind, jolt him off his feet a few times
@@ -309,7 +317,7 @@ namespace MadrasGethu
         ///   from behind ........ German Suplex
         ///   Shift + Q .......... Powerbomb (full Gethu)
         ///   W + Q at a wall .... Spinebuster
-        ///   S + Q .............. Dhobi Pachad
+        ///   S + Q .............. Kasimedu Spin Drop
         ///   Q .................. Body Slam
         /// </summary>
         WrestleMove PickGrabFinisher(Vector3 aim, Vector3 move)
@@ -320,7 +328,7 @@ namespace MadrasGethu
             if (GameInput.Sprint && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
             if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out var wallHit))
                 return Spinebuster(Flat(wallHit.point - transform.position).magnitude);
-            if (keys.y < -0.5f && MoveUnlocks.Has(MoveId.DhobiPachad)) return DhobiPachad();
+            if (keys.y < -0.5f && MoveUnlocks.Has(MoveId.SpinDrop)) return SpinDrop();
             return MoveUnlocks.Has(MoveId.BodySlam) ? BodySlam() : null;
         }
 
@@ -335,7 +343,7 @@ namespace MadrasGethu
                 return;
             }
             if (MoveUnlocks.Has(MoveId.BodySlam)) Prompts.Add(new PromptItem { key = "Q", label = "Body Slam", dim = dim });
-            if (MoveUnlocks.Has(MoveId.DhobiPachad)) Prompts.Add(new PromptItem { key = "S+Q", label = "Dhobi Pachad", dim = dim });
+            if (MoveUnlocks.Has(MoveId.SpinDrop)) Prompts.Add(new PromptItem { key = "S+Q", label = "Spin Drop", dim = dim });
             if (MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out _))
                 Prompts.Add(new PromptItem { key = "W+Q", label = "Spinebuster", dim = dim });
             if (MoveUnlocks.Has(MoveId.Powerbomb) && Gethu >= maxGethu)
@@ -484,6 +492,7 @@ namespace MadrasGethu
             curPitch = 0f;
             curDrop = curLean = 0f;
             curYaw = curBodyPitch = 0f;
+            curVictimYaw = 0f;
             wrestleReleased = false;
             qtePerfects = qteMisses = qteDone = 0;
             qteActive = false;
@@ -518,6 +527,7 @@ namespace MadrasGethu
             stepLeanFrom = curLean;
             stepYawFrom = curYaw;
             stepBodyPitchFrom = curBodyPitch;
+            stepVictimYawFrom = curVictimYaw;
             wrestleStepTimer = 0f;
             if (st.qte != QteKey.None)
             {
@@ -579,6 +589,7 @@ namespace MadrasGethu
             curLean = st.lean ?? stepLeanFrom;
             curYaw = st.yaw ?? stepYawFrom;
             curBodyPitch = st.bodyPitch ?? stepBodyPitchFrom;
+            curVictimYaw = st.victimYaw ?? stepVictimYawFrom;
             FinishWrestleStep(st);
             if (State == PlayerState.Wrestle) AdvanceWrestleStep();
         }
@@ -616,7 +627,8 @@ namespace MadrasGethu
             float pitch = Mathf.Lerp(stepPitchFrom, st.pitch ?? stepPitchFrom, e);
             // He turns with the hero: his offset from the hero rotates by the hero's turn.
             Vector3 hipWorld = heroWorld + turn * (wrestleRotation * (hip - hero));
-            wrestleVictim.HoldAt(hipWorld - Vector3.up * 0.9f, turn * wrestleVictimRotation);
+            float victimYaw = Mathf.Lerp(stepVictimYawFrom, st.victimYaw ?? stepVictimYawFrom, e);
+            wrestleVictim.HoldAt(hipWorld - Vector3.up * 0.9f, turn * wrestleVictimRotation * Quaternion.AngleAxis(victimYaw, Vector3.up));
             wrestleVictim.Visual.SetCarry(Quaternion.Euler(pitch, 0f, 0f));
         }
 

@@ -44,7 +44,7 @@ Earn XP from fights and missions, spend skill points in three branches. Every mo
 | Branch | Example skills |
 |---|---|
 | **Kuthu (strikes)** | Charged Haymaker, Shoulder Barge chain, Air Hammer, Back Elbow, longer combo window |
-| **Malyutham (grapples)** | Dhobi Pachad, German Suplex, Powerbomb, Spinebuster, faster break-free, wider QTE timing |
+| **Malyutham (grapples)** | Kasimedu Spin Drop, German Suplex, Powerbomb, Spinebuster, faster break-free, wider QTE timing |
 | **Theru (street)** | Leg Sweep, Shoulder Rush, Spear, Clothesline, Wall Bounce, weapon durability, cheaper finishers |
 
 ## Side content (later)
