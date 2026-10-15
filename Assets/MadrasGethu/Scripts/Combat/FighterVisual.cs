@@ -232,15 +232,24 @@ namespace MadrasGethu
         /// </summary>
         public float PlayTimed(FighterPose move, float impactIn, float afterImpact)
         {
+            return PlayTimed(move, impactIn, afterImpact, 2.6f, 0.3f);
+        }
+
+        /// <summary>
+        /// As above, but the clip may be sped up by at most maxSpeed (big kicks look like a twitch when
+        /// squeezed), and the pose is held for up to maxRecover after the impact so the follow-through shows.
+        /// </summary>
+        public float PlayTimed(FighterPose move, float impactIn, float afterImpact, float maxSpeed, float maxRecover)
+        {
             float clipImpact = ImpactTime(move);
             if (clipImpact <= 0f)
             {
-                Play(move, impactIn + Mathf.Min(afterImpact, 0.3f), impactIn + afterImpact);
+                Play(move, impactIn + Mathf.Min(afterImpact, maxRecover), impactIn + afterImpact);
                 return impactIn;
             }
-            float speed = Mathf.Clamp(clipImpact / Mathf.Max(0.05f, impactIn), 0.6f, 2.6f);
+            float speed = Mathf.Clamp(clipImpact / Mathf.Max(0.05f, impactIn), 0.6f, maxSpeed);
             float actual = clipImpact / speed;
-            PlayAtSpeed(move, actual + Mathf.Min(afterImpact, 0.3f), speed);
+            PlayAtSpeed(move, actual + Mathf.Min(afterImpact, maxRecover), speed);
             return actual;
         }
 
@@ -335,7 +344,7 @@ namespace MadrasGethu
                 Vector3 moved = (rootPos - lastRootPosition) / dt;
                 moved.y = 0f;
                 draggedVelocity = Vector3.Lerp(draggedVelocity, moved, 1f - Mathf.Exp(-10f * dt));
-                v = carried || draggedVelocity.magnitude < 0.35f ? Vector3.zero : draggedVelocity;
+                v = (carried && !CarryWalks) || draggedVelocity.magnitude < 0.35f ? Vector3.zero : draggedVelocity;
             }
             lastRootPosition = rootPos;
             v.y = 0f;
@@ -418,8 +427,12 @@ namespace MadrasGethu
             carryRotation = localRotation;
         }
 
+        /// <summary>While carried (tilted by SetCarry) his feet are still on the ground: legs step along when he's moved.</summary>
+        public bool CarryWalks { get; set; }
+
         public void ClearCarry()
         {
+            CarryWalks = false;
             if (!carried) return;
             carried = false;
             if (body == null) return;

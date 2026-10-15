@@ -20,7 +20,9 @@ namespace MadrasGethu
         public float damage = 6f;
         public string label;
         public Vector3 knockout;            // non-zero: the final blow (impulse: x right, y up, z away from the hero)
-        public bool started, landed;
+        public float gap = 0.12f;           // at least this long after the previous blow lands before this one starts
+        public float maxSpeed = 1.6f;       // how much the animation may be sped up to hit on time (kicks: less)
+        public bool started, landed, jumped;
     }
 
     public class StrikeCombo
@@ -184,20 +186,20 @@ namespace MadrasGethu
         {
             var b = Beat(at, FighterPose.Uppercut, 16f, "UPPERCUT!");
             b.lead = 0.26f; b.heroZ = 0.15f; b.victimZ = 0.72f; b.victimPitch = -25f;
-            b.knockout = new Vector3(0f, 6.5f, 4f);
+            b.knockout = new Vector3(0f, 3.5f, 2.2f);
             return b;
         }
 
         StrikeCombo KasimeduKickStorm()
         {
             var c = new StrikeCombo { name = "KASIMEDU KICK STORM", id = MoveId.KasimeduKickStorm };
-            var shove = c.Add(Beat(0.25f, FighterPose.Push, 4f, "SHOVE"));
-            shove.lead = 0.2f; shove.victimZ = 1.45f; shove.victimPitch = -12f;
-            var front = c.Add(Beat(0.8f, FighterPose.FrontKick, 10f, "FRONT KICK"));
-            front.lead = 0.28f; front.heroZ = 0.55f; front.victimZ = 1.6f; front.victimPitch = 42f;
-            var round = c.Add(Beat(1.4f, FighterPose.Roundhouse, 18f, "ROUNDHOUSE!"));
-            round.lead = 0.32f; round.heroZ = 0.65f; round.victimZ = 1.65f; round.victimPitch = 20f;
-            round.knockout = new Vector3(5f, 2.5f, 1.5f);
+            var shove = c.Add(Beat(0.3f, FighterPose.Push, 4f, "SHOVE"));
+            shove.lead = 0.25f; shove.victimZ = 1.35f; shove.victimPitch = -12f;
+            var front = c.Add(Beat(1.0f, FighterPose.FrontKick, 10f, "FRONT KICK"));
+            front.lead = 0.45f; front.gap = 0.25f; front.maxSpeed = 1.4f; front.heroZ = 0.45f; front.victimZ = 1.55f; front.victimPitch = 42f;
+            var round = c.Add(Beat(1.9f, FighterPose.Roundhouse, 18f, "ROUNDHOUSE!"));
+            round.lead = 0.5f; round.gap = 0.35f; round.maxSpeed = 1.4f; round.heroZ = 0.55f; round.victimZ = 1.6f; round.victimPitch = 20f;
+            round.knockout = new Vector3(2.2f, 1.2f, 1.2f);   // spun round and dropped beside you, not thrown away
             return c;
         }
 
@@ -210,18 +212,20 @@ namespace MadrasGethu
             knee.ik = GrabStrikeKind.Knee; knee.lead = 0.17f; knee.holdCollar = true; knee.victimZ = 0.58f; knee.victimPitch = 42f;
             var back = c.Add(Beat(1.2f, FighterPose.Backfist, 16f, "SPINNING BACKFIST!"));
             back.lead = 0.36f; back.spin = 360f; back.heroZ = 0.05f; back.victimZ = 0.8f; back.victimPitch = 15f;
-            back.knockout = new Vector3(-4.5f, 2.5f, 2f);
+            back.knockout = new Vector3(-2.4f, 1.2f, 1.4f);
             return c;
         }
 
         StrikeCombo Jallikattu()
         {
             var c = new StrikeCombo { name = "JALLIKATTU", id = MoveId.Jallikattu };
-            var push = c.Add(Beat(0.3f, FighterPose.PushKick, 6f, "PUSH KICK"));
-            push.lead = 0.26f; push.victimZ = 2.1f; push.victimPitch = -15f;
-            var knee = c.Add(Beat(1.25f, FighterPose.FlyingKnee, 18f, "FLYING KNEE!"));
-            knee.lead = 0.3f; knee.run = true; knee.jump = true; knee.heroZ = 1.45f; knee.victimZ = 2.15f; knee.victimPitch = 5f;
-            knee.knockout = new Vector3(0f, 3.5f, 5.5f);
+            var push = c.Add(Beat(0.45f, FighterPose.PushKick, 6f, "PUSH KICK"));
+            push.lead = 0.4f; push.maxSpeed = 1.4f; push.victimZ = 2.0f; push.victimPitch = -15f;
+            // Two or three running steps after the push kick, then leave the ground for the knee.
+            var knee = c.Add(Beat(1.6f, FighterPose.FlyingKnee, 18f, "FLYING KNEE!"));
+            knee.lead = 0.5f; knee.gap = 0.4f; knee.maxSpeed = 1.4f; knee.run = true; knee.jump = true;
+            knee.heroZ = 1.4f; knee.victimZ = 2.05f; knee.victimPitch = 5f;
+            knee.knockout = new Vector3(0f, 1.6f, 3.2f);
             return c;
         }
 
@@ -230,12 +234,12 @@ namespace MadrasGethu
             var c = new StrikeCombo { name = "GETHU MASS COMBO", id = MoveId.GethuMassCombo, cost = maxGethu, cinematic = true };
             var jab = c.Add(Beat(0.25f, FighterPose.Jab, 6f, "JAB")); jab.victimZ = 0.75f; jab.victimPitch = -8f;
             var cross = c.Add(Beat(0.5f, FighterPose.Cross, 7f, "CROSS")); cross.victimZ = 0.8f; cross.victimPitch = -12f;
-            var kick = c.Add(Beat(0.85f, FighterPose.FrontKick, 9f, "BODY KICK")); kick.lead = 0.26f; kick.heroZ = 0.1f; kick.victimZ = 0.95f; kick.victimPitch = 32f;
+            var kick = c.Add(Beat(0.85f, FighterPose.FrontKick, 9f, "BODY KICK")); kick.lead = 0.4f; kick.gap = 0.15f; kick.maxSpeed = 1.4f; kick.heroZ = 0.1f; kick.victimZ = 0.95f; kick.victimPitch = 32f;
             var hook = c.Add(Beat(1.15f, FighterPose.Hook, 8f, "HOOK")); hook.heroZ = 0.25f; hook.victimZ = 1.0f; hook.victimPitch = -10f;
             var knee = c.Add(Beat(1.45f, FighterPose.Knee, 9f, "KNEE")); knee.ik = GrabStrikeKind.Knee; knee.lead = 0.17f; knee.heroZ = 0.45f; knee.victimZ = 0.95f; knee.victimPitch = 45f;
             var drop = c.Add(Beat(2.15f, FighterPose.FlyingKick, 22f, "DROPKICK!"));
-            drop.lead = 0.36f; drop.jump = true; drop.heroZ = 0.5f; drop.victimZ = 1.1f; drop.victimPitch = 20f;
-            drop.knockout = new Vector3(0f, 3f, 9f);
+            drop.lead = 0.45f; drop.gap = 0.2f; drop.maxSpeed = 1.4f; drop.jump = true; drop.heroZ = 0.5f; drop.victimZ = 1.1f; drop.victimPitch = 20f;
+            drop.knockout = new Vector3(0f, 2f, 5f);
             return c;
         }
 
@@ -293,27 +297,36 @@ namespace MadrasGethu
             if (rapid) UpdateRapid();
 
             ComboBeat next = null;
-            foreach (var b in combo.beats)
+            for (int i = 0; i < combo.beats.Count; i++)
             {
-                if (!b.started && comboTime >= b.at - b.lead) StartBeat(b);
-                if (b.started && !b.landed && comboTime >= b.at) LandBeat(b);
+                var b = combo.beats[i];
+                if (!b.started && comboTime >= b.at - b.lead && (i == 0 || combo.beats[i - 1].landed)) StartBeat(i);
+                if (b.started && !b.landed && b.jump && !b.jumped && b.at - comboTime <= 0.32f)
+                {
+                    b.jumped = true;   // leave the ground so he comes down as the blow lands
+                    Motor.AddImpulse(Vector3.up * 4.6f);
+                }
+                if (b.started && !b.landed && comboTime >= b.at) LandBeat(i);
                 if (!b.landed && next == null) next = b;
             }
 
             MoveHeroForCombo(next, dt);
-            if (combo.cinematic && cam != null) ComboCamera();
+            if (cam != null) ComboCamera();
 
             // The rowdy reacts: rocked back, doubled over, stumbling away (until he's knocked out).
             if (!comboKnockedOut)
             {
+                // He staggers back over a few steps (his legs walk it), and his body reacts at once.
+                float kz = 1f - Mathf.Exp(-6f * dt);
                 float k = 1f - Mathf.Exp(-12f * dt);
-                comboVictimZ = Mathf.Lerp(comboVictimZ, Mathf.Min(comboVictimZTarget, comboRoom - 0.3f), k);
+                comboVictimZ = Mathf.Lerp(comboVictimZ, Mathf.Min(comboVictimZTarget, comboRoom - 0.3f), kz);
                 comboVictimPitch = Mathf.Lerp(comboVictimPitch, comboVictimPitchTarget, k);
                 Vector3 heroFlat = Flat(transform.position - comboOrigin);
                 float heroZ = Vector3.Dot(heroFlat, comboRotation * Vector3.forward);
                 float z = Mathf.Max(comboVictimZ, heroZ + 0.45f);   // never inside the hero
                 victim.HoldAt(ComboPoint(z), comboRotation * Quaternion.Euler(0f, 180f, 0f));
                 victim.Visual.SetCarry(Quaternion.Euler(comboVictimPitch, 0f, 0f));
+                victim.Visual.CarryWalks = true;
                 if (comboHolding) Visual.SetGrip(victim, false);
             }
 
@@ -323,7 +336,7 @@ namespace MadrasGethu
             if (comboTime >= comboEndAt) EndStrikeCombo();
         }
 
-        /// <summary>Side-on close-up for the Gethu Mass Combo, framing both of them.</summary>
+        /// <summary>Side-on close-up for every grab combo, framing both of them.</summary>
         void ComboCamera()
         {
             Vector3 fwd = comboRotation * Vector3.forward;
@@ -331,7 +344,7 @@ namespace MadrasGethu
             if (Vector3.Dot(cam.transform.position - transform.position, side) < 0f) side = -side;
             Vector3 mid = Vector3.Lerp(transform.position, comboVictim.transform.position, 0.5f) + Vector3.up * 1.0f;
             float span = Vector3.Distance(transform.position, comboVictim.transform.position) * 0.5f + 1.2f;
-            cam.SetCinematicFraming(mid + side * 3f + Vector3.up * 0.3f, mid, 48f, 0f, mid, span);
+            cam.SetCinematicFraming(mid + side * 3.2f + Vector3.up * 0.5f, mid, 48f, 0f, mid, span);
         }
 
         void MoveHeroForCombo(ComboBeat next, float dt)
@@ -339,12 +352,16 @@ namespace MadrasGethu
             Vector3 fwd = comboRotation * Vector3.forward;
             float heroZ = Vector3.Dot(Flat(transform.position - comboOrigin), fwd);
             Vector3 v = Vector3.zero;
-            if (next != null)
+            // Steps (or runs) into place before a blow starts, then plants his feet for it, so the kick
+            // animation isn't sliding along the ground. A leaping blow keeps travelling through the air.
+            if (next != null && (!next.started || next.jump))
             {
                 float target = Mathf.Min(next.heroZ, comboRoom - 0.6f);
-                float timeLeft = Mathf.Max(0.05f, next.at - comboTime);
+                if (next.jump && !next.started) target -= 0.6f;
+                float arrive = next.started ? next.at : next.at - next.lead;
+                float timeLeft = Mathf.Max(0.12f, arrive - comboTime);
                 float speed = (target - heroZ) / timeLeft;
-                speed = Mathf.Clamp(speed, -2f, next.run ? 7f : 2.6f);
+                speed = Mathf.Clamp(speed, -2f, next.run ? 6f : 2.6f);
                 if (Mathf.Abs(target - heroZ) < 0.03f) speed = 0f;
                 v = fwd * speed;
             }
@@ -358,8 +375,17 @@ namespace MadrasGethu
             transform.rotation = comboRotation * Quaternion.Euler(0f, -spin, 0f);
         }
 
-        void StartBeat(ComboBeat b)
+        /// <summary>Moves beat i and everything after it later by delta seconds.</summary>
+        void DelayBeats(int i, float delta)
         {
+            if (delta <= 0f) return;
+            for (int j = i; j < combo.beats.Count; j++)
+                if (!combo.beats[j].landed) combo.beats[j].at += delta;
+        }
+
+        void StartBeat(int index)
+        {
+            var b = combo.beats[index];
             b.started = true;
             float lead = Mathf.Max(0.08f, b.at - comboTime);
             if (!b.holdCollar && comboHolding)
@@ -370,15 +396,24 @@ namespace MadrasGethu
             if (b.ik != GrabStrikeKind.None) Visual.GrabStrike(b.ik, lead / 0.4f);
             else
             {
-                if (b.holdCollar) Visual.FreeRightHand(lead + 0.3f);
-                Visual.PlayTimed(b.pose, lead, 0.3f);
+                // Played near its natural speed: the blow lands when the animation's contact frame does,
+                // and the rest of the combo waits for it.
+                float actual = Visual.PlayTimed(b.pose, lead, 0.45f, b.maxSpeed, 0.4f);
+                DelayBeats(index, comboTime + actual - b.at);
+                if (b.holdCollar) Visual.FreeRightHand(actual + 0.3f);
             }
-            if (b.jump) Motor.AddImpulse(Vector3.up * 4.6f);
         }
 
-        void LandBeat(ComboBeat b)
+        void LandBeat(int index)
         {
+            var b = combo.beats[index];
             b.landed = true;
+            // The next blow starts only after this one has had its moment (follow-through, his reaction).
+            if (index + 1 < combo.beats.Count)
+            {
+                var n = combo.beats[index + 1];
+                DelayBeats(index + 1, comboTime + n.gap - (n.at - n.lead));
+            }
             var victim = comboVictim;
             Vector3 fwd = comboRotation * Vector3.forward;
             Vector3 right = comboRotation * Vector3.right;
@@ -486,7 +521,7 @@ namespace MadrasGethu
             rapidCount++;
             var b = new ComboBeat
             {
-                at = comboTime + 0.1f, lead = 0.1f, damage = 3.5f,
+                at = comboTime + 0.1f, lead = 0.1f, damage = 3.5f, gap = 0f, maxSpeed = 2.6f,
                 label = rapidCount == RapidFacePunches ? "BODY!" : null,
             };
             if (face)
@@ -511,7 +546,7 @@ namespace MadrasGethu
         {
             var b = Beat(at, FighterPose.Haymaker, 18f, "HAYMAKER!");
             b.lead = 0.3f; b.heroZ = 0.1f; b.victimZ = 0.75f;
-            b.knockout = new Vector3(0f, 2.5f, 7f);
+            b.knockout = new Vector3(0f, 1.5f, 4f);
             return b;
         }
 
@@ -538,6 +573,7 @@ namespace MadrasGethu
                     SetState(PlayerState.Grab);
                     stateTimer = 1.5f;
                     grabActionCooldown = 0.1f;
+                    if (cam != null) cam.EndCinematic(0.25f);
                     return;
                 }
                 victim.Visual.ClearCarry();
@@ -545,7 +581,7 @@ namespace MadrasGethu
             }
             Visual.SetGrip(null, false);
             SetState(PlayerState.Free);
-            if (c != null && c.cinematic && cam != null) cam.EndCinematic(0.2f);
+            if (c != null && cam != null) cam.EndCinematic(0.25f);
         }
     }
 }
