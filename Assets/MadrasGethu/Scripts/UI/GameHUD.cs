@@ -441,7 +441,7 @@ namespace MadrasGethu
             { "Wall Slam", "grab, E at the wall" },
             { "WRESTLING", "" },
             { "Body Slam", "grab, Q" },
-            { "Dhobi Pachad", "grab, S+Q" },
+            { "Dhobi Pachad", "grab, S+Q (double slam)" },
             { "German Suplex", "grab from behind, Q" },
             { "Spinebuster", "grab at a wall, W+Q" },
             { "Powerbomb", "grab, SHIFT+Q (full)" },

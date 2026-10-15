@@ -122,13 +122,13 @@ Keyboard and mouse for now (gamepad prompts come later).
 
 | When | Finisher | Prompts |
 |---|---|---|
-| Holding him, **Q** | Body Slam | LMB lift → RMB slam |
-| Holding him, **S + Q** | Dhobi Pachad | LMB → RMB |
+| Holding him, **Q** | Body Slam (scoop him across your chest, quarter turn, slam) | LMB scoop → RMB slam |
+| Holding him, **S + Q** | Dhobi Pachad (swing him over your head and beat him down, twice) | LMB → RMB → LMB → RMB |
 | Holding him from behind, **Q** | German Suplex | LMB ×3 body shots → RMB |
 | Holding him facing a wall, **W + Q** | Spinebuster | LMB → RMB |
 | Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
 | Sprinting at a rowdy | Spear | RMB |
-| Rowdy on the ground | Elbow Drop | Space → LMB |
+| Rowdy lying on the ground | Elbow Drop (leap, land on him elbow-first, roll off) | Space → LMB |
 
 Each costs one Gethu bar (the Powerbomb costs the full meter). Near a tea kadai, fish crates or the auto, **Q** lifts him and smashes him into it.
 

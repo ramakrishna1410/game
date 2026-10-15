@@ -105,6 +105,8 @@ namespace MadrasGethu
         /// <summary>The hero can grab him now (Thadiyan included) and use a wrestling finisher.</summary>
         public bool IsOpen => state == AIState.Dazed || state == AIState.Stagger;
         public override bool IsDowned => state == AIState.Down || state == AIState.GetUp;
+        /// <summary>Lying on the ground (not already getting up).</summary>
+        public bool IsLyingDown => state == AIState.Down;
         public override bool CanBeTargeted => !IsDead && state != AIState.Grabbed;
         public bool IsBoss => kind == EnemyKind.Boss;
 
