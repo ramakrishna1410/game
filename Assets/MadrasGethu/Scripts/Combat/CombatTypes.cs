@@ -26,7 +26,9 @@ namespace MadrasGethu
         ShoulderBarge, LegSweep, Clothesline, BackElbow,
         Lift, Suplex, Spear, ElbowDrop,
         // Grab strike combos
-        FrontKick, Roundhouse, PushKick, FlyingKnee
+        FrontKick, Roundhouse, PushKick, FlyingKnee,
+        // Street moves: free strikes, the tackle and the rowdy's reactions to them
+        SpinKick, SupermanPunch, LowKick, Tackle, GroundPunch, Kneel, GutHit
     }
 
     /// <summary>What kind of threat an enemy attack is, which decides how the hero must answer it.</summary>

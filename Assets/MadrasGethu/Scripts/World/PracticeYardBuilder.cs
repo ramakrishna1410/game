@@ -34,6 +34,8 @@ namespace MadrasGethu
             KasimeduArenaBuilder.BuildTeaKadai(root, new Vector3(-8.2f, 0f, -3f));
             KasimeduArenaBuilder.BuildFishCrates(root, new Vector3(7.5f, 0f, 5f), finisher: true);
             KasimeduArenaBuilder.BuildAuto(root, new Vector3(6.5f, 0f, -6f), 200f);
+            KasimeduArenaBuilder.BuildIceBox(root, new Vector3(-8.6f, 0f, 4f), 90f);
+            BuildJetty(root);
 
             PlaceWeapons();
             Random.InitState(System.Environment.TickCount);
@@ -96,6 +98,15 @@ namespace MadrasGethu
                 InvisibleWall(root, east ? new Vector3(Half + 0.3f, 2f, 0f) : new Vector3(0f, 2f, -Half - 0.3f),
                     east ? new Vector3(0.4f, 4f, Half * 2f + 2f) : new Vector3(Half * 2f + 2f, 4f, 0.4f));
             }
+        }
+
+        /// <summary>East side opens onto the harbour: a strip of sea past the railing for the Kadal Throw.</summary>
+        static void BuildJetty(Transform root)
+        {
+            var water = Palette.Primitive(PrimitiveType.Cube, root, new Vector3(Half + 9f, -1.3f, 0f), new Vector3(16f, 0.2f, Half * 2f + 10f),
+                new Color(0.04f, 0.12f, 0.16f), collider: false, name: "Harbour Water");
+            water.GetComponent<Renderer>().sharedMaterial = Palette.Get(new Color(0.04f, 0.12f, 0.16f), new Color(0.01f, 0.03f, 0.05f));
+            KasimeduArenaBuilder.BuildSeaEdge(root, new Vector3(Half - 0.9f, 0f, 1.5f), Vector3.right);
         }
 
         static void BrickWall(Transform root, Vector3 position, Vector3 size, bool alongX)

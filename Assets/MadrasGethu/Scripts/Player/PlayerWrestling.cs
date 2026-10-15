@@ -42,6 +42,9 @@ namespace MadrasGethu
         public float? bodyPitch;        // hero's whole body tilts forward (elbow drop: falling onto him)
         public bool keepHold;           // impact without letting go (first slam of a double slam)
         public float? victimYaw;        // victim turns on his own (degrees from facing the hero): 90 = lying across the shoulders
+        public float? lid;              // ice box lid: 0 shut .. 1 open
+        public bool splash;             // Kadal Throw: he hits the water at the end of this step
+        public bool letGo;              // hands come off him (he's flying away) but he still follows the path
     }
 
     public class WrestleMove
@@ -58,6 +61,12 @@ namespace MadrasGethu
         public FinisherSpot prop;       // smashed into a tea kadai / crates / auto
         public bool throwAtEnd;         // let go and throw him at the end (no slam)
         public float throwDamage;
+        public EnemyFighter.LaunchKind launchKind = EnemyFighter.LaunchKind.Throw;
+        public bool throwOutward;       // thrown the way he's swinging (giant swing), not straight ahead
+        public bool sweep;              // his body knocks down everyone it swings into (giant swing)
+        public bool ignoreRoom;         // moves to a spot on purpose (jetty edge, ice box): no wall clamping
+        public bool mountAfter;         // rugby tackle: stay on top of him for the ground and pound
+        public FinisherSpot sea;        // Kadal Throw: the jetty edge
         public readonly List<WrestleStep> steps = new List<WrestleStep>();
 
         public WrestleMove Step(WrestleStep s)
@@ -102,6 +111,8 @@ namespace MadrasGethu
         float stepDropFrom, stepLeanFrom, curDrop, curLean;
         float stepYawFrom, curYaw, stepBodyPitchFrom, curBodyPitch;
         float stepVictimYawFrom, curVictimYaw;
+        float stepLidFrom, curLid;
+        readonly HashSet<Fighter> swept = new HashSet<Fighter>();
         bool wrestleReleased;   // he's been slammed and let go (later steps only move the hero)
         float roomAhead, roomBehind;
         float wrestleSide = 1f;   // which side of the hero the camera works from (keeps it on the side it was on)
@@ -281,6 +292,168 @@ namespace MadrasGethu
                 .Step(swing).Step(release);
         }
 
+        // ------------------------------------------------------------------ street finishers
+
+        // Rugby tackle: run in low, shoulder into his stomach, drive him back and take him down on his back,
+        // then end up sitting on him (the ground and pound is in PlayerStreetMoves.cs).
+        WrestleMove Tackle(float distance)
+        {
+            float d = Mathf.Max(0.8f, distance);
+            var run = Pose(S(QteKey.None, null, Mathf.Clamp(d / 6.5f, 0.12f, 0.5f), FighterPose.Tackle), -0.35f, 35f);
+            run.hero = new Vector3(0f, 0f, d - 0.65f);
+            run.shot = CamShot.OverShoulder;
+            run.anim = true;
+            var hit = Pose(With(S(QteKey.None, null, 0.16f, FighterPose.Grab), new Vector3(0f, 0.95f, d + 0.15f), 50f, 0f), -0.45f, 55f);
+            hit.hero = new Vector3(0f, 0f, d - 0.25f);
+            hit.shot = CamShot.Side;
+            var drive = Pose(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.85f, d + 1.0f), 10f, 0.15f), -0.45f, 60f);
+            drive.hero = new Vector3(0f, 0f, d + 0.45f);
+            drive.shot = CamShot.Side;
+            var crash = Pose(Impact(With(S(QteKey.None, null, 0.2f, FighterPose.Grab), new Vector3(0f, 0.28f, d + 1.6f), -90f, 0f), 12f), -0.7f, 55f);
+            crash.hero = new Vector3(0f, -0.25f, d + 1.0f);
+            crash.keepHold = true;
+            crash.shot = CamShot.GroundImpact;
+            var mount = Pose(S(QteKey.None, null, 0.35f, FighterPose.Grab), -0.55f, 22f);
+            mount.hero = new Vector3(0f, 0f, d + 1.5f);
+            mount.shot = CamShot.Side;
+            return new WrestleMove { name = "RUGBY TACKLE", id = MoveId.RugbyTackle, cost = 0f, grip = GripKind.Waist, mountAfter = true }
+                .Step(run).Step(hit).Step(drive).Step(crash).Step(mount);
+        }
+
+        // Trip & Stomp: hook his leg from the outside (osoto gari), drop him flat on his back, stamp on him.
+        WrestleMove TripStomp()
+        {
+            var hook = Pose(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0.1f, 0.95f, 0.55f), -15f, 0f), -0.1f, 15f);
+            var trip = Pose(Impact(With(S(QteKey.None, null, 0.28f, FighterPose.Grab), new Vector3(0f, 0.3f, 1.05f), -90f, 0.1f), 10f), -0.3f, 30f);
+            var stomp = S(QteKey.None, null, 0.42f, FighterPose.Stomp);
+            stomp.anim = true;
+            stomp.hero = new Vector3(0f, 0f, 0.5f);
+            stomp.damage = 12f;
+            return new WrestleMove { name = "TRIP & STOMP", id = MoveId.TripStomp, cost = 0f, grip = GripKind.Waist, cinematic = false }
+                .Step(hook).Step(trip).Step(stomp);
+        }
+
+        // Bowling throw: swing him low round your hip and hurl him along the road into the others.
+        WrestleMove BowlingThrow()
+        {
+            var wind = Pose(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0.55f, 0.75f, -0.1f), 20f, 0f), -0.3f, 20f);
+            wind.yaw = -70f;
+            var fling = Pose(With(S(QteKey.None, null, 0.18f, FighterPose.Throw), new Vector3(0.1f, 0.65f, 0.95f), 30f, 0f), -0.35f, 35f);
+            fling.yaw = 0f;
+            fling.anim = true;
+            return new WrestleMove
+            {
+                name = "BOWLING THROW", id = MoveId.BowlingThrow, cost = 0f, grip = GripKind.Waist, cinematic = false,
+                throwAtEnd = true, throwDamage = 10f, launchKind = EnemyFighter.LaunchKind.Bowl,
+            }.Step(wind).Step(fling);
+        }
+
+        // Giant swing (Raatinam): put him on his back, take both ankles, spin him round three times at
+        // hip height (his body knocks down anyone close), and let go.
+        WrestleMove GiantSwing()
+        {
+            var m = new WrestleMove
+            {
+                name = "GIANT SWING", id = MoveId.GiantSwing, cost = maxGethu, grip = GripKind.Ankles,
+                sweep = true, throwAtEnd = true, throwOutward = true, throwDamage = 30f,
+            };
+            m.Step(Pose(Shot(With(S(QteKey.None, null, 0.4f, FighterPose.Grab), new Vector3(0f, 0.3f, 1.15f), -90f, 0.1f), CamShot.Side), -0.55f, 40f));
+            m.Step(Pose(Shot(With(S(QteKey.Light, "GRAB HIS LEGS", 0.45f, FighterPose.Grab), new Vector3(0f, 0.7f, 1.35f), -80f, 0f), CamShot.LowHero), -0.15f, -12f));
+            var spin1 = Pose(Shot(With(S(QteKey.None, null, 0.8f, FighterPose.Grab), new Vector3(0f, 0.8f, 1.4f), -84f, 0f), CamShot.Wide), -0.1f, -15f);
+            spin1.yaw = 360f;
+            var spin2 = Pose(Shot(With(S(QteKey.Jump, "FASTER", 0.6f, FighterPose.Grab), new Vector3(0f, 0.95f, 1.45f), -88f, 0f), CamShot.Wide), -0.1f, -18f);
+            spin2.yaw = 720f;
+            var spin3 = Pose(Shot(With(S(QteKey.None, null, 0.45f, FighterPose.Grab), new Vector3(0f, 1.0f, 1.5f), -88f, 0f), CamShot.Wide), -0.1f, -18f);
+            spin3.yaw = 1080f;
+            var release = Pose(Shot(With(S(QteKey.Heavy, "LET GO", 0.14f, FighterPose.Grab), new Vector3(0f, 1.0f, 1.5f), -88f, 0f), CamShot.Wide), -0.05f, -5f);
+            release.yaw = 1170f;
+            return m.Step(spin1).Step(spin2).Step(spin3).Step(release);
+        }
+
+        // Chokeslam: one hand on his throat, hoist him up high, then slam him straight down on his back.
+        WrestleMove Chokeslam()
+        {
+            var grab = Pose(Shot(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.55f), 0f, 0f), CamShot.Side), 0f, 5f);
+            var lift = Pose(Shot(With(S(QteKey.Light, "THROAT", 0.55f, FighterPose.Grab), new Vector3(0f, 1.55f, 0.6f), -8f, 0.12f), CamShot.LowHero), 0.05f, -10f);
+            var top = Pose(Shot(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 1.62f, 0.62f), -12f, 0f), CamShot.LowHero), 0.05f, -12f);
+            var slam = Pose(Shot(Impact(With(S(QteKey.Heavy, "CHOKESLAM", 0.26f, FighterPose.Grab), new Vector3(0f, 0.3f, 1.0f), -95f, 0f), 34f), CamShot.GroundImpact), -0.6f, 45f);
+            return new WrestleMove { name = "CHOKESLAM", id = MoveId.Chokeslam, cost = GethuBar, grip = GripKind.Neck }
+                .Step(grab).Step(lift).Step(top).Step(slam);
+        }
+
+        // DDT: his head locked under your arm, fall straight back and spike his head into the road.
+        WrestleMove DDT()
+        {
+            var headlock = Pose(Shot(With(S(QteKey.Light, "HEADLOCK", 0.35f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.85f), 65f, 0f), CamShot.Side), -0.05f, 15f);
+            var fall = Pose(Shot(Impact(With(S(QteKey.Jump, "FALL BACK", 0.32f, FighterPose.Grab), new Vector3(0f, 0.55f, 0.5f), 112f, 0f), 30f), CamShot.GroundImpact), 0f, 0f);
+            fall.hero = new Vector3(0f, -0.45f, -0.35f);
+            fall.bodyPitch = -65f;
+            var getUp = S(QteKey.None, null, 0.45f, FighterPose.Grab);
+            getUp.hero = new Vector3(0f, 0f, -0.35f);
+            getUp.bodyPitch = 0f;
+            getUp.shot = CamShot.Side;
+            return new WrestleMove { name = "DDT", id = MoveId.DDT, cost = GethuBar, grip = GripKind.Headlock }
+                .Step(headlock).Step(fall).Step(getUp);
+        }
+
+        // Kadal Throw: lift him at the jetty edge and heave him into the harbour. Splash.
+        WrestleMove KadalThrow(FinisherSpot spot)
+        {
+            Vector3 o = spot.outDirection;
+            float edge = Mathf.Max(0.8f, Vector3.Dot(spot.transform.position - transform.position, o) + 0.6f);
+            var lift = Pose(Shot(With(S(QteKey.Light, "LIFT", 0.55f, FighterPose.Grab), new Vector3(0f, 1.6f, 0.25f), -80f, 0.1f), CamShot.LowHero), 0.05f, -5f);
+            var walk = Pose(Shot(With(S(QteKey.None, null, 0.5f, FighterPose.Grab), new Vector3(0f, 1.62f, edge - 0.6f), -82f, 0f), CamShot.Side), 0.05f, -5f);
+            walk.hero = new Vector3(0f, 0f, edge - 0.9f);
+            var heave = Pose(Shot(With(S(QteKey.Heavy, "INTO THE SEA!", 0.22f, FighterPose.Grab), new Vector3(0f, 2.1f, edge + 0.1f), -120f, 0f), CamShot.Wide), -0.2f, 30f);
+            var flight = Pose(Shot(With(S(QteKey.None, null, 0.42f, FighterPose.Grab), new Vector3(0f, 1.7f, edge + 2.6f), -180f, 0.6f), CamShot.Wide), -0.1f, 20f);
+            flight.letGo = true;
+            var fall = Pose(Shot(With(S(QteKey.None, null, 0.4f, FighterPose.Grab), new Vector3(0f, -1.0f, edge + 3.5f), -210f, 0f), CamShot.Wide), 0f, 5f);
+            fall.letGo = true;
+            fall.splash = true;
+            return new WrestleMove
+            {
+                name = "KADAL THROW", id = MoveId.KadalThrow, cost = spot.gethuCost, grip = GripKind.ChestAndThigh,
+                ignoreRoom = true, sea = spot,
+            }.Step(lift).Step(walk).Step(heave).Step(flight).Step(fall);
+        }
+
+        // Ice Box Slam: walk him to the fish market ice box, push his head in, and slam the lid on him. Twice.
+        WrestleMove IceBoxSlam(FinisherSpot spot)
+        {
+            float d = Mathf.Max(1.3f, Flat(spot.transform.position - transform.position).magnitude);
+            Vector3 headIn = new Vector3(0f, 0.82f, d - 0.72f);
+            var walk = Pose(Shot(With(S(QteKey.None, null, 0.45f, FighterPose.Grab), new Vector3(0f, 0.95f, d - 0.95f), 10f, 0f), CamShot.Side), -0.05f, 10f);
+            walk.hero = new Vector3(0f, 0f, d - 1.5f);
+            walk.lid = 1f;
+            var push = Pose(Shot(With(S(QteKey.Light, "HEAD IN", 0.3f, FighterPose.Grab), headIn, 100f, 0f), CamShot.Side), -0.25f, 35f);
+            push.lid = 1f;
+            var slam1 = Pose(Shot(Impact(With(S(QteKey.Heavy, "SLAM THE LID", 0.16f, FighterPose.Grab), headIn, 102f, 0f), 14f), CamShot.Side), -0.3f, 40f);
+            slam1.lid = 0f;
+            slam1.keepHold = true;
+            var reopen = Pose(Shot(With(S(QteKey.None, null, 0.25f, FighterPose.Grab), headIn, 100f, 0f), CamShot.Side), -0.25f, 35f);
+            reopen.lid = 0.9f;
+            var slam2 = Pose(Shot(Impact(With(S(QteKey.Heavy, "AGAIN!", 0.16f, FighterPose.Grab), headIn, 104f, 0f), 30f), CamShot.GroundImpact), -0.35f, 45f);
+            slam2.lid = 0f;
+            return new WrestleMove
+            {
+                name = "ICE BOX SLAM", id = MoveId.IceBoxSlam, cost = spot.gethuCost, grip = GripKind.Headlock,
+                victimFacesAway = true, ignoreRoom = true, prop = spot,
+            }.Step(walk).Step(push).Step(slam1).Step(reopen).Step(slam2);
+        }
+
+        /// <summary>Q at a prop: smash (tea kadai, crates, auto), the sea (jetty edge) or the ice box.</summary>
+        void StartSpotFinisher(FinisherSpot spot)
+        {
+            Vector3 to = Flat(spot.SlamPoint - transform.position);
+            to = to.sqrMagnitude > 0.01f ? to.normalized : transform.forward;
+            if (spot.kind == FinisherSpot.SpotKind.Sea && MoveUnlocks.Has(MoveId.KadalThrow))
+                StartGrabFinisher(KadalThrow(spot), spot.outDirection);
+            else if (spot.kind == FinisherSpot.SpotKind.IceBox && MoveUnlocks.Has(MoveId.IceBoxSlam))
+                StartGrabFinisher(IceBoxSlam(spot), to);
+            else
+                StartGrabFinisher(PropSlam(spot), to);
+        }
+
         static WrestleStep Pose(WrestleStep s, float drop, float lean)
         {
             s.drop = drop;
@@ -318,6 +491,9 @@ namespace MadrasGethu
         ///   Shift + Q .......... Powerbomb (full Gethu)
         ///   W + Q at a wall .... Spinebuster
         ///   S + Q .............. Kasimedu Spin Drop
+        ///   W + Q (no wall) .... DDT
+        ///   A + Q .............. Chokeslam
+        ///   D + Q .............. Giant Swing (full Gethu)
         ///   Q .................. Body Slam
         /// </summary>
         WrestleMove PickGrabFinisher(Vector3 aim, Vector3 move)
@@ -328,7 +504,10 @@ namespace MadrasGethu
             if (GameInput.Sprint && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
             if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out var wallHit))
                 return Spinebuster(Flat(wallHit.point - transform.position).magnitude);
+            if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.DDT)) return DDT();
             if (keys.y < -0.5f && MoveUnlocks.Has(MoveId.SpinDrop)) return SpinDrop();
+            if (keys.x > 0.5f && MoveUnlocks.Has(MoveId.GiantSwing)) return GiantSwing();
+            if (keys.x < -0.5f && MoveUnlocks.Has(MoveId.Chokeslam)) return Chokeslam();
             return MoveUnlocks.Has(MoveId.BodySlam) ? BodySlam() : null;
         }
 
@@ -346,6 +525,10 @@ namespace MadrasGethu
             if (MoveUnlocks.Has(MoveId.SpinDrop)) Prompts.Add(new PromptItem { key = "S+Q", label = "Spin Drop", dim = dim });
             if (MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out _))
                 Prompts.Add(new PromptItem { key = "W+Q", label = "Spinebuster", dim = dim });
+            else if (MoveUnlocks.Has(MoveId.DDT))
+                Prompts.Add(new PromptItem { key = "W+Q", label = "DDT", dim = dim });
+            if (MoveUnlocks.Has(MoveId.Chokeslam)) Prompts.Add(new PromptItem { key = "A+Q", label = "Chokeslam", dim = dim });
+            if (MoveUnlocks.Has(MoveId.GiantSwing)) Prompts.Add(new PromptItem { key = "D+Q", label = "Giant Swing", dim = Gethu < maxGethu });
             if (MoveUnlocks.Has(MoveId.Powerbomb) && Gethu >= maxGethu)
                 Prompts.Add(new PromptItem { key = "SHIFT+Q", label = "Powerbomb" });
         }
@@ -437,7 +620,10 @@ namespace MadrasGethu
             {
                 Prompts.Add(new PromptItem { key = "Q", label = "Spear", dim = Gethu < GethuBar });
                 if (MoveUnlocks.Has(MoveId.Clothesline)) Prompts.Add(new PromptItem { key = "RMB", label = "Clothesline" });
+                if (MoveUnlocks.Has(MoveId.RugbyTackle)) Prompts.Add(new PromptItem { key = "E", label = "Tackle" });
             }
+            if (lowKicked != null && lowKicked.IsDazed && Time.time - lowKickTime < 2.3f)
+                Prompts.Add(new PromptItem { key = "LMB", label = "Knee to the face!" });
 
             if (Prompts.Count == 0 && Gethu >= maxGethu && !MassMode)
                 Prompts.Add(new PromptItem { key = "Q", label = "GETHU MODE!" });
@@ -493,6 +679,8 @@ namespace MadrasGethu
             curDrop = curLean = 0f;
             curYaw = curBodyPitch = 0f;
             curVictimYaw = 0f;
+            curLid = 0f;
+            swept.Clear();
             wrestleReleased = false;
             qtePerfects = qteMisses = qteDone = 0;
             qteActive = false;
@@ -528,6 +716,7 @@ namespace MadrasGethu
             stepYawFrom = curYaw;
             stepBodyPitchFrom = curBodyPitch;
             stepVictimYawFrom = curVictimYaw;
+            stepLidFrom = curLid;
             wrestleStepTimer = 0f;
             if (st.qte != QteKey.None)
             {
@@ -590,6 +779,7 @@ namespace MadrasGethu
             curYaw = st.yaw ?? stepYawFrom;
             curBodyPitch = st.bodyPitch ?? stepBodyPitchFrom;
             curVictimYaw = st.victimYaw ?? stepVictimYawFrom;
+            curLid = st.lid ?? stepLidFrom;
             FinishWrestleStep(st);
             if (State == PlayerState.Wrestle) AdvanceWrestleStep();
         }
@@ -602,7 +792,7 @@ namespace MadrasGethu
             float lift = Mathf.Sin(t * Mathf.PI);
 
             Vector3 hero = Vector3.Lerp(stepHeroFrom, st.hero ?? stepHeroFrom, e);
-            hero.z = Mathf.Clamp(hero.z, -(roomBehind - 0.4f), roomAhead - 0.4f);
+            if (!wrestleMove.ignoreRoom) hero.z = Mathf.Clamp(hero.z, -(roomBehind - 0.4f), roomAhead - 0.4f);
             float yaw = Mathf.Lerp(stepYawFrom, st.yaw ?? stepYawFrom, e);
             Quaternion turn = Quaternion.AngleAxis(yaw, Vector3.up);
             Vector3 heroWorld = wrestleOrigin + wrestleRotation * hero;
@@ -614,16 +804,21 @@ namespace MadrasGethu
             if (Mathf.Abs(bodyPitch) > 0.5f) Visual.SetCarry(Quaternion.Euler(bodyPitch, 0f, 0f));
             else Visual.ClearCarry();
 
+            if (wrestleMove.prop != null && wrestleMove.prop.lid != null)
+                wrestleMove.prop.SetLidOpen(Mathf.Lerp(stepLidFrom, st.lid ?? stepLidFrom, st.impact ? t * t : e));
+            if (wrestleMove.sweep && !wrestleReleased) SweepWithBody();
+
             if (wrestleReleased) return;
             if (!wrestleMove.carry && !st.impact) return;   // elbow drop: hands go to him only as you land on him
             // Hands stay on his body and the hero's own body crouches, drives up and follows him down.
             float drop = Mathf.Lerp(stepDropFrom, st.drop ?? stepDropFrom, e);
             float lean = Mathf.Lerp(stepLeanFrom, st.lean ?? stepLeanFrom, e);
-            Visual.SetGrapple(wrestleVictim, wrestleMove.grip, drop, lean);
+            if (st.letGo) Visual.ReleaseGripSlowly(0.15f);
+            else Visual.SetGrapple(wrestleVictim, wrestleMove.grip, drop, lean);
             if (!wrestleMove.carry) return;
 
             Vector3 hip = Vector3.Lerp(stepHipFrom, st.hip ?? stepHipFrom, e) + Vector3.up * st.arc * lift;
-            hip.z = Mathf.Clamp(hip.z, -(roomBehind - 0.3f), roomAhead - 0.3f);
+            if (!wrestleMove.ignoreRoom) hip.z = Mathf.Clamp(hip.z, -(roomBehind - 0.3f), roomAhead - 0.3f);
             float pitch = Mathf.Lerp(stepPitchFrom, st.pitch ?? stepPitchFrom, e);
             // He turns with the hero: his offset from the hero rotates by the hero's turn.
             Vector3 hipWorld = heroWorld + turn * (wrestleRotation * (hip - hero));
@@ -736,11 +931,22 @@ namespace MadrasGethu
             {
                 // Let go at the end of the swing: he flies off and the ragdoll takes over.
                 Vector3 dir = wrestleRotation * Vector3.forward;
+                if (wrestleMove.throwOutward)
+                {
+                    Vector3 outward = Flat(victim.transform.position - transform.position);
+                    if (outward.sqrMagnitude > 0.01f) dir = outward.normalized;
+                }
                 Visual.SetGrip(null, false);
-                victim.Launch(this, dir, EnemyFighter.LaunchKind.Throw);
+                victim.Launch(this, dir, wrestleMove.launchKind);
+                if (wrestleMove.launchKind == EnemyFighter.LaunchKind.Bowl || wrestleMove.sweep) NotifyMoveLanded(wrestleMove.name);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = wrestleMove.throwDamage, direction = dir, hitsDowned = true });
                 RegisterHits(1, 8f);
                 if (GM != null) { GM.Shake(0.2f); GM.AddPopup("THROW!", victim.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.8f); }
+                return;
+            }
+            if (st.splash && victim != null)
+            {
+                SeaSplash(victim);
                 return;
             }
             if (st.damage <= 0f || victim == null) return;
@@ -859,6 +1065,12 @@ namespace MadrasGethu
         void EndWrestle()
         {
             var victim = wrestleVictim;
+            // Rugby tackle: he's on his back and you're on top of him. Stay there.
+            if (wrestleMove != null && wrestleMove.mountAfter && victim != null && !victim.IsDead && victim.IsGrabbed)
+            {
+                StartMount(victim);
+                return;
+            }
             if (victim != null && !victim.IsDead && victim.IsGrabbed && victim.Visual.CanRagdoll)
             {
                 victim.ReleaseFromGrab(Vector3.zero, knockDown: true);

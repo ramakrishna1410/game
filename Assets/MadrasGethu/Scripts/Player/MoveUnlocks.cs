@@ -12,6 +12,12 @@ namespace MadrasGethu
         BodySlam, SpinDrop, GermanSuplex, Powerbomb, Spear, ElbowDrop, Spinebuster,
         // Grab strike combos
         RoyapuramRush, MachineGunKuthu, KasimeduKickStorm, ThalaivarSpecial, Jallikattu, GethuMassCombo,
+        // Street moves (no grab)
+        SpinningHeelKick, SupermanPunch, KaalOdaippu, LiverShot, RugbyTackle,
+        // Holding him
+        MuttaMothal, ArmTwist, EarClap, TripStomp, BowlingThrow,
+        // Finishers only
+        GiantSwing, Chokeslam, DDT, KadalThrow, IceBoxSlam,
     }
 
     /// <summary>

@@ -9,7 +9,8 @@ namespace MadrasGethu
         public float at;                    // seconds from the start of the combo when the blow lands
         public float lead = 0.22f;          // how long before 'at' the swing starts
         public FighterPose pose;            // the hero's animation
-        public GrabStrikeKind ik;           // knee / headbutt done with IK instead (needs no animation file)
+        public GrabStrikeKind ik;           // knee / headbutt / ear clap done with IK instead (needs no animation file)
+        public bool noAnim;                 // done with the hands' grip alone (arm twist)
         public bool holdCollar;             // left hand still holds his collar for this blow
         public float heroZ;                 // where the hero is when it lands
         public bool run;                    // cover the distance at a run (otherwise steps)
@@ -32,6 +33,11 @@ namespace MadrasGethu
         public float cost;
         public readonly List<ComboBeat> beats = new List<ComboBeat>();
         public bool cinematic;
+        public GripKind grip = GripKind.Collar;   // where the hands are while he's held
+        public float gripLean;
+        public bool releaseAtEnd;           // let go when it's over (arm twist) instead of keeping hold
+        public float injureArm;             // seconds he can't attack afterwards
+        public float dazeOnRelease;         // ear clap: dizzy when you let go of him
         public ComboBeat Add(ComboBeat b) { beats.Add(b); return b; }
     }
 
@@ -84,7 +90,7 @@ namespace MadrasGethu
 
         /// <summary>Holding stance (upper body) between blows while he's still held by the collar.</summary>
         bool ComboHoldsStance => combo != null && comboHolding
-            && !combo.beats.Exists(b => b.started && !b.landed && b.ik == GrabStrikeKind.None);
+            && !combo.beats.Exists(b => b.started && !b.landed && b.ik == GrabStrikeKind.None && !b.noAnim);
         public string GrabComboName => combo != null ? combo.name : null;
         public bool RapidPunching => rapid;
 
@@ -106,6 +112,14 @@ namespace MadrasGethu
                     Visual.Flinch(0.15f);   // a little set: tightening the grip
                 }
                 return false;
+            }
+
+            // RMB held down (not clicked): twist his arm.
+            if (codeFirst == 'R' && !l && !r && GameInput.HeavyHeld && Time.time - codeTime > 0.26f && MoveUnlocks.Has(MoveId.ArmTwist))
+            {
+                codeFirst = '\0';
+                StartStrikeCombo(ArmTwistCombo());
+                return true;
             }
 
             if (l || r)
@@ -230,6 +244,27 @@ namespace MadrasGethu
             return c;
         }
 
+        // Arm twist: both hands on his wrist, crank the arm so he bends over, knee into the elbow. He's let go
+        // with a bad arm: drops his weapon and can't attack for a while.
+        StrikeCombo ArmTwistCombo()
+        {
+            var c = new StrikeCombo { name = "ARM TWIST", id = MoveId.ArmTwist, grip = GripKind.Wrist, gripLean = 10f, releaseAtEnd = true, injureArm = 7f };
+            var twist = c.Add(Beat(0.4f, FighterPose.Grab, 6f, "TWIST"));
+            twist.noAnim = true; twist.holdCollar = true; twist.lead = 0.35f; twist.victimZ = 0.7f; twist.victimPitch = 55f;
+            var snap = c.Add(Beat(0.95f, FighterPose.Knee, 14f, "SNAP!"));
+            snap.ik = GrabStrikeKind.Knee; snap.holdCollar = true; snap.lead = 0.17f; snap.victimZ = 0.68f; snap.victimPitch = 62f;
+            return c;
+        }
+
+        // Ear clap: open palms on both ears. You keep hold of him; when you let go he reels about, dizzy.
+        StrikeCombo EarClapCombo()
+        {
+            var c = new StrikeCombo { name = "EAR CLAP", id = MoveId.EarClap, dazeOnRelease = 3.5f };
+            var clap = c.Add(Beat(0.32f, FighterPose.Push, 9f, "EAR CLAP!"));
+            clap.ik = GrabStrikeKind.EarClap; clap.holdCollar = true; clap.lead = 0.3f; clap.victimZ = 0.62f; clap.victimPitch = -8f;
+            return c;
+        }
+
         StrikeCombo GethuMassCombo()
         {
             var c = new StrikeCombo { name = "GETHU MASS COMBO", id = MoveId.GethuMassCombo, cost = maxGethu, cinematic = true };
@@ -329,7 +364,11 @@ namespace MadrasGethu
                 victim.HoldAt(ComboPoint(z), comboRotation * Quaternion.Euler(0f, 180f, 0f));
                 victim.Visual.SetCarry(Quaternion.Euler(comboVictimPitch, 0f, 0f));
                 victim.Visual.CarryWalks = true;
-                if (comboHolding) Visual.SetGrip(victim, false);
+                if (comboHolding)
+                {
+                    if (combo.grip == GripKind.Collar) Visual.SetGrip(victim, false);
+                    else Visual.SetGrapple(victim, combo.grip, 0f, combo.gripLean);
+                }
             }
 
             bool allLanded = combo.beats.TrueForAll(b => b.landed);
@@ -395,7 +434,8 @@ namespace MadrasGethu
                 comboHolding = false;
                 Visual.SetGrip(null, false);   // let go of his collar
             }
-            if (b.ik != GrabStrikeKind.None) Visual.GrabStrike(b.ik, lead / 0.4f);
+            if (b.noAnim) { }
+            else if (b.ik != GrabStrikeKind.None) Visual.GrabStrike(b.ik, lead / 0.4f);
             else
             {
                 // Played near its natural speed: the blow lands when the animation's contact frame does,
@@ -566,10 +606,29 @@ namespace MadrasGethu
             rushWaiting = false;
             Motor.SetDesiredVelocity(Vector3.zero, instant: true);
 
+            // Holds that end on their own (arm twist, ear clap) count as landed when they finish.
+            if (c != null && !comboKnockedOut && (c.releaseAtEnd || c.dazeOnRelease > 0f) && c.beats.TrueForAll(b => b.landed))
+                NotifyMoveLanded(c.name);
+
             if (victim != null && !victim.IsDead && victim.IsGrabbed && !comboKnockedOut)
             {
-                if (comboHolding)
+                if (c != null && c.releaseAtEnd)
                 {
+                    victim.Visual.ClearCarry();
+                    victim.ReleaseFromGrab(Flat(victim.transform.position - transform.position).normalized * 2f, knockDown: false);
+                    if (c.injureArm > 0f)
+                    {
+                        victim.InjureArm(c.injureArm);
+                        if (GM != null) GM.AddPopup("ARM INJURED", victim.Center + Vector3.up, new Color(1f, 0.6f, 0.3f), 1f);
+                    }
+                }
+                else if (comboHolding)
+                {
+                    if (c != null && c.dazeOnRelease > 0f)
+                    {
+                        victim.DazeWhenReleased(c.dazeOnRelease);
+                        if (GM != null) GM.AddPopup("DIZZY", victim.Center + Vector3.up * 1.1f, new Color(1f, 0.95f, 0.4f), 0.9f);
+                    }
                     // Combo ended without a knockout (Royapuram Rush without the uppercut): keep hold of him.
                     victim.Visual.ClearCarry();
                     grabbed = victim;

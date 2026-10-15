@@ -151,7 +151,8 @@ namespace MadrasGethu
             Visual.SetAnimatorBool("Held", state == AIState.Grabbed);
             Visual.SetAnimatorBool("Holding", state == AIState.HoldingHero);
             Visual.SetAnimatorBool("Begging", state == AIState.Begging);
-            Visual.SetAnimatorBool("Dazed", state == AIState.Dazed);
+            // Kneeling or doubled over (low kick, liver shot) plays its own pose instead of the dizzy sway.
+            Visual.SetAnimatorBool("Dazed", state == AIState.Dazed && Time.time >= ownReactionUntil);
             if (state == AIState.Dead) return;
             float dt = Time.deltaTime;
             stateTimer -= dt;
@@ -366,6 +367,7 @@ namespace MadrasGethu
                 {
                     // Seeing stars: sways on the spot, can't fight back.
                     dazeWobble += dt;
+                    if (Time.time < ownReactionUntil) { Motor.SetDesiredVelocity(Vector3.zero); if (stateTimer <= 0f) ResumeStance(); break; }
                     Vector3 sway = transform.right * Mathf.Sin(dazeWobble * 3.1f) * 0.35f + transform.forward * Mathf.Sin(dazeWobble * 1.7f) * 0.2f;
                     Motor.SetDesiredVelocity(sway);
                     if (Visual.IsPlaceholder && Mathf.Repeat(dazeWobble, 0.9f) < dt) Visual.Flinch(0.6f);
@@ -1137,7 +1139,53 @@ namespace MadrasGethu
 
         // ------------------------------------------------------------------ grabs, throws and shoves
 
-        public enum LaunchKind { Throw, Shove }
+        public enum LaunchKind { Throw, Shove, Bowl }
+
+        float ownReactionUntil;   // kneeling / doubled over: holds its own pose while dazed
+        float dazeOnRelease;      // ear clap: when the hero lets go he reels about instead of fighting back
+
+        /// <summary>Low kick to the knee: he drops to one knee, open for a knee to the face.</summary>
+        public void KneelDown(float seconds)
+        {
+            if (IsDead || IsDowned || state == AIState.Grabbed) return;
+            Daze(seconds);
+            if (state != AIState.Dazed) return;
+            ownReactionUntil = Time.time + seconds;
+            Visual.Play(FighterPose.Kneel, seconds);
+        }
+
+        /// <summary>Liver shot: folds over holding his side, can't fight back for a few seconds.</summary>
+        public void DoubleOver(float seconds)
+        {
+            if (IsDead || IsDowned || state == AIState.Grabbed) return;
+            Daze(seconds);
+            if (state != AIState.Dazed) return;
+            ownReactionUntil = Time.time + Mathf.Min(seconds, 1.6f);
+            Visual.Play(FighterPose.GutHit, Mathf.Min(seconds, 1.6f));
+        }
+
+        /// <summary>Arm twisted and snapped: drops his weapon and can't attack for a while.</summary>
+        public void InjureArm(float seconds)
+        {
+            Disarm();
+            nextAttackTime = Mathf.Max(nextAttackTime, Time.time + seconds);
+        }
+
+        /// <summary>Ear clap: when the hero lets go (without knocking him down) he reels, dazed.</summary>
+        public void DazeWhenReleased(float seconds) => dazeOnRelease = seconds;
+
+        /// <summary>Thrown off the jetty: a splash and he's gone (the practice dummy is put back on his mark).</summary>
+        public void ThrownIntoSea(PlayerFighter by)
+        {
+            if (isDummy)
+            {
+                if (state == AIState.Grabbed) ReleaseFromGrab(Vector3.down * 2f, knockDown: true);
+                if (GameManager.Instance != null) GameManager.Instance.RespawnDummySoon(this, 1.2f);
+                return;
+            }
+            if (state == AIState.Grabbed) Motor.SetFrozen(false);
+            ReceiveHit(new HitInfo { attacker = by, damage = Health + 1f, direction = Vector3.down, unblockable = true, hitsDowned = true });
+        }
 
         /// <summary>Held by the collar (front) or from behind. He struggles in the hero's grip.</summary>
         public void EnterGrabbed(bool fromBehind)
@@ -1176,7 +1224,14 @@ namespace MadrasGethu
                 stateTimer = 0.5f;
                 Visual.Play(FighterPose.StaggerBack, 0.5f, 0.6f);
                 Motor.AddImpulse(push);
+                if (dazeOnRelease > 0f)
+                {
+                    float s = dazeOnRelease;
+                    dazeOnRelease = 0f;
+                    Daze(s);
+                }
             }
+            dazeOnRelease = 0f;
         }
 
         /// <summary>
@@ -1194,7 +1249,14 @@ namespace MadrasGethu
             launchKind = kind;
             thrownHits.Clear();
 
-            if (kind == LaunchKind.Throw)
+            if (kind == LaunchKind.Bowl)
+            {
+                // Hurled low along the road: he skids and rolls into everyone in the way.
+                KnockDown(direction * 11f + Vector3.up * 1.6f, 2.0f);
+                if (!Visual.CanRagdoll) Visual.Tumble(direction, 0.9f);
+                thrownTimer = 1.4f;
+            }
+            else if (kind == LaunchKind.Throw)
             {
                 // A real throw: a couple of metres through the air, then he hits the street and rolls.
                 KnockDown(direction * 8f + Vector3.up * 4f, 2.0f);

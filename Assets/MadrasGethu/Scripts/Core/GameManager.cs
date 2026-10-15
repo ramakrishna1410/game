@@ -41,6 +41,9 @@ namespace MadrasGethu
 
         public bool PracticeMode => practiceMode;
         public EnemyFighter Dummy { get; private set; }
+        /// <summary>Second dummy (Y): for moves that need two rowdies (head clash, bowling throw, giant swing).</summary>
+        public EnemyFighter PartnerDummy { get; private set; }
+        float dummyRespawnAt = -1f, partnerRespawnAt = -1f;
         /// <summary>Moves landed in the practice yard (upper case, no "!").</summary>
         public readonly HashSet<string> PracticeLanded = new HashSet<string>();
         public string PracticeLastMove { get; private set; }
@@ -119,9 +122,38 @@ namespace MadrasGethu
             AliveEnemies.Add(Dummy);
         }
 
+        static readonly Vector3 PartnerOffset = new Vector3(2.4f, 0f, 0.6f);
+
+        void SpawnPartner()
+        {
+            RemovePartner();
+            PartnerDummy = CharacterFactory.CreateEnemy(EnemyKind.Rowdy, dummySpawn + PartnerOffset);
+            PartnerDummy.isDummy = true;
+            PartnerDummy.displayName = "Dummy 2 (" + PartnerDummy.Profile.displayName + ")";
+            PartnerDummy.gameObject.name = PartnerDummy.displayName;
+            PartnerDummy.Damaged += OnDummyDamaged;
+            AliveEnemies.Add(PartnerDummy);
+        }
+
+        void RemovePartner()
+        {
+            if (PartnerDummy == null) return;
+            AliveEnemies.Remove(PartnerDummy);
+            Destroy(PartnerDummy.gameObject);
+            PartnerDummy = null;
+        }
+
+        /// <summary>Puts a practice dummy back on his mark after a moment (e.g. thrown into the sea).</summary>
+        public void RespawnDummySoon(EnemyFighter dummy, float delay)
+        {
+            if (dummy == Dummy) dummyRespawnAt = Time.time + delay;
+            else if (dummy == PartnerDummy) partnerRespawnAt = Time.time + delay;
+        }
+
         void ResetPractice()
         {
             SpawnDummy();
+            if (PartnerDummy != null) SpawnPartner();
             foreach (var spot in FinisherSpot.All) spot.Repair();
             brokenSince.Clear();
             foreach (var w in Weapon.All.ToArray())
@@ -131,7 +163,18 @@ namespace MadrasGethu
 
         /// <summary>Not while the hero has hold of the dummy (grab, finisher), or the hero would hold a deleted body.</summary>
         bool CanReplaceDummy =>
-            Player == null || (Player.Grabbed == null && Player.State != PlayerFighter.PlayerState.Wrestle && Player.State != PlayerFighter.PlayerState.Finisher);
+            Player == null || (Player.Grabbed == null && Player.State != PlayerFighter.PlayerState.Wrestle && Player.State != PlayerFighter.PlayerState.Finisher
+                               && Player.State != PlayerFighter.PlayerState.Combo && Player.State != PlayerFighter.PlayerState.Mount
+                               && Player.State != PlayerFighter.PlayerState.HeadClash);
+
+        /// <summary>Knocked out of the yard, into the sea, or far off: true when he should go back on his mark.</summary>
+        bool Lost(EnemyFighter d, Vector3 home, ref float respawnAt)
+        {
+            if (respawnAt > 0f && Time.time >= respawnAt) { respawnAt = -1f; return true; }
+            if (d.transform.position.y < -3f) return true;
+            return !d.IsGrabbed && !d.IsDowned &&
+                   (d.transform.position.y < -2f || Vector3.ProjectOnPlane(d.transform.position - home, Vector3.up).magnitude > 14f);
+        }
 
         void UpdatePractice()
         {
@@ -148,11 +191,20 @@ namespace MadrasGethu
                 AddPopup(Player.infiniteGethu ? "INFINITE GETHU: ON" : "INFINITE GETHU: OFF", Player.Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 0.9f);
             }
 
+            if (GameInput.PracticePartnerPressed && CanReplaceDummy)
+            {
+                if (PartnerDummy == null)
+                {
+                    SpawnPartner();
+                    AddPopup("SECOND DUMMY", PartnerDummy.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 1f);
+                }
+                else RemovePartner();
+            }
+
             if (Dummy == null) SpawnDummy();
             // Knocked out of the yard (or far off): put him back on his mark.
-            if (!Dummy.IsGrabbed && !Dummy.IsDowned && CanReplaceDummy &&
-                (Dummy.transform.position.y < -2f || Vector3.ProjectOnPlane(Dummy.transform.position - dummySpawn, Vector3.up).magnitude > 14f))
-                SpawnDummy();
+            if (CanReplaceDummy && Lost(Dummy, dummySpawn, ref dummyRespawnAt)) SpawnDummy();
+            if (PartnerDummy != null && CanReplaceDummy && Lost(PartnerDummy, dummySpawn + PartnerOffset, ref partnerRespawnAt)) SpawnPartner();
 
             if (Time.time - lastDummyHitTime > 2.5f) PracticeStringDamage = 0f;
 

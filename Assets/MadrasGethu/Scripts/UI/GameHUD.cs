@@ -439,6 +439,12 @@ namespace MadrasGethu
             { "Stomp", "RMB on the ground" },
             { "Wall Bounce", "knock him into a wall" },
             { "Wall Slam", "grab, E at the wall" },
+            { "STREET MOVES", "" },
+            { "Spinning Heel Kick", "dodge, RMB" },
+            { "Superman Punch", "jump, RMB" },
+            { "Kaal Odaippu", "S+LMB, then LMB" },
+            { "Liver Shot", "parry (F), then RMB" },
+            { "Rugby Tackle", "sprint + E, LMB.., RMB" },
             { "GRAB COMBOS", "" },
             { "Royapuram Rush", "grab, LMB LMB LMB" },
             { "Machine Gun Kuthu", "grab, tap LMB fast, RMB" },
@@ -446,6 +452,12 @@ namespace MadrasGethu
             { "Thalaivar Special", "grab, LMB RMB" },
             { "Jallikattu", "grab, RMB LMB" },
             { "Gethu Mass Combo", "grab, LMB+RMB (full)" },
+            { "HOLDING HIM", "" },
+            { "Mutta Mothal", "grab, E by another rowdy" },
+            { "Arm Twist", "grab, hold RMB" },
+            { "Ear Clap", "grab, LMB then F" },
+            { "Trip & Stomp", "grab, S+F" },
+            { "Bowling Throw", "grab, SHIFT+E" },
             { "WRESTLING", "" },
             { "Body Slam", "grab, Q" },
             { "Spin Drop", "grab, S+Q (shoulders, spin)" },
@@ -454,10 +466,15 @@ namespace MadrasGethu
             { "Powerbomb", "grab, SHIFT+Q (full)" },
             { "Spear", "sprint at him, Q" },
             { "Elbow Drop", "him on the ground, Q" },
+            { "Chokeslam", "grab, A+Q" },
+            { "DDT", "grab, W+Q (no wall)" },
+            { "Giant Swing", "grab, D+Q (full)" },
             { "PROPS", "" },
             { "Tea Kadai Smash", "grab at the kadai, Q" },
             { "Meen Petti Slam", "grab at the crates, Q" },
             { "Auto Smash", "grab at the auto, Q" },
+            { "Kadal Throw", "grab at the jetty edge, Q" },
+            { "Ice Box Slam", "grab at the ice box, Q" },
         };
 
         /// <summary>Practice yard: a checklist of every move (ticks when it lands), damage numbers and the yard keys.</summary>
@@ -471,7 +488,8 @@ namespace MadrasGethu
             string dummyName = GM.Dummy != null ? GM.Dummy.Profile.displayName : "-";
             Shadowed(new Rect(x, y, w, 22 * S), $"R reset dummy  ·  T dummy: {dummyName}  ·  G infinite Gethu: {(p != null && p.infiniteGethu ? "ON" : "OFF")}", right, Color.white);
             y += 22 * S;
-            Shadowed(new Rect(x, y, w, 22 * S), showChecklist ? "L hide move list" : "L show move list", right, new Color(1f, 1f, 1f, 0.7f));
+            Shadowed(new Rect(x, y, w, 22 * S), (GM.PartnerDummy != null ? "Y remove 2nd dummy  ·  " : "Y add a 2nd dummy  ·  ")
+                + (showChecklist ? "L hide move list" : "L show move list"), right, new Color(1f, 1f, 1f, 0.7f));
             y += 26 * S;
             if (GM.PracticeStringDamage > 0f)
             {
@@ -492,26 +510,32 @@ namespace MadrasGethu
             for (int i = 0; i < rows; i++)
                 if (PracticeMoves[i, 1] != "") { total++; if (GM.PracticeLanded.Contains(PracticeMoves[i, 0].ToUpperInvariant())) done++; }
 
-            float lh = 19 * S, cx = 30 * S, cy = 150 * S, cw = 420 * S;
+            float lh = 19 * S, cx = 30 * S, cy = 150 * S, cw = 420 * S, gap = 24 * S;
             var rowStyle = new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * S) };
             var hintStyle = new GUIStyle(rowStyle) { alignment = TextAnchor.UpperRight };
-            Bar(new Rect(cx - 8 * S, cy - 8 * S, cw + 16 * S, (rows + 1) * lh + 16 * S), 1f, new Color(0f, 0f, 0f, 0.4f));
+            // Long list: two columns so it fits on the screen.
+            int perColumn = Mathf.Max(8, Mathf.FloorToInt((Screen.height - cy - 30 * S) / lh) - 1);
+            int columns = rows > perColumn ? 2 : 1;
+            int rowsPerColumn = columns == 2 ? Mathf.CeilToInt(rows / 2f) : rows;
+            Bar(new Rect(cx - 8 * S, cy - 8 * S, columns * cw + (columns - 1) * gap + 16 * S, (rowsPerColumn + 1) * lh + 16 * S), 1f, new Color(0f, 0f, 0f, 0.4f));
             Shadowed(new Rect(cx, cy, cw, lh), $"MOVES LANDED  {done} / {total}", new GUIStyle(rowStyle) { fontStyle = FontStyle.Bold }, Gold);
             for (int i = 0; i < rows; i++)
             {
-                float ry = cy + (i + 1) * lh;
+                int col = i / rowsPerColumn;
+                float colX = cx + col * (cw + gap);
+                float ry = cy + (i - col * rowsPerColumn + 1) * lh;
                 string name = PracticeMoves[i, 0], hint = PracticeMoves[i, 1];
                 if (hint == "")
                 {
-                    Shadowed(new Rect(cx, ry, cw, lh), name, new GUIStyle(rowStyle) { fontStyle = FontStyle.Bold }, new Color(1f, 0.7f, 0.3f));
+                    Shadowed(new Rect(colX, ry, cw, lh), name, new GUIStyle(rowStyle) { fontStyle = FontStyle.Bold }, new Color(1f, 0.7f, 0.3f));
                     continue;
                 }
                 bool landed = GM.PracticeLanded.Contains(name.ToUpperInvariant());
                 Color c = landed ? new Color(0.55f, 1f, 0.6f) : new Color(1f, 1f, 1f, 0.75f);
                 float dot = 11 * S;
-                HudIcons.Draw(new Rect(cx, ry + (lh - dot) / 2f, dot, dot), landed ? HudIcons.Disc : HudIcons.Ring, c);
-                Shadowed(new Rect(cx + dot + 6 * S, ry, cw, lh), name, rowStyle, c);
-                Shadowed(new Rect(cx, ry, cw, lh), hint, hintStyle, new Color(1f, 1f, 1f, landed ? 0.45f : 0.6f));
+                HudIcons.Draw(new Rect(colX, ry + (lh - dot) / 2f, dot, dot), landed ? HudIcons.Disc : HudIcons.Ring, c);
+                Shadowed(new Rect(colX + dot + 6 * S, ry, cw, lh), name, rowStyle, c);
+                Shadowed(new Rect(colX, ry, cw, lh), hint, hintStyle, new Color(1f, 1f, 1f, landed ? 0.45f : 0.6f));
             }
         }
 
@@ -537,12 +561,23 @@ namespace MadrasGethu
                 "LMB, rowdy behind . Back Elbow          dodge > LMB ....... Pivot Backfist",
                 "heavy > RMB ....... Double Hammer       jump > LMB ........ Flying Kick",
                 "Knocked into a wall: WALL BOUNCE (he staggers back dazed)",
+                "dodge > RMB ....... Spinning Heel Kick  jump > RMB ........ Superman Punch",
+                "S + LMB > LMB ..... Low kick > Kaal Odaippu (knee to the face)",
+                "parry (F) > RMB ... Liver Shot          sprint + E ........ Rugby Tackle (LMB, RMB)",
+                "",
+                "HOLDING HIM",
+                "E, rowdy close .... Mutta Mothal        hold RMB .......... Arm Twist",
+                "LMB then F ........ Ear Clap            S + F ............. Trip & Stomp",
+                "SHIFT + E ......... Bowling Throw",
                 "",
                 "WRESTLING (Q, 1 Gethu bar; follow the ring prompts)",
                 "hold, Q .............. Body Slam      hold, S+Q ......... Spin Drop",
                 "hold from behind, Q .. German Suplex  hold at a wall, W+Q Spinebuster",
                 "hold, SHIFT+Q (full) .. Powerbomb      sprint at a rowdy . Spear",
-                "rowdy on the ground ... Elbow Drop     combos: NALLA > SEMMA > MASS > THALAIVAA",
+                "rowdy on the ground ... Elbow Drop     hold, A+Q ......... Chokeslam",
+                "hold, W+Q (no wall) .. DDT            hold, D+Q (full) .. Giant Swing",
+                "at the jetty edge, Q .. Kadal Throw    at an ice box, Q .. Ice Box Slam",
+                "combos: NALLA > SEMMA > MASS > THALAIVAA",
             };
             float w = 760 * S, lh = 22 * S;
             var r = new Rect(30 * S, Screen.height - (lines.Length * lh + 40 * S), w, lines.Length * lh + 20 * S);

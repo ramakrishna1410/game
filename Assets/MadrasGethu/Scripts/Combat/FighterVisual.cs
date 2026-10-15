@@ -388,7 +388,7 @@ namespace MadrasGethu
                 handIK.Strike(kind, duration);
                 return duration * 0.4f;
             }
-            Play(kind == GrabStrikeKind.Knee ? FighterPose.Knee : FighterPose.Headbutt, duration, duration);
+            Play(kind == GrabStrikeKind.Knee ? FighterPose.Knee : kind == GrabStrikeKind.EarClap ? FighterPose.Push : FighterPose.Headbutt, duration, duration);
             return duration * 0.4f;
         }
 
@@ -396,6 +396,12 @@ namespace MadrasGethu
         public void FreeRightHand(float seconds)
         {
             if (handIK != null) handIK.FreeRightHand(seconds);
+        }
+
+        /// <summary>Both hands off him for a moment; the crouch / lean posture stays (punching down from the mount).</summary>
+        public void FreeHands(float seconds)
+        {
+            if (handIK != null) handIK.FreeHands(seconds);
         }
 
         /// <summary>Hands on someone's collar (front) or shoulders (behind); null lets go.</summary>

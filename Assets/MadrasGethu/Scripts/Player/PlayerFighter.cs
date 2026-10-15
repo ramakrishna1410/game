@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public partial class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle, Combo }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle, Combo, Mount, HeadClash }
 
         /// <summary>One button prompt for the HUD: a key cap (or mouse button) and what it does.</summary>
         public struct PromptItem
@@ -184,6 +184,7 @@ namespace MadrasGethu
             team = Team.Player;
             displayName = "Maaran";
             if (lightChain.Count == 0) BuildDefaultMoves();
+            BuildStreetMoves();
         }
 
         public void SetCamera(ThirdPersonCamera camera) => cam = camera;
@@ -306,6 +307,8 @@ namespace MadrasGethu
                 case PlayerState.Finisher: UpdateFinisher(); break;
                 case PlayerState.Wrestle: UpdateWrestle(); break;
                 case PlayerState.Combo: UpdateGrabCombo(); break;
+                case PlayerState.Mount: UpdateMount(); break;
+                case PlayerState.HeadClash: UpdateHeadClash(); break;
                 case PlayerState.Stagger:
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
                     break;
@@ -383,6 +386,7 @@ namespace MadrasGethu
 
             if (GameInput.GrabPressed)
             {
+                if (TryStartTackle()) return true;
                 TryGrab();
                 return true;
             }
@@ -403,10 +407,10 @@ namespace MadrasGethu
                 return true;
             }
 
-            // Dodge -> attack: spin out of the dodge with a backfist.
+            // Dodge -> attack: spin out of the dodge with a backfist (LMB) or a spinning heel kick (RMB).
             if (Time.time - lastDodgeEnd < 0.4f)
             {
-                StartAttack(dodgeStrike, null);
+                StartAttack(heavy && MoveUnlocks.Has(MoveId.SpinningHeelKick) ? spinHeelKick : dodgeStrike, null);
                 lightIndex = 0;
                 return true;
             }
@@ -418,6 +422,29 @@ namespace MadrasGethu
             {
                 StartAttack(runningAttack, null);
                 lightIndex = 0;
+                return true;
+            }
+
+            // Just parried him: RMB slips inside and digs a hook into his liver.
+            if (heavy && LiverShotTarget() is EnemyFighter liver)
+            {
+                StartAttack(liverShot, liver);
+                lightIndex = 0;
+                return true;
+            }
+
+            // He's down on one knee from the low kick: LMB drives a knee into his face.
+            if (light && KneelingTarget() is EnemyFighter kneeling)
+            {
+                StartAttack(kneeToFace, kneeling);
+                lightIndex = 0;
+                return true;
+            }
+
+            // Stepping away from him (S) + LMB: low kick to the knee.
+            if (light && lightIndex == 0 && LowKickTarget() is Fighter shin)
+            {
+                StartAttack(lowKick, shin);
                 return true;
             }
 
@@ -618,6 +645,7 @@ namespace MadrasGethu
             }
             if (result.hits > 0)
             {
+                OnStreetMoveLanded(currentAttack, result.firstHit);
                 NotifyMoveLanded(currentAttack.name);
                 RegisterHits(result.hits, currentAttack.gethuGain * result.hits);
                 if (GM != null)
@@ -751,8 +779,9 @@ namespace MadrasGethu
             // Jump -> attack: flying kick at whoever is ahead.
             if (Time.time < lightBufferedUntil || Time.time < heavyBufferedUntil)
             {
+                bool superman = Time.time < heavyBufferedUntil && MoveUnlocks.Has(MoveId.SupermanPunch);
                 lightBufferedUntil = heavyBufferedUntil = 0f;
-                StartAttack(flyingKick, null);
+                StartAttack(superman ? supermanPunch : flyingKick, null);
                 return;
             }
 
@@ -771,6 +800,8 @@ namespace MadrasGethu
             State == PlayerState.Finisher ||
             State == PlayerState.Wrestle ||
             State == PlayerState.Combo ||
+            State == PlayerState.Mount ||
+            State == PlayerState.HeadClash ||
             State == PlayerState.Parry ||
             (State == PlayerState.Attack && !struck &&
              (currentAttack == counter || currentAttack == counterUppercut || currentAttack == counterThrow));
@@ -816,6 +847,8 @@ namespace MadrasGethu
             }
 
             parryTarget = best;
+            lastParried = best;
+            lastParryTime = Time.time;
             parryPerfect = best.TimeToImpact <= perfectParryWindow;
             parryCounterStarted = false;
 
@@ -854,6 +887,15 @@ namespace MadrasGethu
         {
             // Another rowdy swinging at the same time? Parry him too (Batman-style chains).
             if (stateTimer > 0.1f && GameInput.BlockPressed && TryCounter()) return;
+
+            // RMB straight out of the parry: slip and liver shot instead of the automatic counter.
+            if (GameInput.HeavyPressed && MoveUnlocks.Has(MoveId.LiverShot) && parryTarget != null && !parryTarget.IsDead)
+            {
+                heavyBufferedUntil = 0f;
+                parryCounterStarted = true;
+                StartAttack(liverShot, parryTarget);
+                return;
+            }
 
             if (parryPerfect && !parryCounterStarted && stateTimer >= 0.2f)
             {
@@ -966,7 +1008,7 @@ namespace MadrasGethu
             Prompts.Add(new PromptItem { key = "LMB", label = "Punch" });
             Prompts.Add(new PromptItem { key = "RMB", label = "Kick" });
             Prompts.Add(new PromptItem { key = "SHIFT", label = "Drag fast" });
-            Prompts.Add(new PromptItem { key = "E", label = spot != null ? "Throw him in" : "Throw" });
+            Prompts.Add(new PromptItem { key = "E", label = HeadClashPartner() != null ? "Head clash" : spot != null ? "Throw him in" : "Throw" });
             Prompts.Add(new PromptItem { key = "F", label = "Shove" });
             if (spot != null)
                 Prompts.Add(new PromptItem { key = "Q", label = spot.finisherName, dim = Gethu < spot.gethuCost });
@@ -990,7 +1032,7 @@ namespace MadrasGethu
             {
                 if (spot != null && Gethu >= spot.gethuCost)
                 {
-                    StartGrabFinisher(PropSlam(spot), Flat(spot.SlamPoint - transform.position).normalized);
+                    StartSpotFinisher(spot);
                     return;
                 }
                 if (spot == null && wrestle != null && Gethu >= wrestle.cost)
@@ -1005,6 +1047,9 @@ namespace MadrasGethu
             }
 
             Vector3 aim = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
+
+            // LMB then F: ear clap. S + F: trip him and stomp.
+            if (GameInput.BlockPressed && TryGrabFMove()) return;
 
             // Shove: both hands into his chest, he stumbles back (and falls if he can't keep up).
             if (GameInput.BlockPressed)
@@ -1025,6 +1070,7 @@ namespace MadrasGethu
             // Throw, or a wall slam if there's a wall right where you're aiming.
             if (GameInput.GrabPressed)
             {
+                if (TryGrabEMove(aim)) return;   // head clash (another rowdy close) or bowling throw (Shift)
                 if (TryWallSlam(aim)) return;
 
                 // A real throw: swing him round by the collar, then let go.

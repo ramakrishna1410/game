@@ -120,6 +120,14 @@ namespace MadrasGethu.EditorTools
                 T("PushKick", 1.1f, new[] { "pushkick", "teep", "frontpushkick", "stompkick" }, "FrontKick", "Kick"),
                 T("FlyingKnee", 1f, new[] { "flyingknee", "jumpingknee", "jumpknee", "flyingkneestrike" }, "Knee", "FlyingKick"),
                 T("ElbowDrop", 1f, new[] { "elbowdrop", "legdrop", "jumpdown" }, "Stomp", "Slam"),
+                // Street moves
+                T("SpinKick", 1.2f, new[] { "spinkick", "spinningkick", "hurricanekick", "spinheelkick", "spinningheelkick", "tornadokick", "spinninghookkick" }, "Roundhouse", "Kick"),
+                T("SupermanPunch", 1.1f, new[] { "supermanpunch", "jumpingpunch", "jumppunch", "leappunch", "leapingpunch" }, "Haymaker", "Cross"),
+                T("LowKick", 1.3f, new[] { "lowkick", "calfkick", "legkicklow", "kicktotheknee", "thaikick" }, "Kick", "FrontKick"),
+                T("Tackle", 1f, new[] { "rugbytackle", "doublelegtakedown", "takedown", "tackling" }, "Spear", "Charge"),
+                T("GroundPunch", 1.4f, new[] { "groundpunch", "mountpunch", "groundandpound", "punchingdown", "groundattack" }, "Cross", "Slam"),
+                T("Kneel", 1f, new[] { "kneel", "kneeldown", "hurtkneel", "fallonknee", "kneelinghurt" }, "Beg", "StaggerBack"),
+                T("GutHit", 1f, new[] { "guthit", "stomachhit", "gutpunch", "bodyhit", "doubleover", "holdingstomach", "kidneyhit" }, "Flinch", "StaggerBack"),
 
                 new Slot { name = "Dazed", kind = SlotKind.HoldBool, boolParameter = "Dazed", aliases = new[] { "dazed", "dizzy", "dizzyidle", "stunned" }, fallbacks = new[] { "StaggerBack", "Flinch" } },
                 new Slot { name = "Beg", kind = SlotKind.HoldBool, boolParameter = "Begging", aliases = new[] { "beg", "begging", "pleading", "kneelbeg", "kneeling" }, fallbacks = new[] { "Flinch" } },
@@ -898,8 +906,9 @@ namespace MadrasGethu.EditorTools
                 case "BearHug": case "WeaponSwing": case "Clothesline": case "BackElbow": case "ShoulderBarge": case "Spear":
                     return Reach.Hands;
                 case "Kick": case "RowdyKick": case "FlyingKick": case "LegSweep":
-                case "FrontKick": case "Roundhouse": case "PushKick":
+                case "FrontKick": case "Roundhouse": case "PushKick": case "SpinKick": case "LowKick":
                     return Reach.Feet;
+                case "SupermanPunch": case "GroundPunch": return Reach.Hands;
                 case "Knee": case "FlyingKnee": return Reach.Knees;
                 case "Uppercut": return Reach.HandUp;
                 case "Slam": case "GroundPound": case "WeaponSmash": case "ElbowDrop": return Reach.SmashHands;

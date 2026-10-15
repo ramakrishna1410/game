@@ -3,10 +3,17 @@ using UnityEngine;
 namespace MadrasGethu
 {
     /// <summary>Strikes done procedurally while holding someone (no animation file needed).</summary>
-    public enum GrabStrikeKind { None, Knee, Headbutt }
+    public enum GrabStrikeKind { None, Knee, Headbutt, EarClap }
 
     /// <summary>Where the hero's hands go on the other man's body.</summary>
-    public enum GripKind { Collar, Waist, ChestAndThigh, Thighs }
+    public enum GripKind
+    {
+        Collar, Waist, ChestAndThigh, Thighs,
+        Neck,       // chokeslam: right hand on his throat, left on his belt
+        Headlock,   // DDT: right arm round his head, left hand on his back
+        Ankles,     // giant swing: both hands round his lower legs
+        Wrist,      // arm twist: his right wrist and elbow
+    }
 
     /// <summary>
     /// Puts the hero's hands on the opponent's shirt collar while grabbing (front) or on his
@@ -31,6 +38,7 @@ namespace MadrasGethu
         Vector3 footLLocal, footRLocal;
         Quaternion footLRotLocal, footRRotLocal;
         float freeRightUntil;          // right hand off the collar while it throws a punch
+        float freeBothUntil;           // both hands off him (punching down from the mount)
 
         // Knee / headbutt while holding: a quick out-and-back curve applied with IK.
         GrabStrikeKind strikeKind;
@@ -92,6 +100,9 @@ namespace MadrasGethu
 
         /// <summary>Lets the right hand go for a moment (a punch while holding him by the collar).</summary>
         public void FreeRightHand(float seconds) => freeRightUntil = Time.time + seconds;
+
+        /// <summary>Both hands off him for a moment, keeping the posture (punching down from the mount).</summary>
+        public void FreeHands(float seconds) => freeBothUntil = Time.time + seconds;
 
         float slowReleaseSpeed;
 
@@ -177,12 +188,26 @@ namespace MadrasGethu
             Quaternion palms = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
 
             if (!topLayer) return;
-            float rightWeight = Time.time < freeRightUntil ? 0f : weight;
-            animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, weight);
+
+            // Ear clap: both open palms swing out wide and slap in on his ears.
+            if (strikeKind == GrabStrikeKind.EarClap)
+            {
+                float c = StrikeAmount;
+                Vector3 side = transform.right;
+                Vector3 wideL = head - side * 0.55f + Vector3.up * 0.05f, wideR = head + side * 0.55f + Vector3.up * 0.05f;
+                Vector3 earL = head - side * 0.11f, earR = head + side * 0.11f;
+                float swing = Mathf.Sin(Mathf.Clamp01(c) * Mathf.PI);
+                left = Vector3.Lerp(Vector3.Lerp(left, wideL, swing), earL, c * c);
+                right = Vector3.Lerp(Vector3.Lerp(right, wideR, swing), earR, c * c);
+            }
+
+            float handWeight = Time.time < freeBothUntil ? 0f : weight;
+            float rightWeight = Time.time < freeRightUntil ? 0f : handWeight;
+            animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, handWeight);
             animator.SetIKPositionWeight(AvatarIKGoal.RightHand, rightWeight);
             animator.SetIKPosition(AvatarIKGoal.LeftHand, left);
             animator.SetIKPosition(AvatarIKGoal.RightHand, right);
-            animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, weight * 0.5f);
+            animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, handWeight * 0.5f);
             animator.SetIKRotationWeight(AvatarIKGoal.RightHand, rightWeight * 0.5f);
             animator.SetIKRotation(AvatarIKGoal.LeftHand, palms * Quaternion.Euler(0f, 0f, 90f));
             animator.SetIKRotation(AvatarIKGoal.RightHand, palms * Quaternion.Euler(0f, 0f, -90f));
@@ -227,6 +252,9 @@ namespace MadrasGethu
             Vector3 thighL = hips - t.right * 0.12f + Vector3.down * 0.25f, thighR = hips + t.right * 0.12f + Vector3.down * 0.25f;
             Vector3 side = t.right;
             head = t.position + Vector3.up * 1.65f;
+            Vector3 neck = t.position + Vector3.up * 1.5f;
+            Vector3 ankleL = t.position - t.right * 0.12f + Vector3.up * 0.2f, ankleR = t.position + t.right * 0.12f + Vector3.up * 0.2f;
+            Vector3 wrist = t.position + t.right * 0.3f + Vector3.up * 1.0f, elbow = t.position + t.right * 0.25f + Vector3.up * 1.2f;
             var anim = who.Visual != null ? who.Visual.animator : null;
             if (anim != null && anim.isHuman)
             {
@@ -243,6 +271,33 @@ namespace MadrasGethu
                 if (ul != null && ll != null) thighL = Vector3.Lerp(ul.position, ll.position, 0.45f);
                 if (ur != null && lr != null) thighR = Vector3.Lerp(ur.position, lr.position, 0.45f);
                 if (ul != null && ur != null) side = (ur.position - ul.position).normalized;
+                var nk = anim.GetBoneTransform(HumanBodyBones.Neck);
+                var fl = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
+                var fr = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+                var la = anim.GetBoneTransform(HumanBodyBones.RightLowerArm);
+                var hn = anim.GetBoneTransform(HumanBodyBones.RightHand);
+                if (nk != null) neck = nk.position;
+                if (ll != null && fl != null) ankleL = Vector3.Lerp(ll.position, fl.position, 0.65f);
+                if (lr != null && fr != null) ankleR = Vector3.Lerp(lr.position, fr.position, 0.65f);
+                if (hn != null) wrist = hn.position;
+                if (la != null) elbow = la.position;
+            }
+
+            // One-handed holds: each hand has its own job, so no left/right swap.
+            switch (kind)
+            {
+                case GripKind.Neck:
+                    heroRightHand = neck;
+                    heroLeftHand = hips;
+                    return;
+                case GripKind.Headlock:
+                    heroRightHand = neck - hero.right * 0.14f + Vector3.up * 0.06f;   // arm wrapped over his neck
+                    heroLeftHand = chest;                                              // other hand on his back
+                    return;
+                case GripKind.Wrist:
+                    heroLeftHand = wrist;
+                    heroRightHand = elbow;
+                    return;
             }
 
             Vector3 a, b;
@@ -254,6 +309,9 @@ namespace MadrasGethu
                     break;
                 case GripKind.Thighs:
                     a = thighL; b = thighR;
+                    break;
+                case GripKind.Ankles:
+                    a = ankleL; b = ankleR;
                     break;
                 default:   // waist: both sides of the hips, a little round towards his back
                     a = hips - side * 0.17f;

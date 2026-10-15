@@ -25,6 +25,7 @@ namespace MadrasGethu
         {
             public int hits;
             public int blocked;
+            public Fighter firstHit;   // the first fighter the blow landed on (cleanly)
             public bool Connected => hits > 0 || blocked > 0;
         }
 
@@ -60,6 +61,7 @@ namespace MadrasGethu
                 if (r == HitResult.Hit)
                 {
                     result.hits++;
+                    if (result.firstHit == null) result.firstHit = target;
                     FX.HitSpark(target.Center + Vector3.up * 0.3f - dir * 0.3f, attack.heavy);
                 }
                 else if (r == HitResult.Blocked)

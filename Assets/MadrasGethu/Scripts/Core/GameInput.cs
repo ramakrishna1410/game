@@ -117,6 +117,7 @@ namespace MadrasGethu
         public static bool PracticeSwitchPressed => KeyDown(Key.T);
         public static bool PracticeGethuPressed => KeyDown(Key.G);
         public static bool PracticeListPressed => KeyDown(Key.L);
+        public static bool PracticePartnerPressed => KeyDown(Key.Y);
 
         public static bool LightPressed =>
             (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked && Mouse.current.leftButton.wasPressedThisFrame)
@@ -145,6 +146,7 @@ namespace MadrasGethu
         public static bool PracticeSwitchPressed => Input.GetKeyDown(KeyCode.T);
         public static bool PracticeGethuPressed => Input.GetKeyDown(KeyCode.G);
         public static bool PracticeListPressed => Input.GetKeyDown(KeyCode.L);
+        public static bool PracticePartnerPressed => Input.GetKeyDown(KeyCode.Y);
 
         public static bool LightPressed =>
             (Cursor.lockState == CursorLockMode.Locked && Input.GetMouseButtonDown(0)) || Input.GetKeyDown(KeyCode.JoystickButton2);

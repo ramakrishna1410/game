@@ -61,8 +61,9 @@ A separate scene to learn the moves on **one dummy that never moves, never attac
 | T | Switch dummy: Rowdy → Thadiyan → Boss |
 | G | Infinite Gethu on/off (on by default, so you can practise every finisher) |
 | L | Show/hide the move list |
+| Y | Add / remove a **second dummy** (for Mutta Mothal, Bowling Throw and the Giant Swing) |
 
-The left panel lists every move with its input; each one ticks green the first time it lands. The top right shows the last hit, the damage of your current string and the last move. Smashed props rebuild themselves after a few seconds. The yard has a brick wall (wall slams, wall bounces, spinebuster), a tea kadai, fish crates, an auto and a weapon rack.
+The left panel lists every move with its input; each one ticks green the first time it lands. The top right shows the last hit, the damage of your current string and the last move. Smashed props rebuild themselves after a few seconds. The yard has a brick wall (wall slams, wall bounces, spinebuster), a tea kadai, fish crates, an auto, an ice box, a jetty edge onto the harbour (east side, for the Kadal Throw) and a weapon rack.
 
 Use **Madras Gethu → Open Practice Yard Scene** later, or **Open Kasimedu Arena Scene** to go back to the waves.
 
@@ -118,6 +119,26 @@ Keyboard and mouse for now (gamepad prompts come later).
 | LMB with a rowdy right behind you | Back Elbow |
 | dodge → LMB, jump → LMB | Pivot Backfist, Flying Kick |
 
+### Street moves
+
+| Input | Move |
+|---|---|
+| dodge → RMB | **Spinning Heel Kick**: spin out of the dodge, heel to the jaw, he drops |
+| jump → RMB | **Superman Punch**: a hop forward into a flying cross |
+| S (stepping away from him) + LMB, then LMB | **Kaal Odaippu**: low kick drops him to one knee, then a knee to the face |
+| parry (F), then RMB | **Liver Shot**: slip his punch, hook to the ribs; he folds over, dazed |
+| sprint + E at a rowdy | **Rugby Tackle**: take him down and sit on him; LMB rains punches, RMB finishes |
+
+### Holding him (grab with E first)
+
+| Input | Move |
+|---|---|
+| E with another rowdy close by | **Mutta Mothal**: smash his head into his friend's, both go down |
+| hold RMB | **Arm Twist**: crank his arm, knee the elbow; he drops his weapon and can't attack for a while |
+| LMB then F | **Ear Clap**: both palms on his ears; when you let go he reels about, dizzy |
+| S + F | **Trip & Stomp**: hook his leg, drop him on his back, stamp on him |
+| Shift + E | **Bowling Throw**: hurl him low along the road into a group |
+
 ### Grab combos (grab with E, then click, no QTE)
 
 | Clicks after the grab | Combo |
@@ -143,8 +164,13 @@ Hold **Shift** while dragging someone to hurry him along (to a tea kadai or the 
 | Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
 | Sprinting at a rowdy | Spear | RMB |
 | Rowdy lying on the ground | Elbow Drop (leap, land on him elbow-first, roll off) | Space → LMB |
+| Holding him, **A + Q** | Chokeslam (hand on his throat, hoist him high, slam him down) | LMB → RMB |
+| Holding him, **W + Q** (no wall in front) | DDT (headlock, fall back, spike his head) | LMB → Space |
+| Holding him, **D + Q** with full Gethu | Giant Swing (his ankles, three spins; his body knocks down anyone close; let go) | LMB → Space → RMB |
+| Holding him at the **jetty edge**, **Q** | Kadal Throw (lift him and heave him into the harbour) | LMB → RMB |
+| Holding him at a fish market **ice box**, **Q** | Ice Box Slam (head in, slam the lid on him twice) | LMB → RMB → RMB |
 
-Each costs one Gethu bar (the Powerbomb costs the full meter). Near a tea kadai, fish crates or the auto, **Q** lifts him and smashes him into it.
+Each costs one Gethu bar (the Powerbomb and Giant Swing cost the full meter). Near a tea kadai, fish crates or the auto, **Q** lifts him and smashes him into it.
 
 During every lift Maaran's hands stay locked on the rowdy (IK) and his body crouches, drives up, arches or follows him down; the rowdy goes limp (ragdoll) on landing. **E** while holding swings him round by the collar and throws him. Every **PERFECT** adds damage and a little Gethu; all PERFECT = **FLAWLESS**.
 

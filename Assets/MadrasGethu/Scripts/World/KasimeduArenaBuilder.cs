@@ -215,6 +215,11 @@ namespace MadrasGethu
             BuildFishCrates(root, new Vector3(6f, 0f, 14f), finisher: true);
             BuildFishCrates(root, new Vector3(-6.4f, 0f, -18f), finisher: true);
             BuildAuto(root, new Vector3(-3.2f, 0f, -2f), 20f);
+            // Lids hinge on the side away from the lane, so they open towards you.
+            BuildIceBox(root, new Vector3(5.4f, 0f, 2.5f), -90f);
+            BuildIceBox(root, new Vector3(-6.0f, 0f, -6f), 90f);
+            foreach (float z in new[] { -11f, 4.5f, 19.5f })
+                BuildSeaEdge(root, new Vector3(6.9f, 0f, z), Vector3.right);
 
             // Ice boxes and nets
             for (int i = 0; i < 5; i++)
@@ -275,6 +280,53 @@ namespace MadrasGethu
             light.intensity = 1.5f;
             // Bench
             Palette.Primitive(PrimitiveType.Cube, v, new Vector3(1.5f, 0.25f, 0f), new Vector3(0.4f, 0.5f, 2f), wood * 0.8f, name: "Bench");
+        }
+
+        /// <summary>Fish market ice box with a hinged lid: drag a rowdy here, head in, slam the lid (Q).</summary>
+        public static void BuildIceBox(Transform root, Vector3 position, float yaw)
+        {
+            var spot = MakeSpot(root, "Ice Box", position, out var v);
+            spot.kind = FinisherSpot.SpotKind.IceBox;
+            spot.finisherName = "ICE BOX SLAM!";
+            spot.promptName = "ice box";
+            spot.damage = 55f;
+            spot.gethuCost = 30f;
+            spot.useRadius = 2.3f;
+            spot.bodyRadius = 0.7f;
+            spot.debrisColor = new Color(0.8f, 0.9f, 1f);
+            v.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+            Color white = new Color(0.88f, 0.88f, 0.84f);
+            Palette.Primitive(PrimitiveType.Cube, v, new Vector3(0f, 0.33f, 0f), new Vector3(1.1f, 0.66f, 0.8f), white, name: "Box");
+            Palette.Primitive(PrimitiveType.Cube, v, new Vector3(0f, 0.45f, 0.401f), new Vector3(1.0f, 0.1f, 0.01f), new Color(0.15f, 0.35f, 0.75f), collider: false, name: "Stripe");
+            for (int i = 0; i < 6; i++)
+                Palette.Primitive(PrimitiveType.Cube, v, new Vector3(-0.35f + (i % 3) * 0.35f, 0.62f, -0.15f + (i / 3) * 0.3f), Vector3.one * 0.14f,
+                    new Color(0.75f, 0.9f, 1f), collider: false, name: "Ice");
+            // The lid hinges on the back edge.
+            var hinge = new GameObject("Lid Hinge").transform;
+            hinge.SetParent(v, false);
+            hinge.localPosition = new Vector3(0f, 0.67f, -0.41f);
+            Palette.Primitive(PrimitiveType.Cube, hinge, new Vector3(0f, 0.03f, 0.41f), new Vector3(1.14f, 0.06f, 0.84f), white * 0.95f, collider: false, name: "Lid");
+            spot.lid = hinge;
+        }
+
+        /// <summary>Edge of the jetty: drag a rowdy here and throw him into the harbour (Q).</summary>
+        public static void BuildSeaEdge(Transform root, Vector3 position, Vector3 toWater)
+        {
+            var spot = MakeSpot(root, "Jetty Edge", position, out var v);
+            spot.kind = FinisherSpot.SpotKind.Sea;
+            spot.outDirection = new Vector3(toWater.x, 0f, toWater.z).normalized;
+            spot.finisherName = "KADAL THROW!";
+            spot.promptName = "jetty edge";
+            spot.damage = 999f;
+            spot.gethuCost = 30f;
+            spot.useRadius = 2.2f;
+            spot.bodyRadius = 0f;
+            // Yellow-and-black warning paint along the edge.
+            Vector3 along = Vector3.Cross(Vector3.up, spot.outDirection);
+            for (int i = -2; i <= 2; i++)
+                Palette.Primitive(PrimitiveType.Cube, v, spot.outDirection * 0.6f + along * i * 0.5f + Vector3.up * 0.012f,
+                    new Vector3(0.45f, 0.01f, 0.45f), i % 2 == 0 ? new Color(0.95f, 0.8f, 0.1f) : new Color(0.08f, 0.08f, 0.08f), collider: false, name: "Edge Paint");
         }
 
         public static void BuildFishCrates(Transform root, Vector3 position, bool finisher)

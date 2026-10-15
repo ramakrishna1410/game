@@ -126,6 +126,26 @@ Exact Mixamo names change; search the words below and pick one that stays on the
 | `Uppercut.fbx`, `Haymaker.fbx`, `Hook.fbx`, `BodyBlow.fbx` | see the Combat table above | Royapuram Rush, Machine Gun Kuthu |
 | `FlyingKick.fbx` | "Drop Kick" / "Flying Kick" | Gethu Mass Combo dropkick |
 
+### Street moves (recommended)
+Without these the moves borrow the animation in the last column.
+
+| Save as | Search Mixamo for | Used in | Borrows |
+|---|---|---|---|
+| `SpinKick.fbx` | "Spinning Kick" / "Hurricane Kick" / "Spin Kick" | Spinning Heel Kick | Roundhouse, Kick |
+| `SupermanPunch.fbx` | "Jumping Punch" / "Superman Punch" | Superman Punch | Haymaker |
+| `LowKick.fbx` | "Low Kick" / "Leg Kick" (to the shin or knee) | Kaal Odaippu | Kick |
+| `Tackle.fbx` | "Tackle" / "Takedown" / "Rugby Tackle" | Rugby Tackle | Spear |
+| `GroundPunch.fbx` | "Punching Down" / "Ground Punch" (punching someone on the floor) | Rugby Tackle mount punches | Cross |
+
+For enemies (into `Art/Animations/Rowdy/`, or `Art/Animations/` for everyone):
+
+| Save as | Search Mixamo for | Used for | Borrows |
+|---|---|---|---|
+| `Kneel.fbx` | "Kneeling Down" / "Hurt Kneel" / "Falling To Knee" | dropped to one knee by the low kick | Beg |
+| `GutHit.fbx` | "Stomach Hit" / "Gut Punch" reaction / "Kidney Hit" | folded over by the liver shot | Flinch |
+
+Chokeslam, DDT, Giant Swing, Kadal Throw, Ice Box Slam, Arm Twist and Ear Clap need no new files: the hands, posture and the rowdy's body are placed in code like the other wrestling moves.
+
 For enemies, into `Art/Animations/Rowdy/`:
 
 | Save as | Search Mixamo for | Used for |

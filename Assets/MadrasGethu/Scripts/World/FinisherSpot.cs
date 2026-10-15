@@ -10,11 +10,23 @@ namespace MadrasGethu
     /// </summary>
     public class FinisherSpot : MonoBehaviour
     {
+        public enum SpotKind
+        {
+            Smash,    // tea kadai, crates, auto: smash his head into it, it breaks
+            Sea,      // jetty edge: throw him into the harbour
+            IceBox,   // fish market ice box: head in, slam the lid on him
+        }
+
         public static readonly List<FinisherSpot> All = new List<FinisherSpot>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics() => All.Clear();
 
+        public SpotKind kind = SpotKind.Smash;
+        [Tooltip("Sea: the way to the water (flat, world space).")]
+        public Vector3 outDirection = Vector3.right;
+        [Tooltip("Ice box: the lid's hinge (rotates round its local X axis to open).")]
+        public Transform lid;
         public string finisherName = "TEA KADAI SMASH!";
         public string promptName = "Tea Kadai";
         public float damage = 60f;
@@ -30,7 +42,13 @@ namespace MadrasGethu
         public bool IsBroken { get; private set; }
 
         /// <summary>Where the enemy's head gets slammed.</summary>
-        public Vector3 SlamPoint => transform.position + Vector3.up * 0.9f;
+        public Vector3 SlamPoint => transform.position + Vector3.up * (kind == SpotKind.IceBox ? 0.7f : 0.9f);
+
+        /// <summary>Ice box lid: 0 = shut, 1 = wide open.</summary>
+        public void SetLidOpen(float amount)
+        {
+            if (lid != null) lid.localRotation = Quaternion.Euler(-105f * Mathf.Clamp01(amount), 0f, 0f);
+        }
 
         readonly List<GameObject> debris = new List<GameObject>();
 
@@ -61,7 +79,7 @@ namespace MadrasGethu
         {
             foreach (var s in All)
             {
-                if (s.IsBroken) continue;
+                if (s.IsBroken || s.kind == SpotKind.Sea) continue;
                 Vector3 d = s.transform.position - position;
                 d.y = 0f;
                 if (d.magnitude <= s.bodyRadius + reach) return s;
@@ -102,6 +120,7 @@ namespace MadrasGethu
             debris.Clear();
             IsBroken = false;
             if (intactVisual != null) intactVisual.SetActive(true);
+            SetLidOpen(0f);
         }
     }
 }
