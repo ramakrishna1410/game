@@ -1144,7 +1144,9 @@ namespace MadrasGethu
         {
             ReleaseToken();
             Visual.SetTelegraph(false);
-            Visual.SetCombatStance(true);   // fight-stance footwork, so he can stumble backwards when dragged
+            // Fight-stance footwork (so he can stumble backwards when dragged), but no guard up: the
+            // held / struggling pose takes the arms.
+            Visual.SetCombatStance(true);
             Visual.Play(FighterPose.Flinch, 0.4f);
             state = AIState.Grabbed;
             GrabbedFromBehind = fromBehind;

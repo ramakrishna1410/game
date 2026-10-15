@@ -159,19 +159,23 @@ namespace MadrasGethu
                 .Step(tuck).Step(swingUp).Step(beat).Step(again).Step(finish);
         }
 
+        // German suplex: lock both arms round his waist from behind, jolt him off his feet a few times
+        // (hip lifts, not knees: you can't knee a man from behind), then sit down, bridge back and throw
+        // him over your head so he lands on his shoulders behind you.
         WrestleMove GermanSuplex()
         {
             var m = new WrestleMove { name = "GERMAN SUPLEX", id = MoveId.GermanSuplex, cost = GethuBar, victimFacesAway = true, grip = GripKind.Waist };
+            m.Step(Pose(Shot(With(S(QteKey.None, null, 0.25f, FighterPose.Grab), new Vector3(0f, 0.9f, 0.38f), 0f, 0f), CamShot.Side), -0.1f, 15f));
             for (int i = 0; i < 3; i++)
             {
-                var shot = With(S(QteKey.Light, "BODY SHOT", 0.3f, FighterPose.Knee), new Vector3(0f, 0.9f, 0.5f), 0f, 0f);
-                shot.damage = 5f;
-                shot.shot = CamShot.Front;
-                shot.anim = true;
-                m.Step(Pose(shot, 0f, 5f));
+                var jolt = With(S(QteKey.Light, "HIP LIFT", 0.32f, FighterPose.Grab), new Vector3(0f, 0.92f, 0.38f), -5f, 0.22f);
+                jolt.damage = 5f;
+                jolt.shot = CamShot.Side;
+                m.Step(Pose(jolt, -0.1f, 5f));
             }
-            m.Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.4f), 0f, 0f), CamShot.Side), -0.3f, 10f));
-            return m.Step(Pose(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.65f, FighterPose.Grab), new Vector3(0f, 0.35f, -0.85f), -180f, 0.9f), 34f), CamShot.Side), -0.55f, -65f));
+            m.Step(Pose(Shot(With(S(QteKey.None, null, 0.3f, FighterPose.Grab), new Vector3(0f, 0.85f, 0.35f), 0f, 0f), CamShot.Side), -0.35f, 10f));
+            // Lands on his upper back and shoulders (head not buried in the road), then the ragdoll rolls him over.
+            return m.Step(Pose(Shot(Impact(With(S(QteKey.Heavy, "SUPLEX", 0.65f, FighterPose.Grab), new Vector3(0f, 0.75f, -0.75f), -150f, 0.9f), 34f), CamShot.Side), -0.55f, -65f));
         }
 
         // Real powerbomb: head under his chest, hands on his thighs, stand up with him sitting on your

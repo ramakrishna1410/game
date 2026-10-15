@@ -113,6 +113,7 @@ namespace MadrasGethu
             var part = new Part { bone = bone, rb = bone.gameObject.AddComponent<Rigidbody>() };
             part.rb.mass = mass;
             part.rb.solverIterations = 12;
+            part.rb.maxDepenetrationVelocity = 2f;   // never shoot out of an overlap
             part.rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             bone.gameObject.layer = CombatUtil.RagdollLayer;
             if (parent != null)
@@ -235,6 +236,7 @@ namespace MadrasGethu
                 blendTime = blendDuration;
                 animator.enabled = false;
                 SetPhysics(true);
+                LiftOutOfGround();
                 foreach (var p in parts)
                 {
                     SetVelocity(p.rb, velocity);
@@ -245,6 +247,27 @@ namespace MadrasGethu
             {
                 // Already down (stomped, elbow-dropped): add to what he's doing.
                 foreach (var p in parts) p.rb.AddForce(velocity, ForceMode.VelocityChange);
+            }
+        }
+
+        /// <summary>
+        /// If any body part starts inside the road (a slam placed him a little too low), raise the whole body
+        /// just above it. Otherwise the physics engine pushes him out violently and he shoots across the street.
+        /// </summary>
+        void LiftOutOfGround()
+        {
+            Physics.SyncTransforms();
+            float lowest = float.MaxValue;
+            foreach (var p in parts)
+                if (p.col != null) lowest = Mathf.Min(lowest, p.col.bounds.min.y);
+            if (lowest == float.MaxValue) return;
+            float ground = transform.position.y;
+            if (Physics.Raycast(hips.position + Vector3.up * 1.5f, Vector3.down, out var hit, 4f, CombatUtil.WorldMask, QueryTriggerInteraction.Ignore))
+                ground = hit.point.y;
+            if (lowest < ground + 0.02f)
+            {
+                hips.position += Vector3.up * (ground + 0.02f - lowest);
+                Physics.SyncTransforms();
             }
         }
 

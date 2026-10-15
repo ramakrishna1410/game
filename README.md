@@ -124,7 +124,7 @@ Keyboard and mouse for now (gamepad prompts come later).
 |---|---|---|
 | Holding him, **Q** | Body Slam (scoop him across your chest, quarter turn, slam) | LMB scoop → RMB slam |
 | Holding him, **S + Q** | Dhobi Pachad (swing him over your head and beat him down, twice) | LMB → RMB → LMB → RMB |
-| Holding him from behind, **Q** | German Suplex | LMB ×3 body shots → RMB |
+| Holding him from behind, **Q** | German Suplex (waist lock, hip lifts, bridge back) | LMB ×3 hip lifts → RMB |
 | Holding him facing a wall, **W + Q** | Spinebuster | LMB → RMB |
 | Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
 | Sprinting at a rowdy | Spear | RMB |
