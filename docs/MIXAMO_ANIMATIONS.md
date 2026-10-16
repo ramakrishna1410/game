@@ -144,7 +144,7 @@ For enemies (into `Art/Animations/Rowdy/`, or `Art/Animations/` for everyone):
 | `Kneel.fbx` | "Kneeling Down" / "Hurt Kneel" / "Falling To Knee" | dropped to one knee by the low kick | Beg |
 | `GutHit.fbx` | "Stomach Hit" / "Gut Punch" reaction / "Kidney Hit" | folded over by the liver shot | Flinch |
 
-Chokeslam, DDT, Giant Swing, Kadal Throw, Ice Box Slam, Arm Twist and Ear Clap need no new files: the hands, posture and the rowdy's body are placed in code like the other wrestling moves.
+Choke-Out, Thai Clinch Knees, Giant Swing, Kadal Throw, Ice Box Slam, Arm Twist and Ear Clap need no new files: the hands, posture and the rowdy's body are placed in code like the other wrestling moves.
 
 For enemies, into `Art/Animations/Rowdy/`:
 

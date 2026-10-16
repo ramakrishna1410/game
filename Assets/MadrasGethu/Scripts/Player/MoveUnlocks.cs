@@ -17,7 +17,7 @@ namespace MadrasGethu
         // Holding him
         MuttaMothal, ArmTwist, EarClap, TripStomp, BowlingThrow,
         // Finishers only
-        GiantSwing, Chokeslam, DDT, KadalThrow, IceBoxSlam,
+        GiantSwing, ChokeOut, ThaiClinch, KadalThrow, IceBoxSlam,
     }
 
     /// <summary>

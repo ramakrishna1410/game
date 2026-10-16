@@ -164,8 +164,8 @@ Hold **Shift** while dragging someone to hurry him along (to a tea kadai or the 
 | Holding him, **Shift + Q** with full Gethu | Powerbomb (shockwave) | LMB → Space → RMB |
 | Sprinting at a rowdy | Spear | RMB |
 | Rowdy lying on the ground | Elbow Drop (leap, land on him elbow-first, roll off) | Space → LMB |
-| Holding him, **A + Q** | Chokeslam (hand on his throat, hoist him high, slam him down) | LMB → RMB |
-| Holding him, **W + Q** (no wall in front) | DDT (headlock, fall back, spike his head) | LMB → Space |
+| Holding him, **A + Q** | Choke-Out (spin him round, forearm across his throat; he sinks to his knees and goes limp) | LMB ×4 squeezes |
+| Holding him, **W + Q** (no wall in front) | Thai Clinch Knees (pull his head down, three knees to the face, elbow to the back of the neck) | LMB ×3 knees → RMB elbow |
 | Holding him, **D + Q** with full Gethu | Giant Swing (his ankles, three spins; his body knocks down anyone close; let go) | LMB → Space → RMB |
 | Holding him at the **jetty edge**, **Q** | Kadal Throw (lift him and heave him into the harbour) | LMB → RMB |
 | Holding him at a fish market **ice box**, **Q** | Ice Box Slam (head in, slam the lid on him twice) | LMB → RMB → RMB |

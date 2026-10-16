@@ -10,7 +10,9 @@ namespace MadrasGethu
     {
         Collar, Waist, ChestAndThigh, Thighs,
         Neck,       // chokeslam: right hand on his throat, left on his belt
-        Headlock,   // DDT: right arm round his head, left hand on his back
+        Headlock,   // ice box: right arm over his neck, left hand on his back
+        Clinch,     // Thai clinch: both hands behind his head, pulling it down
+        Choke,      // choke from behind: right forearm across his throat, left hand behind his head
         Ankles,     // giant swing: both hands round his lower legs
         Wrist,      // arm twist: his right wrist and elbow
     }
@@ -344,6 +346,20 @@ namespace MadrasGethu
                 case GripKind.Wrist:
                     heroLeftHand = wrist;
                     heroRightHand = elbow;
+                    return;
+                case GripKind.Clinch:
+                {
+                    // Hands cupped on the back of his head, either side.
+                    Vector3 back = Vector3.Lerp(neck, head, 0.5f) + Vector3.up * 0.07f;
+                    heroLeftHand = back - hero.right * 0.09f;
+                    heroRightHand = back + hero.right * 0.09f;
+                    return;
+                }
+                case GripKind.Choke:
+                    // From behind: the right forearm wraps across the front of his throat (hand at his far
+                    // shoulder), the left hand presses the back of his head forward.
+                    heroRightHand = neck - hero.right * 0.13f + hero.forward * 0.1f;
+                    heroLeftHand = head - hero.forward * 0.1f + Vector3.up * 0.03f;
                     return;
             }
 

@@ -15,7 +15,7 @@ namespace MadrasGethu
     ///   LMB then F ..................... Ear Clap (in PlayerGrabCombos.cs)
     ///   S + F .......................... Trip & Stomp
     ///   SHIFT + E ...................... Bowling Throw
-    /// The finisher-only moves (Giant Swing, Chokeslam, DDT, Kadal Throw, Ice Box Slam) are in PlayerWrestling.cs.
+    /// The finisher-only moves (Giant Swing, Choke-Out, Thai Clinch Knees, Kadal Throw, Ice Box Slam) are in PlayerWrestling.cs.
     /// </summary>
     public partial class PlayerFighter
     {

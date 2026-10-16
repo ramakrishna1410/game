@@ -44,6 +44,7 @@ namespace MadrasGethu
         public float? victimYaw;        // victim turns on his own (degrees from facing the hero): 90 = lying across the shoulders
         public float? lid;              // ice box lid: 0 shut .. 1 open
         public bool splash;             // Kadal Throw: he hits the water at the end of this step
+        public GrabStrikeKind heroStrike;   // a knee (or headbutt) thrown with IK during this step, hands keep their grip
         public bool letGo;              // hands come off him (he's flying away) but he still follows the path
         public float? victimLean;       // he bends at the waist with his feet planted (degrees, + = forward)
         public float? victimDrop;       // and bends his knees (metres, negative)
@@ -376,34 +377,83 @@ namespace MadrasGethu
             return m.Step(spin1).Step(spin2).Step(spin3).Step(release);
         }
 
-        // Chokeslam: one hand on his throat, hoist him up high, then slam him straight down on his back.
-        WrestleMove Chokeslam()
+        // Thai clinch knees (Muttikaal Mazhai): both hands behind his head, step back and pull him down so he's
+        // bent over with his feet planted, three knees into his face (his head snaps up each time), then an
+        // elbow straight down on the back of his neck drops him flat on his face. Nothing is lifted.
+        WrestleMove ThaiClinch()
         {
-            var grab = Pose(Shot(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.55f), 0f, 0f), CamShot.Side), 0f, 5f);
-            var lift = Pose(Shot(With(S(QteKey.Light, "THROAT", 0.55f, FighterPose.Grab), new Vector3(0f, 1.55f, 0.6f), -8f, 0.12f), CamShot.LowHero), 0.05f, -10f);
-            var top = Pose(Shot(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 1.62f, 0.62f), -12f, 0f), CamShot.LowHero), 0.05f, -12f);
-            var slam = Pose(Shot(Impact(With(S(QteKey.Heavy, "CHOKESLAM", 0.26f, FighterPose.Grab), new Vector3(0f, 0.3f, 1.0f), -95f, 0f), 34f), CamShot.GroundImpact), -0.6f, 45f);
-            return new WrestleMove { name = "CHOKESLAM", id = MoveId.Chokeslam, cost = GethuBar, grip = GripKind.Neck }
-                .Step(grab).Step(lift).Step(top).Step(slam);
+            var m = new WrestleMove
+            {
+                name = "THAI CLINCH KNEES", id = MoveId.ThaiClinch, cost = GethuBar, grip = GripKind.Clinch,
+                releasePush = new Vector3(0f, -3f, 0.3f),   // straight down, face first
+            };
+            var pull = Pose(Shot(With(S(QteKey.None, null, 0.35f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.62f), 0f, 0f), CamShot.Side), -0.1f, 10f);
+            pull.hero = new Vector3(0f, 0f, -0.6f);
+            pull.victimLean = 75f;
+            pull.victimDrop = -0.2f;
+            m.Step(pull);
+            for (int i = 0; i < 3; i++)
+            {
+                var knee = Pose(Shot(S(QteKey.Light, "KNEE", 0.22f, FighterPose.Grab), CamShot.Side), -0.1f, 12f);
+                knee.heroStrike = GrabStrikeKind.Knee;
+                knee.damage = 8f;
+                var snap = Pose(S(QteKey.None, null, 0.16f, FighterPose.Grab), -0.1f, 8f);   // his head snaps up
+                snap.victimLean = 48f;
+                snap.shot = CamShot.Side;
+                var down = Pose(S(QteKey.None, null, 0.2f, FighterPose.Grab), -0.1f, 12f);   // pulled back down
+                down.victimLean = 75f;
+                down.shot = CamShot.Side;
+                m.Step(knee).Step(snap).Step(down);
+            }
+            // Raise the elbow, then drive it down on the back of his neck.
+            var elbow = Pose(Shot(Impact(S(QteKey.Heavy, "ELBOW", 0.3f, FighterPose.Slam), 22f), CamShot.GroundImpact), -0.35f, 40f);
+            elbow.anim = true;
+            elbow.letGo = true;
+            elbow.victimLean = 95f;
+            elbow.victimDrop = -0.4f;
+            var after = Pose(S(QteKey.None, null, 0.4f, FighterPose.Grab), -0.15f, 15f);
+            after.shot = CamShot.GroundImpact;
+            return m.Step(elbow).Step(after);
         }
 
-        // DDT: he's bent over with his head locked under your arm (his feet still on the road), you fall
-        // straight back and spike his head into the road; his legs go up over him.
-        WrestleMove DDT()
+        // Choke-out: spin him round, forearm across his throat from behind. Each squeeze (LMB) he struggles less
+        // and sinks lower, down onto his knees; then he goes limp and you let him fall on his face.
+        WrestleMove ChokeOut()
         {
-            // Leaning in from his planted feet: head at your chest, under the right arm.
-            var headlock = Pose(Shot(With(S(QteKey.Light, "HEADLOCK", 0.35f, FighterPose.Grab), new Vector3(0f, 0.66f, 0.78f), 43f, 0f), CamShot.Side), -0.1f, 25f);
-            var fall = Pose(Shot(Impact(With(S(QteKey.Jump, "FALL BACK", 0.3f, FighterPose.Grab), new Vector3(0f, 0.6f, 0.5f), 125f, 0f), 30f), CamShot.GroundImpact), 0f, 0f);
-            fall.hero = new Vector3(0f, -0.55f, -0.3f);
-            fall.bodyPitch = -85f;
-            var lie = S(QteKey.None, null, 0.35f, FighterPose.Grab);   // a beat on your back
-            lie.shot = CamShot.Side;
-            var getUp = S(QteKey.None, null, 0.5f, FighterPose.Grab);
-            getUp.hero = new Vector3(0f, 0f, -0.35f);
-            getUp.bodyPitch = 0f;
-            getUp.shot = CamShot.Side;
-            return new WrestleMove { name = "DDT", id = MoveId.DDT, cost = GethuBar, grip = GripKind.Headlock }
-                .Step(headlock).Step(fall).Step(lie).Step(getUp);
+            var m = new WrestleMove
+            {
+                name = "CHOKE-OUT", id = MoveId.ChokeOut, cost = GethuBar, grip = GripKind.Choke,
+                victimFacesAway = true, startVictimYaw = grabFromBehind ? 0f : 180f,
+                releasePush = new Vector3(0f, -1f, 0.9f),   // slumps forward, away from you
+            };
+            var lockIn = Pose(Shot(With(S(QteKey.None, null, 0.45f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.36f), 0f, 0f), CamShot.Side), 0f, -4f);
+            lockIn.victimYaw = 0f;          // spun round, his back against your chest
+            lockIn.victimLean = -10f;       // pulled back off balance
+            m.Step(lockIn);
+            for (int i = 0; i < 4; i++)
+            {
+                float sink = -0.08f - i * 0.1f;   // weaker each time, sinking down
+                var squeeze = Pose(Shot(With(S(QteKey.Light, "SQUEEZE", 0.3f, FighterPose.Grab), new Vector3(i % 2 == 0 ? 0.06f : -0.06f, 0.95f, 0.36f), 0f, 0f), CamShot.Side),
+                    sink * 0.8f, 6f + i * 3f);
+                squeeze.victimLean = -12f + i * 2f;
+                squeeze.victimDrop = sink;
+                squeeze.damage = 4f;
+                m.Step(squeeze);
+                var struggle = Pose(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.36f), 0f, 0f), sink * 0.8f, 6f + i * 3f);
+                struggle.victimLean = -16f + i * 3f;
+                struggle.shot = CamShot.Side;
+                m.Step(struggle);
+            }
+            // Out: down onto his knees, limp; let him fall forward on his face.
+            var limp = Shot(Pose(S(QteKey.None, null, 0.5f, FighterPose.Grab), -0.45f, 18f), CamShot.Side);
+            limp.victimDrop = -0.55f;
+            limp.victimLean = 10f;
+            var drop = Pose(Shot(Impact(S(QteKey.None, null, 0.25f, FighterPose.Grab), 30f), CamShot.GroundImpact), -0.3f, 15f);
+            drop.letGo = true;
+            drop.victimLean = 25f;
+            var stand = Pose(S(QteKey.None, null, 0.45f, FighterPose.Grab), 0f, 0f);
+            stand.shot = CamShot.Side;
+            return m.Step(limp).Step(drop).Step(stand);
         }
 
         // Kadal Throw: lift him at the jetty edge and heave him into the harbour. Splash.
@@ -514,8 +564,8 @@ namespace MadrasGethu
         ///   Shift + Q .......... Powerbomb (full Gethu)
         ///   W + Q at a wall .... Spinebuster
         ///   S + Q .............. Kasimedu Spin Drop
-        ///   W + Q (no wall) .... DDT
-        ///   A + Q .............. Chokeslam
+        ///   W + Q (no wall) .... Thai Clinch Knees
+        ///   A + Q .............. Choke-Out
         ///   D + Q .............. Giant Swing (full Gethu)
         ///   Q .................. Body Slam
         /// </summary>
@@ -527,10 +577,10 @@ namespace MadrasGethu
             if (GameInput.Sprint && Gethu >= maxGethu && MoveUnlocks.Has(MoveId.Powerbomb)) return Powerbomb();
             if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out var wallHit))
                 return Spinebuster(Flat(wallHit.point - transform.position).magnitude);
-            if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.DDT)) return DDT();
+            if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.ThaiClinch)) return ThaiClinch();
             if (keys.y < -0.5f && MoveUnlocks.Has(MoveId.SpinDrop)) return SpinDrop();
             if (keys.x > 0.5f && MoveUnlocks.Has(MoveId.GiantSwing)) return GiantSwing();
-            if (keys.x < -0.5f && MoveUnlocks.Has(MoveId.Chokeslam)) return Chokeslam();
+            if (keys.x < -0.5f && MoveUnlocks.Has(MoveId.ChokeOut)) return ChokeOut();
             return MoveUnlocks.Has(MoveId.BodySlam) ? BodySlam() : null;
         }
 
@@ -548,9 +598,9 @@ namespace MadrasGethu
             if (MoveUnlocks.Has(MoveId.SpinDrop)) Prompts.Add(new PromptItem { key = "S+Q", label = "Spin Drop", dim = dim });
             if (MoveUnlocks.Has(MoveId.Spinebuster) && FindWall(grabbed.Center, transform.forward, 2.6f, out _))
                 Prompts.Add(new PromptItem { key = "W+Q", label = "Spinebuster", dim = dim });
-            else if (MoveUnlocks.Has(MoveId.DDT))
-                Prompts.Add(new PromptItem { key = "W+Q", label = "DDT", dim = dim });
-            if (MoveUnlocks.Has(MoveId.Chokeslam)) Prompts.Add(new PromptItem { key = "A+Q", label = "Chokeslam", dim = dim });
+            else if (MoveUnlocks.Has(MoveId.ThaiClinch))
+                Prompts.Add(new PromptItem { key = "W+Q", label = "Thai Clinch", dim = dim });
+            if (MoveUnlocks.Has(MoveId.ChokeOut)) Prompts.Add(new PromptItem { key = "A+Q", label = "Choke-Out", dim = dim });
             if (MoveUnlocks.Has(MoveId.GiantSwing)) Prompts.Add(new PromptItem { key = "D+Q", label = "Giant Swing", dim = Gethu < maxGethu });
             if (MoveUnlocks.Has(MoveId.Powerbomb) && Gethu >= maxGethu)
                 Prompts.Add(new PromptItem { key = "SHIFT+Q", label = "Powerbomb" });
@@ -760,6 +810,8 @@ namespace MadrasGethu
             // Lifts and slams are done with the hands locked on him (IK) over the holding stance;
             // only steps with a real move of their own (knee, jump, run) play an animation.
             if (st.anim) Visual.Play(st.heroPose, st.duration + 0.15f, st.duration + 0.1f);
+            // IK strike: lands as the step ends (contact is 40% into the strike, the rest is pulling back).
+            if (st.heroStrike != GrabStrikeKind.None) Visual.GrabStrike(st.heroStrike, st.duration / 0.4f);
         }
 
         /// <summary>The hero should stand in his holding stance right now (no step animation playing).</summary>
