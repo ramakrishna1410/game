@@ -22,6 +22,8 @@ namespace MadrasGethu
         public float maxHealth = 100f;
         public float radius = 0.4f;
         public float height = 1.8f;
+        /// <summary>A story cutscene is moving this character: the hero's controls and the rowdy AI are off.</summary>
+        [System.NonSerialized] public bool cutsceneControlled;
 
         public float Health { get; protected set; }
         public float HealthFraction => maxHealth > 0f ? Health / maxHealth : 0f;

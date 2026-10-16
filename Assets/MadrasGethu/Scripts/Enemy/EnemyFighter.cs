@@ -102,7 +102,9 @@ namespace MadrasGethu
         public bool isDummy;
         /// <summary>Practice dummy that fights back (punches, grabs, weapon swings, charges) so you can practise counters.</summary>
         public bool sparring;
-        protected override bool Immortal => isDummy;
+        protected override bool Immortal => isDummy || keepAlive;
+        /// <summary>Story: can't be knocked out (a named rowdy who has lines after the fight).</summary>
+        [System.NonSerialized] public bool keepAlive;
         float lastHitTime;
         /// <summary>The hero can grab him now (Thadiyan included) and use a wrestling finisher.</summary>
         public bool IsOpen => state == AIState.Dazed || state == AIState.Stagger;
@@ -150,6 +152,14 @@ namespace MadrasGethu
 
         void Update()
         {
+            if (cutsceneControlled)
+            {
+                Visual.SetTelegraph(false);
+                Visual.SetAnimatorBool("Held", false);
+                Visual.SetAnimatorBool("Holding", false);
+                Visual.SetAnimatorBool("Dazed", false);
+                return;
+            }
             UpdateTyreTrap();
             UpdateTactics();
             Visual.SetAnimatorBool("Held", state == AIState.Grabbed || trappedTyre != null);
@@ -862,7 +872,10 @@ namespace MadrasGethu
         // ------------------------------------------------------------------ surrender (last rowdy standing)
 
         /// <summary>Last rowdy standing loses his nerve: begs for mercy or runs for it.</summary>
-        public void Surrender()
+        public void Surrender() => Surrender(Random.value < 0.5f);
+
+        /// <summary>beg = true: on his knees begging; false: runs for it.</summary>
+        public void Surrender(bool beg)
         {
             if (IsDead || surrendered || kind != EnemyKind.Rowdy) return;
             surrendered = true;
@@ -870,7 +883,7 @@ namespace MadrasGethu
             EnemyDirector.Disengage(this);
             Disarm();
             if (state == AIState.HoldingHero) { var p = Player; StopHoldingHero(); if (p != null) p.ReleasedByEnemy(); }
-            if (Random.value < 0.5f)
+            if (beg)
             {
                 state = AIState.Begging;
                 stateTimer = 10f;
@@ -1290,6 +1303,7 @@ namespace MadrasGethu
                 return;
             }
             if (state == AIState.Grabbed) Motor.SetFrozen(false);
+            keepAlive = false;   // in the sea he's gone, story lines or not
             ReceiveHit(new HitInfo { attacker = by, damage = Health + 1f, direction = Vector3.down, unblockable = true, hitsDowned = true });
         }
 

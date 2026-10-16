@@ -44,6 +44,21 @@ namespace MadrasGethu
             return mat;
         }
 
+        /// <summary>A material showing a picture (signs, posters). emission > black makes it glow (neon).</summary>
+        public static Material Textured(Texture2D texture, Color emission)
+        {
+            var mat = new Material(Get(Color.white)) { color = Color.white, mainTexture = texture };
+            if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", texture);
+            if (emission != Color.black)
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.SetTexture("_EmissionMap", texture);
+                mat.SetColor("_EmissionColor", emission);
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+            return mat;
+        }
+
         /// <summary>Creates a primitive with a coloured material. Pass collider=false for purely visual parts.</summary>
         public static GameObject Primitive(PrimitiveType type, Transform parent, Vector3 localPos, Vector3 localScale,
             Color color, bool collider = true, string name = null)

@@ -98,10 +98,13 @@ namespace MadrasGethu
         }
 
         /// <summary>Background music and harbour ambience, if their files are there.</summary>
-        public static void StartMusic()
+        public static void StartMusic() => StartMusic(true);
+
+        /// <summary>withMusic = false: just the harbour ambience (story scenes start the fight music later).</summary>
+        public static void StartMusic(bool withMusic)
         {
             EnsurePool();
-            var tracks = Resources.LoadAll<AudioClip>("Audio/Music");
+            var tracks = withMusic ? Resources.LoadAll<AudioClip>("Audio/Music") : new AudioClip[0];
             if (tracks.Length > 0 && music == null)
             {
                 music = root.AddComponent<AudioSource>();
@@ -121,6 +124,11 @@ namespace MadrasGethu
                 ambience.volume = MusicVolume * 0.7f;
                 ambience.Play();
             }
+        }
+
+        public static void StopMusic()
+        {
+            if (music != null) { Object.Destroy(music); music = null; }
         }
 
         /// <summary>The impact sound for a blow, when the hit doesn't name one.</summary>

@@ -18,6 +18,19 @@ You download the files and **one menu click** does the rest: **Madras Gethu → 
 | `Thadiyan.fbx` *(optional)* | the big bruiser | a heavy-built male. The game scales him up 25% |
 | `Boss.fbx` *(optional)* | Kumaran Anna | someone older or better dressed |
 
+**Story cast (optional, for Story: Chapter 1).** Any other character file is a story character, matched by its file name:
+
+| Save as | Who | Suggestion |
+|---|---|---|
+| `Kutty.fbx` | Maaran's friend, an auto driver | a slim, cheerful male in a shirt |
+| `Selvi.fbx` | Maaran's mother, runs the idli shop | an older woman (no saree on Mixamo yet; pick the most modest, everyday outfit) |
+| `Kayal.fbx` | his sister, a nursing student | a young woman in casual clothes |
+| `Ilango.fbx` | the police inspector | a male in a uniform-like khaki or plain shirt |
+| `Pallu.fbx` | the rowdy who leads the shakedown | a rough-looking male, different from Rowdy |
+| `Muniyandi.fbx`, `Paati.fbx`, `Boy.fbx` | harbour people you can talk to | an old man, an old woman, a boy |
+
+Anyone without a file uses a placeholder body in their colours (the men use the Rowdy model).
+
 Put them in: `Assets/MadrasGethu/Art/Characters/`
 (The menu **Madras Gethu → Open Art Folder** creates and opens this folder for you.)
 
@@ -198,6 +211,19 @@ Into `Art/Animations/Hero/` (optional): `WeaponSwing.fbx`, `WeaponSmash.fbx`, `P
 
 Anything missing falls back to a similar shared move, so the game always works.
 
+### Story cutscenes (recommended for Story mode; put them in `Art/Animations/`)
+
+| Save as | Mixamo search | Used for |
+|---|---|---|
+| `Talking.fbx` | "Talking" | hand gestures while someone speaks |
+| `Pointing.fbx` | "Pointing" | "point" lines (Pallu, Kutty, Kayal) |
+| `Waving.fbx` | "Waving" | Kutty waving from the auto |
+| `Sitting Idle.fbx` | "Sitting Idle" | Maaran on the bench in Amma's kitchen |
+| `Talking On Phone.fbx` | "Talking On Phone" | Settu's phone call (arms only, he can still turn) |
+| `Sad Idle.fbx` *(optional)* | "Sad Idle" | for later chapters |
+
+Without them the characters just stand and talk; without *Sitting Idle* Maaran stands at the counter.
+
 ## 4. Run the tool
 1. Make sure the arena scene exists (**Madras Gethu → Create Kasimedu Arena Scene**, which you've already done).
 2. Click **Madras Gethu → Setup Characters (Mixamo)**.
@@ -208,7 +234,7 @@ What the tool does:
 - Sets every FBX to **Humanoid** (so all animations work on all characters), and makes the animations play in place.
 - Extracts the textures so skin and clothes show up.
 - Builds `Art/Generated/FighterAnimator.controller`: walk/run blend trees, a fight stance, every attack and reaction, block/hold/held states, and knockdown/get-up/death.
-- Creates `Hero.prefab`, `Rowdy.prefab`, … in `Art/Generated/` and plugs them into **Game Bootstrap** in the arena scene.
+- Creates `Hero.prefab`, `Rowdy.prefab`, … in `Art/Generated/` and plugs them into **Game Bootstrap** in the arena scene (and the Practice Yard and Chapter 1 scenes, if they exist). Story cast files (Kutty, Selvi, ...) go into its **Cast Models** list.
 
 You can run it again any time you add or replace files.
 

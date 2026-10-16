@@ -42,6 +42,7 @@ namespace MadrasGethu
         Vector3 cineWantPos, cineWantLook, cinePos, cineLook;
         float cineWantFov, cineWantRoll, cineFov, cineRoll;
         float zoomPunch;
+        float cineSharpOverride = -1f;
 
         /// <summary>True while a finisher's close-up camera is showing (or blending out).</summary>
         public bool CinematicActive => cineActive || cineWeight > 0.01f;
@@ -154,6 +155,44 @@ namespace MadrasGethu
         static readonly float[] CandidateYaw = { 0f, 40f, -40f, 80f, -80f, 130f, -130f, 0f, 180f };
         static readonly float[] CandidatePitch = { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 40f, 30f };
 
+        /// <summary>
+        /// Story cutscenes: frame a shot. cut = jump straight there (a film cut); otherwise glide from the
+        /// current shot (sharpness: how fast; low values give a slow dolly). Holds until EndCinematic.
+        /// </summary>
+        public void CutsceneShot(Vector3 cameraPosition, Vector3 lookAt, float fov, bool cut, float sharpness = -1f)
+        {
+            if (!CinematicActive && !cut)
+            {
+                cinePos = transform.position;
+                cineLook = transform.position + transform.forward * 4f;
+                cineFov = cam != null ? cam.fieldOfView : 58f;
+                cineRoll = 0f;
+            }
+            cineActive = true;
+            cineEndAt = float.MaxValue;
+            cineWantPos = cameraPosition;
+            cineWantLook = lookAt;
+            cineWantFov = fov;
+            cineWantRoll = 0f;
+            cineSharpOverride = sharpness;
+            if (cut)
+            {
+                cinePos = cameraPosition;
+                cineLook = lookAt;
+                cineFov = fov;
+                cineWeight = 1f;
+            }
+        }
+
+        /// <summary>Points the gameplay camera the way the hero faces (after a cutscene hands control back).</summary>
+        public void SnapBehind(Transform who)
+        {
+            if (who == null) return;
+            yaw = who.eulerAngles.y;
+            pitch = 15f;
+            smoothedPivot = who.position + Vector3.up * heightOffset;
+        }
+
         /// <summary>Holds the last shot for a moment (to show the landing), then eases back to the normal camera.</summary>
         public void EndCinematic(float hold = 0.4f)
         {
@@ -168,7 +207,7 @@ namespace MadrasGethu
             if (GameInput.UnlockCursorPressed) LockCursor(false);
             else if (Cursor.lockState != CursorLockMode.Locked && GameInput.ClickPressed) LockCursor(true);
 
-            if (cineActive && Time.unscaledTime >= cineEndAt) cineActive = false;
+            if (cineActive && Time.unscaledTime >= cineEndAt) { cineActive = false; cineSharpOverride = -1f; }
             Vector2 look = cineActive ? Vector2.zero : GameInput.Look * sensitivity;
             yaw += look.x;
             pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
@@ -208,7 +247,7 @@ namespace MadrasGethu
             cineWeight = Mathf.MoveTowards(cineWeight, cineActive ? 1f : 0f, dt * (cineActive ? 4f : 2.2f));
             if (cineWeight > 0f)
             {
-                float k = 1f - Mathf.Exp(-cinematicSharpness * dt);
+                float k = 1f - Mathf.Exp(-(cineSharpOverride > 0f ? cineSharpOverride : cinematicSharpness) * dt);
                 Vector3 want = cineWantPos;
                 Vector3 toCam = want - cineWantLook;
                 if (toCam.sqrMagnitude > 0.01f && Physics.SphereCast(cineWantLook, collisionRadius, toCam.normalized, out var cineHit, toCam.magnitude,

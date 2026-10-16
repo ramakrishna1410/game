@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public class GameManager : MonoBehaviour
     {
-        public enum State { Intro, Fighting, BetweenWaves, Victory, GameOver, Practice }
+        public enum State { Intro, Fighting, BetweenWaves, Victory, GameOver, Practice, Story }
 
         [System.Serializable]
         public class Wave
@@ -40,6 +40,13 @@ namespace MadrasGethu
         public EnemyKind dummyKind = EnemyKind.Rowdy;
 
         public bool PracticeMode => practiceMode;
+
+        [Header("Story")]
+        [Tooltip("A story chapter runs the show (StoryDirector): no arcade waves.")]
+        public bool storyMode;
+        public bool StoryMode => storyMode;
+        /// <summary>Raised when the hero goes down in story mode (the chapter offers a retry).</summary>
+        public event System.Action PlayerDiedInStory;
         public EnemyFighter Dummy { get; private set; }
         /// <summary>Second dummy (Y): for moves that need two rowdies (head clash, bowling throw, giant swing).</summary>
         public EnemyFighter PartnerDummy { get; private set; }
@@ -89,6 +96,7 @@ namespace MadrasGethu
         void Start()
         {
             if (practiceMode) BeginPractice();
+            else if (storyMode) { CurrentState = State.Story; WaveIndex = -1; }
             else BeginIntro();
         }
 
@@ -321,6 +329,10 @@ namespace MadrasGethu
                     UpdatePractice();
                     break;
 
+                case State.Story:
+                    AliveEnemies.RemoveAll(e => e == null || e.IsDead);
+                    break;
+
                 case State.Victory:
                 case State.GameOver:
                     if (GameInput.RestartPressed) Restart();
@@ -388,6 +400,12 @@ namespace MadrasGethu
 
         public void OnPlayerDied()
         {
+            if (storyMode)
+            {
+                SlowMo(0.25f, 2f);
+                PlayerDiedInStory?.Invoke();
+                return;
+            }
             if (CurrentState == State.GameOver) return;
             CurrentState = State.GameOver;
             SlowMo(0.25f, 2f);

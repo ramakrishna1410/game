@@ -17,6 +17,8 @@ namespace MadrasGethu
         public GameObject thadiyanModelPrefab;
         [Tooltip("Optional: model for the boss, Kumaran Anna.")]
         public GameObject bossModelPrefab;
+        [Tooltip("Story characters (Selvi, Kutty, Kayal, Ilango, Pallu...), matched by name. Set by the Setup Characters tool.")]
+        public GameObject[] castModels;
         [Tooltip("Animator Controller for all real characters (Art/Generated/FighterAnimator). Set by the Setup Characters tool.")]
         public RuntimeAnimatorController fighterAnimator;
 
@@ -28,6 +30,9 @@ namespace MadrasGethu
         [Tooltip("Practice yard: one dummy that never moves, never attacks and never dies. No waves.")]
         public bool practiceMode;
 
+        [Tooltip("Story chapter to play (0 = arcade waves).")]
+        public int storyChapter;
+
         void Awake()
         {
             Time.timeScale = 1f;
@@ -37,6 +42,10 @@ namespace MadrasGethu
             CharacterFactory.ThadiyanModelPrefab = thadiyanModelPrefab;
             CharacterFactory.BossModelPrefab = bossModelPrefab;
             CharacterFactory.FighterAnimator = fighterAnimator;
+            CharacterFactory.SetCastModels(castModels);
+
+            if (storyChapter > 0)
+                playerStart = StoryDirector.PlayerStartFor(storyChapter);
 
             if (practiceMode)
             {
@@ -50,7 +59,7 @@ namespace MadrasGethu
             }
 
             var cam = SetupCamera();
-            GameAudio.StartMusic();
+            GameAudio.StartMusic(storyChapter == 0);
 
             var gmGo = new GameObject("Game Manager");
             var gm = gmGo.AddComponent<GameManager>();
@@ -60,6 +69,10 @@ namespace MadrasGethu
             {
                 gm.practiceMode = true;
                 gm.dummySpawn = PracticeYardBuilder.DummySpawn;
+            }
+            else if (storyChapter > 0)
+            {
+                gm.storyMode = true;
             }
             else
             {
@@ -75,6 +88,7 @@ namespace MadrasGethu
             cam.target = player.transform;
 
             gmGo.AddComponent<GameHUD>();
+            if (storyChapter > 0) StoryDirector.Create(gmGo, storyChapter);
         }
 
         ThirdPersonCamera SetupCamera()

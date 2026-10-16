@@ -10,6 +10,7 @@ namespace MadrasGethu.EditorTools
         const string SceneFolder = "Assets/MadrasGethu/Scenes";
         const string ScenePath = SceneFolder + "/KasimeduArena.unity";
         public const string PracticeScenePath = SceneFolder + "/PracticeYard.unity";
+        public const string Chapter1ScenePath = SceneFolder + "/Chapter1_KasimeduKaalai.unity";
 
         [MenuItem("Madras Gethu/Create Kasimedu Arena Scene", priority = 0)]
         public static void CreateArenaScene()
@@ -79,7 +80,32 @@ namespace MadrasGethu.EditorTools
                 EditorSceneManager.OpenScene(PracticeScenePath);
         }
 
-        [MenuItem("Madras Gethu/Tamil Text Test", priority = 20)]
+        [MenuItem("Madras Gethu/Story: Chapter 1 (Kasimedu Morning)", priority = 10)]
+        public static void OpenChapter1()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            // Always rebuilt, so it picks up the latest characters from the arena scene.
+            EnsureSceneFolder();
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var go = new GameObject("Game Bootstrap (Chapter 1)");
+            var bootstrap = go.AddComponent<GameBootstrap>();
+            bootstrap.storyChapter = 1;
+            EditorSceneManager.SaveScene(scene, Chapter1ScenePath);
+            bool copied = CopyCharactersFromArena(bootstrap);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, Chapter1ScenePath);
+            AddSceneToBuildSettings(Chapter1ScenePath);
+            Selection.activeGameObject = go;
+            EditorUtility.DisplayDialog("Madras Gethu",
+                "Chapter 1 scene ready at\n" + Chapter1ScenePath +
+                (copied ? "\n\nYour characters were copied from the arena scene." : "\n\n(No characters set up yet: placeholder bodies are used.)") +
+                "\n\nPress Play.\nSpace / Left click: next line · Tab: skip scene · F2: subtitles (Tamil+English / Tamil+Tanglish / English / Tanglish)",
+                "Vaa, poalaam!");
+        }
+
+        [MenuItem("Madras Gethu/Tamil Text Test", priority = 30)]
         public static void TamilTextTestScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -90,7 +116,7 @@ namespace MadrasGethu.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             new GameObject("Tamil Text Test").AddComponent<TamilTextTest>();
             EditorSceneManager.SaveScene(scene, path);
-            EditorApplication.EnterPlaymode();
+            EditorApplication.isPlaying = true;
         }
 
         /// <summary>Copies the character models and animator from the arena scene's bootstrap.</summary>
@@ -111,6 +137,7 @@ namespace MadrasGethu.EditorTools
                 target.enemyModelPrefab = source.enemyModelPrefab;
                 target.thadiyanModelPrefab = source.thadiyanModelPrefab;
                 target.bossModelPrefab = source.bossModelPrefab;
+                target.castModels = source.castModels;
                 target.fighterAnimator = source.fighterAnimator;
                 EditorUtility.SetDirty(target);
             }

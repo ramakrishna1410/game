@@ -258,6 +258,14 @@ namespace MadrasGethu
 
         void Update()
         {
+            if (cutsceneControlled)
+            {
+                Prompts.Clear();
+                Visual.SetAnimatorBool("Holding", false);
+                Visual.SetAnimatorBool("Held", false);
+                if (cam != null) cam.InCombat = false;
+                return;
+            }
             float dt = Time.deltaTime;
             stateTimer += dt;
             dodgeCooldown -= dt;
@@ -1523,6 +1531,25 @@ namespace MadrasGethu
                 Motor.AddImpulse(push);
             }
             if (GM != null) GM.OnPlayerDied();
+        }
+
+        /// <summary>A cutscene starts: let go of whatever he's doing (keeps health, Gethu and position).</summary>
+        public void EnterCutscene()
+        {
+            if (wrestleMove != null) EndWrestle();
+            if (combo != null) EndStrikeCombo();
+            codeFirst = '\0';
+            if (grabbed != null) ReleaseGrab(Vector3.zero, false);
+            heldBy = null;
+            Motor.SetFrozen(false);
+            DropWeapon();
+            massModeTimer = 0f;
+            ComboHits = 0;
+            Motor.ClearImpulse();
+            Visual.ResetPose();
+            SetState(PlayerState.Free);
+            Visual.SetCombatStance(false);
+            cutsceneControlled = true;
         }
 
         public void Respawn(Vector3 position)

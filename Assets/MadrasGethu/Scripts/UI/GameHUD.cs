@@ -25,7 +25,7 @@ namespace MadrasGethu
         void Start()
         {
             helpAutoHideAt = Time.unscaledTime + 12f;
-            if (GM != null && GM.PracticeMode) { showHelp = false; helpAutoHideAt = float.MaxValue; }
+            if (GM != null && (GM.PracticeMode || GM.StoryMode)) { showHelp = false; helpAutoHideAt = float.MaxValue; }
         }
 
         void Update()
@@ -53,6 +53,8 @@ namespace MadrasGethu
         void OnGUI()
         {
             if (GM == null) return;
+            // Story cutscenes draw their own screen (subtitles, letterbox).
+            if (StoryDirector.HidesHud) return;
             EnsureStyles();
 
             DrawFinisherMarkers();
@@ -60,7 +62,7 @@ namespace MadrasGethu
             DrawPopups();
             DrawPlayerPanel();
             DrawCombo();
-            DrawWaveInfo();
+            if (!GM.StoryMode) DrawWaveInfo();
             if (GM.PracticeMode) DrawPractice();
             DrawBanner();
             DrawPrompt();

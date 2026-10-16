@@ -24,6 +24,7 @@ namespace MadrasGethu
     ///   Q         Gethu (finisher)       RT           Gethu (finisher)
     ///   Enter     restart                Start        restart
     ///   H         toggle controls help   Back/View    toggle controls help
+    ///   Story: Space/Enter/LMB next line (A), Tab skip scene (Start), F2 subtitle language
     /// </summary>
     public static class GameInput
     {
@@ -120,6 +121,11 @@ namespace MadrasGethu
         public static bool PracticePartnerPressed => KeyDown(Key.Y);
         public static bool PracticeSparPressed => KeyDown(Key.K);
         public static bool PracticeWeaponPressed => KeyDown(Key.J);
+        // Story: next line, skip the scene, change subtitles.
+        public static bool StoryNextPressed => KeyDown(Key.Space) || KeyDown(Key.Enter) || PadDown(GamepadButton.South)
+                                               || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame);
+        public static bool StorySkipPressed => KeyDown(Key.Tab) || PadDown(GamepadButton.Start);
+        public static bool SubtitleModePressed => KeyDown(Key.F2);
 
         public static bool LightPressed =>
             (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked && Mouse.current.leftButton.wasPressedThisFrame)
@@ -151,6 +157,10 @@ namespace MadrasGethu
         public static bool PracticePartnerPressed => Input.GetKeyDown(KeyCode.Y);
         public static bool PracticeSparPressed => Input.GetKeyDown(KeyCode.K);
         public static bool PracticeWeaponPressed => Input.GetKeyDown(KeyCode.J);
+        public static bool StoryNextPressed => Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return)
+                                               || Input.GetKeyDown(KeyCode.JoystickButton0) || Input.GetMouseButtonDown(0);
+        public static bool StorySkipPressed => Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.JoystickButton7);
+        public static bool SubtitleModePressed => Input.GetKeyDown(KeyCode.F2);
 
         public static bool LightPressed =>
             (Cursor.lockState == CursorLockMode.Locked && Input.GetMouseButtonDown(0)) || Input.GetKeyDown(KeyCode.JoystickButton2);

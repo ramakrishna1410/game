@@ -42,12 +42,55 @@ namespace MadrasGethu
 
         // ------------------------------------------------------------------ lighting
 
+        static Light moonLight, rimLight;
+        static readonly System.Collections.Generic.List<Light> lampLights = new System.Collections.Generic.List<Light>();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() { moonLight = null; rimLight = null; lampLights.Clear(); }
+
+        /// <summary>Story: early morning (sun low over the sea, lamps off) or the usual night.</summary>
+        public static void SetTimeOfDay(bool morning)
+        {
+            var cam = Camera.main;
+            if (morning)
+            {
+                if (moonLight != null)
+                {
+                    moonLight.transform.rotation = Quaternion.Euler(14f, -100f, 0f);   // sunrise over the Bay of Bengal (east = +X)
+                    moonLight.color = new Color(1f, 0.78f, 0.6f);
+                    moonLight.intensity = 1.25f;
+                }
+                if (rimLight != null) { rimLight.color = new Color(0.65f, 0.75f, 1f); rimLight.intensity = 0.35f; }
+                RenderSettings.ambientLight = new Color(0.58f, 0.55f, 0.58f);
+                RenderSettings.fogColor = new Color(0.78f, 0.66f, 0.6f);
+                RenderSettings.fogDensity = 0.011f;
+                if (cam != null) cam.backgroundColor = new Color(0.86f, 0.68f, 0.58f);
+                foreach (var l in lampLights) if (l != null) l.enabled = false;
+            }
+            else
+            {
+                if (moonLight != null)
+                {
+                    moonLight.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
+                    moonLight.color = new Color(0.55f, 0.65f, 0.95f);
+                    moonLight.intensity = 0.8f;
+                }
+                if (rimLight != null) { rimLight.color = new Color(0.6f, 0.7f, 1f); rimLight.intensity = 0.45f; }
+                RenderSettings.ambientLight = new Color(0.27f, 0.28f, 0.36f);
+                RenderSettings.fogColor = new Color(0.05f, 0.06f, 0.1f);
+                RenderSettings.fogDensity = 0.018f;
+                if (cam != null) cam.backgroundColor = new Color(0.05f, 0.06f, 0.1f);
+                foreach (var l in lampLights) if (l != null) l.enabled = true;
+            }
+        }
+
         public static void SetupNightLighting(Transform root)
         {
             var moonGo = new GameObject("Moonlight");
             moonGo.transform.SetParent(root, false);
             moonGo.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
             var moon = moonGo.AddComponent<Light>();
+            moonLight = moon;
             moon.type = LightType.Directional;
             moon.color = new Color(0.55f, 0.65f, 0.95f);
             moon.intensity = 0.8f;
@@ -62,6 +105,7 @@ namespace MadrasGethu
             rimGo.transform.SetParent(root, false);
             rimGo.transform.rotation = Quaternion.Euler(25f, 150f, 0f);
             var rim = rimGo.AddComponent<Light>();
+            rimLight = rim;
             rim.type = LightType.Directional;
             rim.color = new Color(0.6f, 0.7f, 1f);
             rim.intensity = 0.45f;
@@ -185,6 +229,7 @@ namespace MadrasGethu
 
         static void BuildStreetLamps(Transform root)
         {
+            lampLights.Clear();
             for (float z = -HalfLength + 4f; z < HalfLength; z += 13f)
             {
                 var lampRoot = new GameObject("Street Lamp").transform;
@@ -203,6 +248,7 @@ namespace MadrasGethu
                 light.range = 16f;
                 light.intensity = 2.6f;
                 light.shadows = LightShadows.None;
+                lampLights.Add(light);
             }
         }
 

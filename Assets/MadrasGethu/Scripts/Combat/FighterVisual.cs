@@ -515,6 +515,9 @@ namespace MadrasGethu
         }
 
         /// <summary>Sets an Animator bool if the controller has it (e.g. "Holding" while grabbing, "Held" while grabbed).</summary>
+        /// <summary>True if the Animator has this parameter (e.g. "Sitting" once a sitting animation is set up).</summary>
+        public bool HasAnimatorParameter(string parameter) => animatorParams != null && animatorParams.Contains(parameter);
+
         public void SetAnimatorBool(string parameter, bool value)
         {
             if (animator != null && animatorParams != null && animatorParams.Contains(parameter))
@@ -779,6 +782,13 @@ namespace MadrasGethu
             {
                 case FighterPose.Guard:
                     aL = guardL; aR = guardR; break;
+                // Story gestures on the placeholder body
+                case FighterPose.Talk:
+                    aR = new Vector3(-55f + 12f * Mathf.Sin(Time.time * 5f), -25f, 0f); aL = new Vector3(-25f, 15f, 0f); break;
+                case FighterPose.Point:
+                    aR = new Vector3(-88f, -5f, 0f); reachR = 0.25f; twist = -15f; break;
+                case FighterPose.Wave:
+                    aR = new Vector3(-165f, -20f + 25f * Mathf.Sin(Time.time * 9f), 0f); break;
                 case FighterPose.Block:
                     aL = new Vector3(-155f, 30f, 0f); aR = new Vector3(-155f, -30f, 0f); reachL = reachR = 0.12f; break;
                 case FighterPose.Jab:

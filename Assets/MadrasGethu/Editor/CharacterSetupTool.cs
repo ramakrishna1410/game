@@ -129,6 +129,14 @@ namespace MadrasGethu.EditorTools
                 T("Kneel", 1f, new[] { "kneel", "kneeldown", "hurtkneel", "fallonknee", "kneelinghurt" }, "Beg", "StaggerBack"),
                 T("GutHit", 1f, new[] { "guthit", "stomachhit", "gutpunch", "bodyhit", "doubleover", "holdingstomach", "kidneyhit" }, "Flinch", "StaggerBack"),
 
+                // Story cutscenes (any folder; everyone shares them)
+                T("Talk", 1f, new[] { "talk", "talking", "explaining", "conversation", "arguing", "talkinggesture" }),
+                T("Point", 1f, new[] { "point", "pointing", "pointinggesture", "pointingforward" }, "Talk"),
+                T("Wave", 1f, new[] { "wave", "waving", "wavinggesture", "hello" }, "Talk"),
+                new Slot { name = "Sit", kind = SlotKind.HoldBool, boolParameter = "Sitting", aliases = new[] { "sit", "sitting", "sittingidle", "sittalking", "sittingtalking" }, fallbacks = new string[0] },
+                new Slot { name = "Phone", kind = SlotKind.HoldBool, boolParameter = "OnPhone", aliases = new[] { "phone", "talkingonphone", "phonecall", "onphone", "cellphone", "talkingphone" }, fallbacks = new string[0] },
+                new Slot { name = "Sad", kind = SlotKind.HoldBool, boolParameter = "Sad", aliases = new[] { "sad", "sadidle", "crying", "dejected", "depressed" }, fallbacks = new string[0] },
+
                 new Slot { name = "Dazed", kind = SlotKind.HoldBool, boolParameter = "Dazed", aliases = new[] { "dazed", "dizzy", "dizzyidle", "stunned" }, fallbacks = new[] { "StaggerBack", "Flinch" } },
                 new Slot { name = "Beg", kind = SlotKind.HoldBool, boolParameter = "Begging", aliases = new[] { "beg", "begging", "pleading", "kneelbeg", "kneeling" }, fallbacks = new[] { "Flinch" } },
                 new Slot { name = "Block", kind = SlotKind.HoldBool, boolParameter = "Blocking", aliases = new[] { "block", "blocking", "centerblock", "bodyblock" }, fallbacks = new[] { "Guard" } },
@@ -733,7 +741,7 @@ namespace MadrasGethu.EditorTools
             else if (walk != null) tree.AddChild(walk, 0.8f);
         }
 
-        static readonly string[] UpperBodyHolds = { "Grab", "Held", "Block" };
+        static readonly string[] UpperBodyHolds = { "Grab", "Held", "Block", "Phone" };
 
         /// <summary>Arms, hands and head only (no hips, spine or legs). Saved next to the controllers.</summary>
         static AvatarMask UpperBodyMask(string folder)
@@ -854,13 +862,21 @@ namespace MadrasGethu.EditorTools
                     ? "Kasimedu Arena scene updated with your characters."
                     : "Kasimedu Arena scene updated. No Rowdy.fbx found, so enemies use the Hero model for now.";
 
-            // The practice yard uses the same characters.
+            // The practice yard and the story chapters use the same characters.
+            bool reopen = false;
             if (File.Exists(MadrasGethuMenu.PracticeScenePath))
             {
                 if (AssignInScene(MadrasGethuMenu.PracticeScenePath, prefabs, heroPath, controller))
                     message += " Practice Yard updated too.";
-                EditorSceneManager.OpenScene(ArenaScenePath, OpenSceneMode.Single);
+                reopen = true;
             }
+            if (File.Exists(MadrasGethuMenu.Chapter1ScenePath))
+            {
+                if (AssignInScene(MadrasGethuMenu.Chapter1ScenePath, prefabs, heroPath, controller))
+                    message += " Chapter 1 updated too.";
+                reopen = true;
+            }
+            if (reopen) EditorSceneManager.OpenScene(ArenaScenePath, OpenSceneMode.Single);
             return message;
         }
 
@@ -886,6 +902,9 @@ namespace MadrasGethu.EditorTools
             bootstrap.enemyModelPrefab = rowdy != null ? rowdy : hero;
             bootstrap.thadiyanModelPrefab = Lookup(prefabs, "thadiyan");
             bootstrap.bossModelPrefab = Lookup(prefabs, "boss");
+            // Everyone else (Selvi.fbx, Kutty.fbx, Pallu.fbx...) is a story cast model, found by file name.
+            bootstrap.castModels = prefabs.Where(kv => System.Array.IndexOf(new[] { "hero", "rowdy", "thadiyan", "boss" }, kv.Key) < 0 && kv.Value != hero)
+                                          .Select(kv => kv.Value).ToArray();
             bootstrap.fighterAnimator = controller;
             EditorUtility.SetDirty(bootstrap);
             EditorSceneManager.MarkSceneDirty(scene);

@@ -79,6 +79,20 @@ Blows also get **hit reactions** on top of the animation: a hook snaps his head 
 
 The story, cast and chapter plan are in **[docs/STORY.md](docs/STORY.md)**. Scene-by-scene scripts in Tamil, Tanglish and English are in [docs/script](docs/script).
 
+**Play Chapter 1 (Kasimedu Morning):**
+1. Copy the whole `Assets/MadrasGethu/Resources` folder too (the dialogue, Tamil font and sign pictures live there), as well as `Scripts` and `Editor`.
+2. Optional: download the story characters and cutscene animations listed in [docs/MIXAMO_ANIMATIONS.md](docs/MIXAMO_ANIMATIONS.md) and run **Madras Gethu → Setup Characters (Mixamo)**.
+3. Click **Madras Gethu → Story: Chapter 1 (Kasimedu Morning)** and press **Play**.
+
+| Key | In a cutscene |
+|---|---|
+| Space / Enter / Left click | next line (lines also move on by themselves) |
+| Tab | skip the rest of this cutscene |
+| F2 | subtitles: Tamil + English → Tamil + Tanglish → English → Tanglish (remembered) |
+| E | talk to someone when "E · பேசு" shows over them |
+
+The dialogue is in `Resources/Story/ch01.txt`: one line per row (speaker | gesture | Tamil | Tanglish | English), so wording can be fixed without touching code. Voice recordings go in `Resources/Voice/ch01/<scene>_<line>.ogg` (for example `1.3_shakedown_1.ogg`); a line with a recording waits for it to finish. Music for the auto ride: `Resources/Audio/Story/gaana`.
+
 **Tamil text test:** Tamil letters need shaping (vowel signs and joined letters), which not every Unity text system does. To check yours:
 1. Copy `Assets/MadrasGethu/Resources/Fonts` as well as `Scripts` and `Editor`.
 2. Click **Madras Gethu → Tamil Text Test**. It makes a test scene and presses Play.
@@ -260,8 +274,15 @@ Assets/MadrasGethu/
     World/         KasimeduArenaBuilder (placeholder level), PracticeYardBuilder, FinisherSpot (tea kadai / crates / auto)
     CameraSystem/  ThirdPersonCamera
     UI/            GameHUD (health, Gethu, combo grades, button prompts, QTE ring), HudIcons (key caps, hand, skull)
-  Editor/          "Madras Gethu" menu: creates the arena scene
+    Story/         StoryDirector (cutscenes, camera, retries), Chapter1, StoryScript (reads the dialogue files),
+                   StoryUI (subtitles, letterbox, cards), StoryActor (walk/face/gesture), Cast, StoryProps
+  Resources/
+    Story/         ch01.txt (Chapter 1 dialogue) and Art/ (signs with Tamil text)
+    Fonts/         Noto Sans Tamil
+  Editor/          "Madras Gethu" menu: creates the arena, practice and story scenes
 docs/
+  STORY.md              story bible: cast, 12 chapters, endings
+  script/               scene-by-scene scripts in Tamil, Tanglish and English
   GAME_DESIGN.md        the full Chennai game concept and roadmap
   MIXAMO_ANIMATIONS.md  how to swap the placeholder bodies for real animated characters
 ```
