@@ -79,6 +79,20 @@ namespace MadrasGethu.EditorTools
                 EditorSceneManager.OpenScene(PracticeScenePath);
         }
 
+        [MenuItem("Madras Gethu/Tamil Text Test", priority = 20)]
+        public static void TamilTextTestScene()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            EnsureSceneFolder();
+            const string path = SceneFolder + "/TamilTextTest.unity";
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            new GameObject("Tamil Text Test").AddComponent<TamilTextTest>();
+            EditorSceneManager.SaveScene(scene, path);
+            EditorApplication.EnterPlaymode();
+        }
+
         /// <summary>Copies the character models and animator from the arena scene's bootstrap.</summary>
         static bool CopyCharactersFromArena(GameBootstrap target)
         {

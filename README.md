@@ -75,6 +75,17 @@ Every hit, block, parry, grab, swing, fall, slam, bone crack, prop smash, bottle
 
 Blows also get **hit reactions** on top of the animation: a hook snaps his head to the side, a straight punch snaps it back, an uppercut throws it up, a body shot folds him over.
 
+## Story and Tamil dialogue
+
+The story, cast and chapter plan are in **[docs/STORY.md](docs/STORY.md)**. Scene-by-scene scripts in Tamil, Tanglish and English are in [docs/script](docs/script).
+
+**Tamil text test:** Tamil letters need shaping (vowel signs and joined letters), which not every Unity text system does. To check yours:
+1. Copy `Assets/MadrasGethu/Resources/Fonts` as well as `Scripts` and `Editor`.
+2. Click **Madras Gethu → Tamil Text Test**. It makes a test scene and presses Play.
+3. The screen shows the same Tamil lines four ways (A, B, C) plus a correct reference picture (D). Take a screenshot.
+
+The font is Noto Sans Tamil (free, SIL Open Font License; see `Resources/Fonts/NotoSansTamil-OFL.txt`).
+
 ## Ragdolls and hit timing
 
 With real (Mixamo) characters:
