@@ -404,6 +404,11 @@ namespace MadrasGethu
             if (handIK != null) handIK.SetPosture(drop, lean);
         }
 
+        public void RepinFeet()
+        {
+            if (handIK != null) handIK.RepinFeet();
+        }
+
         public void ClearPosture()
         {
             if (handIK != null) handIK.ClearPosture();

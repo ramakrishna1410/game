@@ -71,6 +71,7 @@ namespace MadrasGethu
         public bool mountAfter;         // rugby tackle: stay on top of him for the ground and pound
         public FinisherSpot sea;        // Kadal Throw: the jetty edge
         public float startVictimYaw;    // he starts turned this far from the move's facing (turned round during the first step)
+        public bool victimClaws;        // choke: his hands claw at your forearm while he still fights it
         public bool keepProp;           // the prop survives the finisher (ice box: lid slams, box stays)
         public Vector3? releasePush;    // hero-local push when he's let go limp (default: away from the hero, down)
         public readonly List<WrestleStep> steps = new List<WrestleStep>();
@@ -388,9 +389,9 @@ namespace MadrasGethu
                 releasePush = new Vector3(0f, -3f, 0.3f),   // straight down, face first
             };
             var pull = Pose(Shot(With(S(QteKey.None, null, 0.35f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.62f), 0f, 0f), CamShot.Side), -0.1f, 10f);
-            pull.hero = new Vector3(0f, 0f, -0.6f);
-            pull.victimLean = 75f;
-            pull.victimDrop = -0.2f;
+            pull.hero = new Vector3(0f, 0f, -0.38f);   // close: his head right at your knees
+            pull.victimLean = 62f;
+            pull.victimDrop = -0.15f;
             m.Step(pull);
             for (int i = 0; i < 3; i++)
             {
@@ -398,10 +399,10 @@ namespace MadrasGethu
                 knee.heroStrike = GrabStrikeKind.Knee;
                 knee.damage = 8f;
                 var snap = Pose(S(QteKey.None, null, 0.16f, FighterPose.Grab), -0.1f, 8f);   // his head snaps up
-                snap.victimLean = 48f;
+                snap.victimLean = 38f;
                 snap.shot = CamShot.Side;
                 var down = Pose(S(QteKey.None, null, 0.2f, FighterPose.Grab), -0.1f, 12f);   // pulled back down
-                down.victimLean = 75f;
+                down.victimLean = 62f;
                 down.shot = CamShot.Side;
                 m.Step(knee).Step(snap).Step(down);
             }
@@ -409,6 +410,7 @@ namespace MadrasGethu
             var elbow = Pose(Shot(Impact(S(QteKey.Heavy, "ELBOW", 0.3f, FighterPose.Slam), 22f), CamShot.GroundImpact), -0.35f, 40f);
             elbow.anim = true;
             elbow.letGo = true;
+            elbow.hero = new Vector3(0f, 0f, -0.2f);   // step in over him
             elbow.victimLean = 95f;
             elbow.victimDrop = -0.4f;
             var after = Pose(S(QteKey.None, null, 0.4f, FighterPose.Grab), -0.15f, 15f);
@@ -425,6 +427,7 @@ namespace MadrasGethu
                 name = "CHOKE-OUT", id = MoveId.ChokeOut, cost = GethuBar, grip = GripKind.Choke,
                 victimFacesAway = true, startVictimYaw = grabFromBehind ? 0f : 180f,
                 releasePush = new Vector3(0f, -1f, 0.9f),   // slumps forward, away from you
+                victimClaws = true,
             };
             var lockIn = Pose(Shot(With(S(QteKey.None, null, 0.45f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.36f), 0f, 0f), CamShot.Side), 0f, -4f);
             lockIn.victimYaw = 0f;          // spun round, his back against your chest
@@ -434,12 +437,12 @@ namespace MadrasGethu
             {
                 float sink = -0.08f - i * 0.1f;   // weaker each time, sinking down
                 var squeeze = Pose(Shot(With(S(QteKey.Light, "SQUEEZE", 0.3f, FighterPose.Grab), new Vector3(i % 2 == 0 ? 0.06f : -0.06f, 0.95f, 0.36f), 0f, 0f), CamShot.Side),
-                    sink * 0.8f, 6f + i * 3f);
+                    sink * 0.8f, -8f + i * 4f);
                 squeeze.victimLean = -12f + i * 2f;
                 squeeze.victimDrop = sink;
                 squeeze.damage = 4f;
                 m.Step(squeeze);
-                var struggle = Pose(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.36f), 0f, 0f), sink * 0.8f, 6f + i * 3f);
+                var struggle = Pose(With(S(QteKey.None, null, 0.22f, FighterPose.Grab), new Vector3(0f, 0.95f, 0.36f), 0f, 0f), sink * 0.8f, -4f + i * 4f);
                 struggle.victimLean = -16f + i * 3f;
                 struggle.shot = CamShot.Side;
                 m.Step(struggle);
@@ -907,7 +910,14 @@ namespace MadrasGethu
             wrestleVictim.Visual.SetCarry(Quaternion.Euler(pitch, 0f, 0f));
             float vLean = Mathf.Lerp(stepVLeanFrom, st.victimLean ?? stepVLeanFrom, e);
             float vDrop = Mathf.Lerp(stepVDropFrom, st.victimDrop ?? stepVDropFrom, e);
-            if (Mathf.Abs(vLean) > 0.5f || Mathf.Abs(vDrop) > 0.01f) wrestleVictim.Visual.SetPosture(vDrop, vLean);
+            if (wrestleMove.victimClaws && !st.letGo && vDrop > -0.45f)
+                wrestleVictim.Visual.SetGrapple(this, GripKind.ClawArm, vDrop, vLean);   // hands on your arm, fighting it
+            else if (wrestleMove.victimClaws)
+            {
+                wrestleVictim.Visual.SetGrip(null, false);   // too weak: the hands drop
+                wrestleVictim.Visual.SetPosture(vDrop, vLean);
+            }
+            else if (Mathf.Abs(vLean) > 0.5f || Mathf.Abs(vDrop) > 0.01f) wrestleVictim.Visual.SetPosture(vDrop, vLean);
         }
 
         static void ShotLayout(CamShot shot, out Vector3 offset, out float lookHeight, out float fov, out float roll)

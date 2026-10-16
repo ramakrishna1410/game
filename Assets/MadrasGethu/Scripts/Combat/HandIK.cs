@@ -13,6 +13,7 @@ namespace MadrasGethu
         Headlock,   // ice box: right arm over his neck, left hand on his back
         Clinch,     // Thai clinch: both hands behind his head, pulling it down
         Choke,      // choke from behind: right forearm across his throat, left hand behind his head
+        ClawArm,    // being choked: both hands pulling at the choking forearm
         Ankles,     // giant swing: both hands round his lower legs
         Wrist,      // arm twist: his right wrist and elbow
     }
@@ -130,6 +131,9 @@ namespace MadrasGethu
         }
 
         public void ClearPosture() => postureOnly = false;
+
+        /// <summary>Take the feet's planted spots again from the current pose (after a big change of position).</summary>
+        public void RepinFeet() => feetPinned = false;
 
         void Update()
         {
@@ -353,6 +357,22 @@ namespace MadrasGethu
                     Vector3 back = Vector3.Lerp(neck, head, 0.5f) + Vector3.up * 0.07f;
                     heroLeftHand = back - hero.right * 0.09f;
                     heroRightHand = back + hero.right * 0.09f;
+                    return;
+                }
+                case GripKind.ClawArm:
+                {
+                    // 'who' is the one choking: grab his right forearm, near the elbow and near the wrist.
+                    Vector3 elbowC = who.transform.position + Vector3.up * 1.35f, handC = who.transform.position + Vector3.up * 1.4f + who.transform.forward * 0.3f;
+                    if (anim != null && anim.isHuman)
+                    {
+                        var ea = anim.GetBoneTransform(HumanBodyBones.RightLowerArm);
+                        var ha = anim.GetBoneTransform(HumanBodyBones.RightHand);
+                        if (ea != null) elbowC = ea.position;
+                        if (ha != null) handC = ha.position;
+                    }
+                    heroLeftHand = Vector3.Lerp(elbowC, handC, 0.35f);
+                    heroRightHand = Vector3.Lerp(elbowC, handC, 0.8f);
+                    head = handC;
                     return;
                 }
                 case GripKind.Choke:

@@ -113,7 +113,8 @@ namespace MadrasGethu
         float mountNextPunch, mountPunchLands = -1f, mountLastInput, mountFinishAt = -1f;
         float mountTime, mountStartPitch, mountPunchLean;
         Vector3 mountFrom;
-        bool mountLeft;
+        bool mountLeft, mountPinned;
+        float mountSide = 1f;   // which side of him you kneel on
         const int MountMaxPunches = 10;
         const float MountSettle = 0.3f;   // getting from the tackle onto his hips
 
@@ -136,6 +137,13 @@ namespace MadrasGethu
             qteActive = false;
             lightBufferedUntil = heavyBufferedUntil = 0f;
             victim.PinDown(2f);
+            // Kneel on the side of him you landed on.
+            Vector3 hips0 = MountHips(victim), head0 = victim.Visual.RagdollHead;
+            Vector3 body0 = Flat(head0 - hips0);
+            if (body0.sqrMagnitude < 0.01f) body0 = transform.forward;
+            mountSide = Vector3.Dot(Flat(transform.position - hips0), Vector3.Cross(Vector3.up, body0.normalized)) >= 0f ? 1f : -1f;
+            mountPinned = false;
+            Visual.RepinFeet();
             SetState(PlayerState.Mount);
         }
 
@@ -156,22 +164,26 @@ namespace MadrasGethu
             mountTime += Time.deltaTime;
             victim.PinDown(1.5f);   // he stays down while you're on him
 
-            // Straddle his hips, facing his head; settle from the tackle (lying on him) up onto your knees.
+            // Knee-on-him beside his chest (not on top of his body, so legs never go through him or the
+            // road), facing across him; settle from the tackle up onto your knees.
             Vector3 hips = MountHips(victim);
             Vector3 head = victim.Visual.RagdollHead;
             Vector3 toHead = Flat(head - hips);
             if (toHead.sqrMagnitude < 0.01f) toHead = transform.forward;
-            Vector3 seat = new Vector3(hips.x, mountGroundY, hips.z) - toHead.normalized * 0.05f;
+            Vector3 side = Vector3.Cross(Vector3.up, toHead.normalized) * mountSide;
+            Vector3 chest = Vector3.Lerp(hips, head, 0.55f);
+            Vector3 seat = new Vector3(chest.x, mountGroundY, chest.z) + side * 0.55f;
             float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(mountTime / MountSettle));
             Motor.Teleport(Vector3.Lerp(mountFrom, seat, k));
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toHead.normalized), k);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(-side), k);
+            if (!mountPinned && k >= 1f) { mountPinned = true; Visual.RepinFeet(); }   // feet planted where you knelt
             float pitch = Mathf.Lerp(mountStartPitch, 0f, k);
             if (Mathf.Abs(pitch) > 0.5f) Visual.SetCarry(Quaternion.Euler(pitch, 0f, 0f));
             else Visual.ClearCarry();
 
             // Kneeling over him; every punch leans the body down into it.
             mountPunchLean = Mathf.MoveTowards(mountPunchLean, 0f, Time.deltaTime * 90f);
-            Visual.SetGrapple(victim, GripKind.Waist, -0.62f, 30f + mountPunchLean);
+            Visual.SetGrapple(victim, GripKind.Waist, -0.45f * k, 32f + mountPunchLean);
             Visual.FreeHands(0.2f);
             MountCamera(hips);
 
@@ -180,9 +192,9 @@ namespace MadrasGethu
                 mountPunchLands = -1f;
                 float dmg = Mathf.Min(5f * (MassMode ? massModeDamageMultiplier : 1f), Mathf.Max(0f, victim.Health - 1f));
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = dmg, direction = transform.forward, unblockable = true, hitsDowned = true });
-                // His head snaps away from the fist.
-                Vector3 side = transform.right * (mountLeft ? 1f : -1f);
-                victim.Visual.RagdollHeadJolt(side * 2.2f + Vector3.down * 1.2f);
+                // His head snaps away from the fist (you punch across him), a little up or down his body each time.
+                Vector3 snap = transform.forward * 2f + toHead.normalized * (mountLeft ? 0.6f : -0.6f) + Vector3.down * 1.2f;
+                victim.Visual.RagdollHeadJolt(snap);
                 FX.HitSpark(head, false);
                 RegisterHits(1, 3f);
                 if (GM != null) { GM.HitStop(0.04f); GM.Shake(0.12f); }
