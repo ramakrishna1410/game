@@ -676,9 +676,7 @@ namespace MadrasGethu
         {
             if (HeldWeapon != null)
             {
-                Prompts.Add(new PromptItem { key = "LMB", label = "Swing" });
-                Prompts.Add(new PromptItem { key = "RMB", label = "Smash" });
-                Prompts.Add(new PromptItem { key = "E", label = "Throw " + HeldWeapon.displayName });
+                AddWeaponPrompts();
                 return;
             }
             var weapon = Weapon.FindNearbyOnGround(transform.position, 1.5f);
