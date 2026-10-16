@@ -30,6 +30,8 @@ namespace MadrasGethu
         public bool countersBlocks;         // blocks a flurry and hits back (boss)
         public bool hasPhaseTwo;            // boss rage at half health
         public string grabOutcome = "headbutt";   // headbutt, bearhug, throw
+        public float grabEscape;            // chance to shove off a grab when fresh (never when dazed / staggered / from behind)
+        public float flankChance;           // chance to circle behind the hero before attacking
 
         public AttackData PickAttack()
         {
@@ -80,6 +82,8 @@ namespace MadrasGethu
                 throwsObjects = true,
                 picksUpWeapons = true,
                 grabOutcome = "headbutt",
+                grabEscape = 0.25f,
+                flankChance = 0.35f,
             };
             p.attacks.Add(new AttackData("Wild Swing", FighterPose.RowdySwing, 9f)
                 { weight = 3.5f, startup = 0.55f, recovery = 0.6f, range = 1.6f, lunge = 1.3f, knockback = 3f });
@@ -111,6 +115,8 @@ namespace MadrasGethu
                 pants = new Color(0.35f, 0.25f, 0.5f),
                 accent = new Color(0.9f, 0.75f, 0.2f),          // gold chain-belt
                 grabOutcome = "bearhug",
+                grabEscape = 0.25f,
+                flankChance = 0.15f,
             };
             p.attacks.Add(new AttackData("Haymaker", FighterPose.RowdySwing, 18f)
                 { weight = 2f, startup = 0.75f, recovery = 0.7f, range = 1.9f, lunge = 1.5f, knockback = 6f, heavy = true });
@@ -148,6 +154,8 @@ namespace MadrasGethu
                 countersBlocks = true,
                 hasPhaseTwo = true,
                 grabOutcome = "throw",
+                grabEscape = 0.5f,
+                flankChance = 0.25f,
             };
             var jab = new AttackData("Jab", FighterPose.Jab, 10f)
                 { startup = 0.42f, recovery = 0.4f, range = 1.6f, lunge = 1.4f, knockback = 3f };

@@ -219,6 +219,14 @@ Also with a weapon in hand:
 - **F** with a lathi, pipe or plank is a **Weapon Block**: it stops even orange (unblockable) swings, but not a charge.
 - **E** on a rowdy in front grabs him one-handed. LMB / RMB then hits him with the weapon (**Weapon Grab Strike**).
 
+### Rowdy smarts
+
+The rowdies fight back with their heads, but every trick has a warning and a way out:
+- **They read you.** Throw the same string three times in a row and they block it ("HE'S READING YOU!"). Heavies, grabs, counters and orange moves still get through, and a heavy straight after a read block breaks his guard for extra damage. Mix it up and they're open again.
+- **Grab escape.** A fresh rowdy may shove your grab off (25%, the boss 50%). A dazed or staggered rowdy, or one grabbed from behind, never escapes.
+- **No free holds.** Hold someone for more than 1.5 s and a friend comes for you from behind with a red **!**. Throw him, use him (Mutta Mothal), start a finisher, or press **LMB** to let go and elbow the newcomer. Finishers and grab combos stay safe; the others close in and wait for them to end.
+- **Flanking.** One rowdy at a time may circle behind you before attacking. A red **!** over him and a red arrow round Maaran show where he is; parry (F) or dodge (C).
+
 **Enemy warning colours:** 🔵 the blue **F** box means parry; **orange** means unblockable, so dodge (C); **yellow** means a grab, so dodge, or tap E to break free if he catches you.
 
 **How to fight:**

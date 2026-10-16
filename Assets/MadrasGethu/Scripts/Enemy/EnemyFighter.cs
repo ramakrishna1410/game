@@ -16,7 +16,7 @@ namespace MadrasGethu
     /// Thadiyan: shoulder charge, ground pound, bear hug, armour against light hits.
     /// Boss: combos, feints, counters a flurry, grab-throw, and at half health rages with an iron pipe.
     /// </summary>
-    public class EnemyFighter : Fighter
+    public partial class EnemyFighter : Fighter
     {
         enum AIState
         {
@@ -151,6 +151,7 @@ namespace MadrasGethu
         void Update()
         {
             UpdateTyreTrap();
+            UpdateTactics();
             Visual.SetAnimatorBool("Held", state == AIState.Grabbed || trappedTyre != null);
             Visual.SetAnimatorBool("Holding", state == AIState.HoldingHero);
             Visual.SetAnimatorBool("Begging", state == AIState.Begging);
@@ -239,13 +240,25 @@ namespace MadrasGethu
                         break;
                     }
                     HoldRing(dirToPlayer, dist, engageRadius, Profile.circleSpeed * MoodSpeed, allowTaunt: false);
-                    if (Time.time >= nextAttackTime && !player.IsDowned && !player.IsHeld && dist < engageRadius + 1.5f
-                        && EnemyDirector.RequestAttack(this))
+                    // He's in a finisher (can't be touched): close in and wait for it to end.
+                    // Holding one of us: give him a moment, then someone comes for him from behind.
+                    bool holdingOther = player.Grabbed != null && player.Grabbed != this;
+                    bool holdOpen = !holdingOther || player.GrabHoldTime >= PlayerFighter.HoldGrace;
+                    if (Time.time >= nextAttackTime && !player.IsDowned && !player.IsHeld && !player.IsBusyFinishing && holdOpen
+                        && dist < engageRadius + 1.5f && EnemyDirector.RequestAttack(this))
                     {
                         hasToken = true;
                         ChooseAttack(player, dist);
                         state = AIState.CloseIn;
                         stateTimer = 2.5f;
+                        if (holdingOther)
+                        {
+                            if (currentAttack.kind != AttackKind.Strike) { currentAttack = Profile.attacks[0]; currentCombo = null; }
+                            if (StartFlank(player, forced: true)) stateTimer = 4f;
+                            if (GameManager.Instance != null && Flanker == this)
+                                GameManager.Instance.AddPopup("BEHIND YOU!", player.Center + Vector3.up * 1.2f, new Color(1f, 0.35f, 0.3f), 0.9f);
+                        }
+                        else if (StartFlank(player, forced: false)) stateTimer = 4f;
                     }
                     else if (Time.time >= nextAttackTime && player.IsHeld && !player.IsHeldBy(this) && dist < engageRadius + 2f
                              && EnemyDirector.RequestAttack(this))
@@ -264,6 +277,7 @@ namespace MadrasGethu
                 {
                     bool charge = currentAttack.kind == AttackKind.Charge;
                     float reach = charge ? currentAttack.range : currentAttack.range * 0.85f + player.radius;
+                    if (!charge && UpdateFlankMove(player, dirToPlayer, dist)) break;   // circling round behind him first
                     if (!charge) MoveTowards(dirToPlayer, Mathf.Min(Profile.runSpeed, 3.2f) * MoodSpeed);
                     else Motor.FaceDirection(dirToPlayer);
                     if (dist <= reach)
@@ -925,6 +939,17 @@ namespace MadrasGethu
             }
 
             // Bigger rowdies sometimes put their guard up while circling.
+            // The hero keeps throwing the same string: they've seen it.
+            if (TryReadBlock(hit)) return HitResult.Blocked;
+            // ...and right after that block his guard is open: a heavy hurts more.
+            if (hit.heavy && GuardOpen && hit.attacker is PlayerFighter)
+            {
+                readBlockTime = -10f;
+                hit.damage *= 1.3f;
+                if (GameManager.Instance != null)
+                    GameManager.Instance.AddPopup("GUARD BROKEN!", Center + Vector3.up * 1.1f, new Color(1f, 0.85f, 0.35f), 0.9f);
+            }
+
             bool canBlock = !isDummy && (state == AIState.Engage || state == AIState.Wait || state == AIState.Approach) && !hit.heavy && !hit.unblockable;
             if (canBlock && Random.value < Profile.blockChance)
             {

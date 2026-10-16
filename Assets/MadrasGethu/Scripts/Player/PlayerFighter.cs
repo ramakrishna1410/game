@@ -489,6 +489,7 @@ namespace MadrasGethu
 
         void StartAttack(AttackData attack, Fighter forcedTarget)
         {
+            TrackString(attack);
             SetState(PlayerState.Attack);
             currentAttack = attack;
             struck = false;
@@ -954,7 +955,9 @@ namespace MadrasGethu
                 if (front != null && front.CanBeGrabbed)
                 {
                     Vector3 toFront = Flat(front.transform.position - transform.position).normalized;
-                    BeginGrab(front, Vector3.Dot(front.transform.forward, toFront) > 0.35f);
+                    bool behindHim = Vector3.Dot(front.transform.forward, toFront) > 0.35f;
+                    if (GrabShrugged(front, behindHim)) return;
+                    BeginGrab(front, behindHim);
                     return;
                 }
                 ThrowWeapon();
@@ -980,7 +983,9 @@ namespace MadrasGethu
             {
                 Vector3 toEnemy = Flat(target.transform.position - transform.position).normalized;
                 // He's facing away from us: grab him from behind.
-                BeginGrab(target, Vector3.Dot(target.transform.forward, toEnemy) > 0.35f);
+                bool behindHim = Vector3.Dot(target.transform.forward, toEnemy) > 0.35f;
+                if (GrabShrugged(target, behindHim)) return;
+                BeginGrab(target, behindHim);
                 return;
             }
 
@@ -1062,6 +1067,9 @@ namespace MadrasGethu
             }
 
             if (grabActionCooldown > 0f) return;
+
+            // A friend of his sneaking up behind you: LMB lets go and elbows him.
+            if (TryHoldElbow()) return;
 
             if (GameInput.GethuPressed)
             {

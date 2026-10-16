@@ -300,6 +300,14 @@ namespace MadrasGethu
                     HudIcons.DrawKey(box, key, boxColor, new GUIStyle(keyText) { fontSize = Mathf.RoundToInt(22 * S * pulse) });
                     Shadowed(new Rect(sp.x - 70 * S, box.yMax, 140 * S, 20 * S), what, new GUIStyle(small) { alignment = TextAnchor.MiddleCenter }, boxColor);
                 }
+                else if (e.SneakWarning)
+                {
+                    // Coming for you from behind: red !
+                    float pulse = 0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 14f);
+                    float size = 40 * S * pulse;
+                    var box = new Rect(sp.x - size / 2f, Screen.height - sp.y - size - 14 * S, size, size);
+                    HudIcons.DrawKey(box, "!", new Color(1f, 0.2f, 0.15f, 0.95f), new GUIStyle(keyText) { fontSize = Mathf.RoundToInt(24 * S * pulse) });
+                }
                 if (e.IsBegging)
                 {
                     Shadowed(new Rect(sp.x - 220 * S, Screen.height - sp.y - 40 * S, 440 * S, 26 * S),
@@ -332,6 +340,42 @@ namespace MadrasGethu
                 var r = new Rect(sp.x - w / 2f, Screen.height - sp.y, w, h);
                 Bar(r, 1f, Panel);
                 Bar(r, e.HealthFraction, e.IsTelegraphing ? new Color(1f, 0.3f, 0.2f) : new Color(0.9f, 0.85f, 0.8f));
+            }
+            DrawThreatArrows(cam);
+        }
+
+        /// <summary>A rowdy sneaking up or winding up behind the hero (often off screen): red arrow round the hero, pointing at him.</summary>
+        void DrawThreatArrows(Camera cam)
+        {
+            var p = GM.Player;
+            if (p == null || p.IsDead) return;
+            Vector3 hs = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 1.1f);
+            if (hs.z <= 0f) return;
+            Vector2 hero = new Vector2(hs.x, Screen.height - hs.y);
+            Vector3 camFwd = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+            Vector3 camRight = Vector3.ProjectOnPlane(cam.transform.right, Vector3.up).normalized;
+            Vector3 heroFwd = Vector3.ProjectOnPlane(p.transform.forward, Vector3.up).normalized;
+            foreach (var e in GM.AliveEnemies)
+            {
+                if (e == null || e.IsDead) continue;
+                Vector3 to = Vector3.ProjectOnPlane(e.transform.position - p.transform.position, Vector3.up);
+                if (to.magnitude > 6f || to.sqrMagnitude < 0.01f) continue;
+                bool threat = e.SneakWarning || (e.CurrentTelegraph != TelegraphColor.None && Vector3.Dot(heroFwd, to.normalized) < -0.3f);
+                if (!threat) continue;
+                // Screen direction of the threat (camera-relative: up on screen = away from the camera).
+                Vector2 dir = new Vector2(Vector3.Dot(to, camRight), -Vector3.Dot(to, camFwd)).normalized;
+                float pulse = 0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 14f);
+                Color red = new Color(1f, 0.2f, 0.15f, 0.95f);
+                Vector2 c = hero + dir * 120f * S;
+                float big = 34 * S * pulse;
+                HudIcons.Draw(new Rect(c.x - big / 2f, c.y - big / 2f, big, big), HudIcons.Disc, red);
+                Shadowed(new Rect(c.x - big / 2f, c.y - big / 2f, big, big), "!", new GUIStyle(keyText) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(22 * S) }, Color.white);
+                for (int i = 1; i <= 2; i++)   // dots leading out towards him
+                {
+                    Vector2 d = c + dir * (big * 0.5f + i * 12f * S);
+                    float sz = (11 - i * 3) * S;
+                    HudIcons.Draw(new Rect(d.x - sz / 2f, d.y - sz / 2f, sz, sz), HudIcons.Disc, red);
+                }
             }
         }
 
@@ -635,6 +679,12 @@ namespace MadrasGethu
                 "CHAIN ... LMB whip (long) · RMB wrap him and pull him into your grab",
                 "FISH .... LMB/RMB Meen Adi          TYRE .... LMB/RMB drop it over him",
                 "armed: F with lathi/pipe/plank blocks even orange swings · E then LMB hits him",
+                "",
+                "ROWDY SMARTS",
+                "same string 3x in a row: they block it (then a heavy breaks the guard) · switch it up",
+                "fresh rowdies can shove a grab off: daze / stagger him or grab from behind first",
+                "holding one 1.5 s+: a friend comes from behind (red !) · LMB lets go + elbows him",
+                "red ! + arrow round you = attack from behind: parry (F) or dodge (C)",
             };
             float w = 760 * S, lh = 22 * S;
             // Too tall for the screen: split into two panels side by side at a blank line.
