@@ -7,7 +7,6 @@ namespace MadrasGethu
     ///   dodge, RMB ............. Spinning Heel Kick
     ///   jump, RMB .............. Superman Punch
     ///   S + LMB, then LMB ...... Kaal Odaippu: low kick drops him to a knee, knee to the face
-    ///   parry (F), then RMB .... Liver Shot: slip inside, hook to the ribs, he folds over
     ///   sprint + E ............. Rugby Tackle, then LMB punches from the mount, RMB finishes
     /// Holding him:
     ///   E with another rowdy close .... Mutta Mothal (head clash)
@@ -19,10 +18,8 @@ namespace MadrasGethu
     /// </summary>
     public partial class PlayerFighter
     {
-        AttackData spinHeelKick, supermanPunch, lowKick, kneeToFace, liverShot;
+        AttackData spinHeelKick, supermanPunch, lowKick, kneeToFace;
 
-        EnemyFighter lastParried;
-        float lastParryTime = -10f;
         EnemyFighter lowKicked;
         float lowKickTime = -10f;
 
@@ -37,8 +34,6 @@ namespace MadrasGethu
                 { announce = true, startup = 0.2f, recovery = 0.4f, range = 1.8f, arc = 100f, lunge = 0.8f, knockback = 0.5f, unblockable = true, gethuGain = 7f, hitStop = 0.08f, shake = 0.15f };
             kneeToFace = new AttackData("Kaal Odaippu", FighterPose.Knee, 18f)
                 { announce = true, startup = 0.18f, recovery = 0.5f, range = 1.6f, lunge = 0.6f, knockback = 5f, launch = 3.5f, heavy = true, unblockable = true, gethuGain = 12f, hitStop = 0.12f, shake = 0.35f };
-            liverShot = new AttackData("Liver Shot", FighterPose.BodyBlow, 16f)
-                { announce = true, startup = 0.14f, recovery = 0.45f, range = 1.8f, arc = 100f, lunge = 0.9f, knockback = 1f, heavy = true, unblockable = true, gethuGain = 12f, hitStop = 0.12f, shake = 0.25f };
         }
 
         /// <summary>Reactions to the street moves once they connect.</summary>
@@ -51,10 +46,6 @@ namespace MadrasGethu
                 enemy.KneelDown(2.2f);
                 lowKicked = enemy;
                 lowKickTime = Time.time;
-            }
-            else if (attack == liverShot)
-            {
-                enemy.DoubleOver(3f);
             }
         }
 
@@ -78,16 +69,6 @@ namespace MadrasGethu
             if (Flat(k.transform.position - transform.position).magnitude > 2.4f) return null;
             lowKicked = null;
             return k;
-        }
-
-        /// <summary>The rowdy you just parried, if RMB comes quickly enough (used up when the shot is thrown).</summary>
-        EnemyFighter LiverShotTarget()
-        {
-            var p = lastParried;
-            if (p == null || !MoveUnlocks.Has(MoveId.LiverShot) || p.IsDead || p.IsDowned || Time.time - lastParryTime > 1.0f) return null;
-            if (Flat(p.transform.position - transform.position).magnitude > 2.8f) return null;
-            lastParried = null;
-            return p;
         }
 
         // ------------------------------------------------------------------ rugby tackle and the mount
@@ -358,6 +339,7 @@ namespace MadrasGethu
             clashHeroStart = transform.position;
             clashHeroEnd = clashPoint - clashDir * 0.6f;
             clashed = false;
+            clashDouble = false;
             Motor.SetDesiredVelocity(Vector3.zero, instant: true);   // no drag speed left over from walking him
             Motor.FaceDirection(clashDir, instant: true);
             other.HoldAt(other.transform.position, Quaternion.LookRotation(-clashDir));
@@ -383,8 +365,18 @@ namespace MadrasGethu
                 float e = t * t;   // accelerates into the hit
                 v.HoldAt(Vector3.Lerp(clashVictimStart, clashPoint, e), Quaternion.LookRotation(clashDir));
                 v.Visual.SetCarry(Quaternion.Euler(25f * e, 0f, 0f));   // head first
-                o.Visual.SetCarry(Quaternion.Euler(10f * e, 0f, 0f));
-                Motor.Teleport(Vector3.Lerp(clashHeroStart, clashHeroEnd, e));
+                if (clashDouble)
+                {
+                    // Double counter: both yanked in by their fists while you duck between them.
+                    o.HoldAt(Vector3.Lerp(clashOtherStart, clashOtherPoint, e), Quaternion.LookRotation(-clashDir));
+                    o.Visual.SetCarry(Quaternion.Euler(25f * e, 0f, 0f));
+                    Visual.SetPosture(-0.45f * e, 15f * e);
+                }
+                else
+                {
+                    o.Visual.SetCarry(Quaternion.Euler(10f * e, 0f, 0f));
+                    Motor.Teleport(Vector3.Lerp(clashHeroStart, clashHeroEnd, e));
+                }
                 if (t < 1f) return;
 
                 clashed = true;
@@ -401,13 +393,13 @@ namespace MadrasGethu
                 GameAudio.Play(Sfx.BoneCrack, contact, 1f);
                 FX.Burst(contact, 18, 5f, 0.06f, new Color(1f, 0.95f, 0.5f), new Color(3f, 2.6f, 1f), 0.5f, 0f);
                 RegisterHits(2, 14f);
-                NotifyMoveLanded("Mutta Mothal");
+                NotifyMoveLanded(clashDouble ? "Double Counter" : "Mutta Mothal");
                 if (GM != null)
                 {
                     GM.HitStop(0.12f);
                     GM.Shake(0.45f, 0.3f);
                     GM.SlowMo(0.3f, 0.35f);
-                    GM.AddPopup("MUTTA MOTHAL!", contact + Vector3.up * 0.8f, new Color(1f, 0.75f, 0.15f), 1.4f);
+                    GM.AddPopup(clashDouble ? "DOUBLE COUNTER!" : "MUTTA MOTHAL!", contact + Vector3.up * 0.8f, new Color(1f, 0.75f, 0.15f), 1.4f);
                 }
                 if (cam != null) cam.ZoomPunch(6f);
                 return;
@@ -424,7 +416,9 @@ namespace MadrasGethu
                 if (clashOther != null && clashOther.IsGrabbed) { clashOther.Visual.ClearCarry(); clashOther.ReleaseFromGrab(Vector3.zero, knockDown: false); }
             }
             clashVictim = clashOther = null;
+            clashDouble = false;
             Visual.SetGrip(null, false);
+            Visual.ClearPosture();
             SetState(PlayerState.Free);
         }
 

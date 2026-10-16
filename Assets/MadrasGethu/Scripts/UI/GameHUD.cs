@@ -443,7 +443,6 @@ namespace MadrasGethu
             { "Spinning Heel Kick", "dodge, RMB" },
             { "Superman Punch", "jump, RMB" },
             { "Kaal Odaippu", "S+LMB, then LMB" },
-            { "Liver Shot", "parry (F), then RMB" },
             { "Rugby Tackle", "sprint + E, LMB.., RMB" },
             { "GRAB COMBOS", "" },
             { "Royapuram Rush", "grab, LMB LMB LMB" },
@@ -452,6 +451,16 @@ namespace MadrasGethu
             { "Thalaivar Special", "grab, LMB RMB" },
             { "Jallikattu", "grab, RMB LMB" },
             { "Gethu Mass Combo", "grab, LMB+RMB (full)" },
+            { "COUNTERS", "" },
+            { "Counter Punch", "perfect parry (F)" },
+            { "Kai Odaippu", "perfect parry, LMB" },
+            { "Counter Throw", "perfect parry, E" },
+            { "Counter Finisher", "perfect parry, Q" },
+            { "Weapon Steal", "perfect parry a weapon" },
+            { "Grab Reversal", "E as he grabs (yellow)" },
+            { "Escape Strike", "break free when held" },
+            { "Matador", "dodge a charge, RMB" },
+            { "Double Counter", "parry two at once" },
             { "HOLDING HIM", "" },
             { "Mutta Mothal", "grab, E by another rowdy" },
             { "Arm Twist", "grab, hold RMB" },
@@ -490,6 +499,9 @@ namespace MadrasGethu
             y += 22 * S;
             Shadowed(new Rect(x, y, w, 22 * S), (GM.PartnerDummy != null ? "Y remove 2nd dummy  ·  " : "Y add a 2nd dummy  ·  ")
                 + (showChecklist ? "L hide move list" : "L show move list"), right, new Color(1f, 1f, 1f, 0.7f));
+            y += 22 * S;
+            Shadowed(new Rect(x, y, w, 22 * S), "K sparring (they fight back): " + (GM.PracticeSparring ? "ON" : "OFF") + "  ·  J give them weapons",
+                right, GM.PracticeSparring ? new Color(1f, 0.6f, 0.4f) : new Color(1f, 1f, 1f, 0.7f));
             y += 26 * S;
             if (GM.PracticeStringDamage > 0f)
             {
@@ -563,7 +575,14 @@ namespace MadrasGethu
                 "Knocked into a wall: WALL BOUNCE (he staggers back dazed)",
                 "dodge > RMB ....... Spinning Heel Kick  jump > RMB ........ Superman Punch",
                 "S + LMB > LMB ..... Low kick > Kaal Odaippu (knee to the face)",
-                "parry (F) > RMB ... Liver Shot          sprint + E ........ Rugby Tackle (LMB, RMB)",
+                "sprint + E ........ Rugby Tackle (LMB, RMB)",
+                "",
+                "COUNTERS (perfect parry = tap F as the blue F shows, then:)",
+                "nothing ........... Counter Punch       LMB ............... Kai Odaippu (arm break)",
+                "E ................. Counter Throw       Q (1 bar) ......... Counter Finisher",
+                "parry a weapon .... Weapon Steal        E as he grabs ..... Grab Reversal",
+                "held: tap E ....... Escape Strike       dodge charge > RMB  Matador",
+                "two punch at once . Double Counter",
                 "",
                 "HOLDING HIM",
                 "E, rowdy close .... Mutta Mothal        hold RMB .......... Arm Twist",

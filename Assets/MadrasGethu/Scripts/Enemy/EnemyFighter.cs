@@ -100,6 +100,8 @@ namespace MadrasGethu
 
         /// <summary>Practice dummy: never moves on his own, never attacks, never dies.</summary>
         public bool isDummy;
+        /// <summary>Practice dummy that fights back (punches, grabs, weapon swings, charges) so you can practise counters.</summary>
+        public bool sparring;
         protected override bool Immortal => isDummy;
         float lastHitTime;
         /// <summary>The hero can grab him now (Thadiyan included) and use a wrestling finisher.</summary>
@@ -205,14 +207,14 @@ namespace MadrasGethu
             switch (state)
             {
                 case AIState.Approach:
-                    if (isDummy) { DummyIdle(); break; }
+                    if (isDummy && !sparring) { DummyIdle(); break; }
                     Visual.SetCombatStance(dist < 9f);
                     MoveTowards(dirToPlayer, Profile.runSpeed * MoodSpeed);
                     if (dist <= waitRadius + 1f) state = AIState.Wait;
                     break;
 
                 case AIState.Wait:
-                    if (isDummy) { DummyIdle(); break; }
+                    if (isDummy && !sparring) { DummyIdle(); break; }
                     if (Time.time >= nextEngageCheck)
                     {
                         nextEngageCheck = Time.time + 0.4f;
@@ -229,7 +231,7 @@ namespace MadrasGethu
                     break;
 
                 case AIState.Engage:
-                    if (isDummy) { DummyIdle(); break; }
+                    if (isDummy && !sparring) { DummyIdle(); break; }
                     if (!EnemyDirector.IsEngaged(this))
                     {
                         state = AIState.Wait;   // swapped out: step back and watch
@@ -1142,6 +1144,57 @@ namespace MadrasGethu
         // ------------------------------------------------------------------ grabs, throws and shoves
 
         public enum LaunchKind { Throw, Shove, Bowl }
+
+        // ------------------------------------------------------------------ hero counters
+
+        /// <summary>Winding up a grab right now (yellow): the hero can reverse it.</summary>
+        public bool IsGrabTelegraph => state == AIState.Windup && currentAttack != null && currentAttack.kind == AttackKind.Grab;
+        /// <summary>Running at the hero in a shoulder charge (Thadiyan).</summary>
+        public bool IsCharging => state == AIState.Charging;
+        public Vector3 ChargeDirection => chargeDirection;
+
+        /// <summary>His attack is cut off by a counter: no hit, no follow-up.</summary>
+        public void CancelForCounter()
+        {
+            Visual.SetTelegraph(false);
+            ReleaseToken();
+            feinting = false;
+            currentCombo = null;
+            Motor.ClearImpulse();
+            if (state == AIState.HoldingHero) StopHoldingHero();
+            state = AIState.Stagger;
+            stateTimer = 0.6f;
+        }
+
+        /// <summary>Weapon steal: the hero takes it out of his hands.</summary>
+        public Weapon TakeWeapon()
+        {
+            var w = HeldWeapon;
+            HeldWeapon = null;
+            return w;
+        }
+
+        /// <summary>Practice: put a weapon in his hands.</summary>
+        public void EquipWeapon(Weapon w)
+        {
+            if (w == null) return;
+            if (HeldWeapon != null) HeldWeapon.Drop();
+            HeldWeapon = w;
+            w.Attach(this);
+        }
+
+        /// <summary>Matador: tripped mid-charge, he flies on and lands on his face.</summary>
+        public void Tripped(Vector3 direction)
+        {
+            direction.y = 0f;
+            direction = direction.sqrMagnitude > 0.01f ? direction.normalized : transform.forward;
+            ReleaseToken();
+            Motor.ClearImpulse();
+            ApplyDamage(12f, new HitInfo { attacker = Player, damage = 12f, direction = direction, heavy = true, pose = FighterPose.LegSweep }, HitResult.Hit);
+            if (IsDead) return;
+            KnockDown(direction * 7f + Vector3.up * 1.5f, 2.4f);
+            if (!Visual.CanRagdoll) Visual.Tumble(direction, 0.6f);
+        }
 
         float ownReactionUntil;   // kneeling / doubled over: holds its own pose while dazed
         float dazeOnRelease;      // ear clap: when the hero lets go he reels about instead of fighting back

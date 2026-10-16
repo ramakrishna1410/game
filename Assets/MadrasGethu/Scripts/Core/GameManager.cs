@@ -44,6 +44,8 @@ namespace MadrasGethu
         /// <summary>Second dummy (Y): for moves that need two rowdies (head clash, bowling throw, giant swing).</summary>
         public EnemyFighter PartnerDummy { get; private set; }
         float dummyRespawnAt = -1f, partnerRespawnAt = -1f;
+        /// <summary>K: the dummies fight back (so you can practise counters).</summary>
+        public bool PracticeSparring { get; private set; }
         /// <summary>Moves landed in the practice yard (upper case, no "!").</summary>
         public readonly HashSet<string> PracticeLanded = new HashSet<string>();
         public string PracticeLastMove { get; private set; }
@@ -119,6 +121,7 @@ namespace MadrasGethu
             Dummy.displayName = "Dummy (" + Dummy.Profile.displayName + ")";
             Dummy.gameObject.name = Dummy.displayName;
             Dummy.Damaged += OnDummyDamaged;
+            Dummy.sparring = PracticeSparring;
             AliveEnemies.Add(Dummy);
         }
 
@@ -132,6 +135,7 @@ namespace MadrasGethu
             PartnerDummy.displayName = "Dummy 2 (" + PartnerDummy.Profile.displayName + ")";
             PartnerDummy.gameObject.name = PartnerDummy.displayName;
             PartnerDummy.Damaged += OnDummyDamaged;
+            PartnerDummy.sparring = PracticeSparring;
             AliveEnemies.Add(PartnerDummy);
         }
 
@@ -191,6 +195,21 @@ namespace MadrasGethu
                 AddPopup(Player.infiniteGethu ? "INFINITE GETHU: ON" : "INFINITE GETHU: OFF", Player.Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 0.9f);
             }
 
+            if (GameInput.PracticeSparPressed)
+            {
+                PracticeSparring = !PracticeSparring;
+                if (Dummy != null) Dummy.sparring = PracticeSparring;
+                if (PartnerDummy != null) PartnerDummy.sparring = PracticeSparring;
+                if (Player != null)
+                    AddPopup(PracticeSparring ? "SPARRING: THEY FIGHT BACK" : "SPARRING OFF", Player.Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 1f);
+            }
+            if (GameInput.PracticeWeaponPressed && Dummy != null && !Dummy.IsGrabbed)
+            {
+                // Hand him a lathi (and the second dummy a pipe) to practise the weapon steal.
+                Dummy.EquipWeapon(Weapon.Create(WeaponType.Lathi, Dummy.transform.position));
+                if (PartnerDummy != null && !PartnerDummy.IsGrabbed) PartnerDummy.EquipWeapon(Weapon.Create(WeaponType.IronPipe, PartnerDummy.transform.position));
+                AddPopup("ARMED", Dummy.Center + Vector3.up, new Color(1f, 0.6f, 0.3f), 0.8f);
+            }
             if (GameInput.PracticePartnerPressed && CanReplaceDummy)
             {
                 if (PartnerDummy == null)

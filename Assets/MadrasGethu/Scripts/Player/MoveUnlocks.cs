@@ -13,11 +13,13 @@ namespace MadrasGethu
         // Grab strike combos
         RoyapuramRush, MachineGunKuthu, KasimeduKickStorm, ThalaivarSpecial, Jallikattu, GethuMassCombo,
         // Street moves (no grab)
-        SpinningHeelKick, SupermanPunch, KaalOdaippu, LiverShot, RugbyTackle,
+        SpinningHeelKick, SupermanPunch, KaalOdaippu, RugbyTackle,
         // Holding him
         MuttaMothal, ArmTwist, EarClap, TripStomp, BowlingThrow,
         // Finishers only
         GiantSwing, ChokeOut, ThaiClinch, KadalThrow, IceBoxSlam,
+        // Counters
+        KaiOdaippu, CounterThrow, CounterFinisher, WeaponSteal, GrabReversal, EscapeStrike, Matador, DoubleCounter,
     }
 
     /// <summary>

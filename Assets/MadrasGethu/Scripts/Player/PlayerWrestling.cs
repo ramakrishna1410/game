@@ -66,6 +66,7 @@ namespace MadrasGethu
         public float throwDamage;
         public EnemyFighter.LaunchKind launchKind = EnemyFighter.LaunchKind.Throw;
         public bool throwOutward;       // thrown the way he's swinging (giant swing), not straight ahead
+        public bool throwAlongFacing;   // thrown the way the hero ends up facing (hip throw: over your back)
         public bool sweep;              // his body knocks down everyone it swings into (giant swing)
         public bool ignoreRoom;         // moves to a spot on purpose (jetty edge, ice box): no wall clamping
         public bool mountAfter;         // rugby tackle: stay on top of him for the ground and pound
@@ -1024,6 +1025,7 @@ namespace MadrasGethu
             {
                 // Let go at the end of the swing: he flies off and the ragdoll takes over.
                 Vector3 dir = wrestleRotation * Vector3.forward;
+                if (wrestleMove.throwAlongFacing) dir = Flat(transform.forward).normalized;
                 if (wrestleMove.throwOutward)
                 {
                     Vector3 outward = Flat(victim.transform.position - transform.position);
@@ -1032,7 +1034,7 @@ namespace MadrasGethu
                 Visual.SetGrip(null, false);
                 GameAudio.Play(Sfx.Whoosh, victim.Center, 0.8f, 0.8f);
                 victim.Launch(this, dir, wrestleMove.launchKind);
-                if (wrestleMove.launchKind == EnemyFighter.LaunchKind.Bowl || wrestleMove.sweep) NotifyMoveLanded(wrestleMove.name);
+                if (wrestleMove.launchKind == EnemyFighter.LaunchKind.Bowl || wrestleMove.sweep || wrestleMove.throwAlongFacing) NotifyMoveLanded(wrestleMove.name);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = wrestleMove.throwDamage, direction = dir, hitsDowned = true });
                 RegisterHits(1, 8f);
                 if (GM != null) { GM.Shake(0.2f); GM.AddPopup("THROW!", victim.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.8f); }

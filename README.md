@@ -61,7 +61,9 @@ A separate scene to learn the moves on **one dummy that never moves, never attac
 | T | Switch dummy: Rowdy → Thadiyan → Boss |
 | G | Infinite Gethu on/off (on by default, so you can practise every finisher) |
 | L | Show/hide the move list |
-| Y | Add / remove a **second dummy** (for Mutta Mothal, Bowling Throw and the Giant Swing) |
+| Y | Add / remove a **second dummy** (for Mutta Mothal, Bowling Throw, Giant Swing and the Double Counter) |
+| K | **Sparring** on/off: the dummies fight back so you can practise counters (you still take no damage) |
+| J | Give the dummies weapons (lathi / pipe) to practise the Weapon Steal |
 
 The left panel lists every move with its input; each one ticks green the first time it lands. The top right shows the last hit, the damage of your current string and the last move. Smashed props rebuild themselves after a few seconds. The yard has a brick wall (wall slams, wall bounces, spinebuster), a tea kadai, fish crates, an auto, an ice box, a jetty edge onto the harbour (east side, for the Kadal Throw) and a weapon rack.
 
@@ -132,8 +134,25 @@ Keyboard and mouse for now (gamepad prompts come later).
 | dodge → RMB | **Spinning Heel Kick**: spin out of the dodge, heel to the jaw, he drops |
 | jump → RMB | **Superman Punch**: a hop forward into a flying cross |
 | S (stepping away from him) + LMB, then LMB | **Kaal Odaippu**: low kick drops him to one knee, then a knee to the face |
-| parry (F), then RMB | **Liver Shot**: slip his punch, hook to the ribs; he folds over, dazed |
 | sprint + E at a rowdy | **Rugby Tackle**: take him down and sit on him; LMB rains punches, RMB finishes |
+
+### Counters
+
+A **perfect parry** (tap F just as the blue F shows) slows time; your next button picks the counter.
+
+| Input | Counter |
+|---|---|
+| perfect parry, nothing | **Counter Punch** |
+| perfect parry, **LMB** | **Kai Odaippu**: catch his arm, elbow into the joint, short punch; he can't attack for a while |
+| perfect parry, **E** | **Counter Throw**: hip in, throw him over your back |
+| perfect parry, **Q** (1 Gethu bar) | **Counter Finisher**: twist his wrist to his knees, headbutt (LMB on the ring), knee to the face |
+| perfect parry against a lathi / pipe | **Weapon Steal**: yank it out of his hands and hit him with it; you keep it |
+| **E** as his grab arrives (yellow) | **Grab Reversal**: knock his hands aside and grab him instead |
+| tap **E** to break free when held | **Escape Strike**: elbow / headbutt / knee on the way out; he's left dazed |
+| dodge (C) a Thadiyan charge, then **RMB** | **Matador**: trip him as he runs past, face-first |
+| perfect parry with two punching at once | **Double Counter**: catch both fists, duck, their heads meet |
+
+In the Practice Yard press **K** to make the dummies fight back (punches, grabs, holds, charges as Thadiyan) and **J** to give them a lathi / pipe. **Y** adds a second dummy for the double counter.
 
 ### Holding him (grab with E first)
 

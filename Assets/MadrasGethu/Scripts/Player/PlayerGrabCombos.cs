@@ -16,6 +16,8 @@ namespace MadrasGethu
         public bool run;                    // cover the distance at a run (otherwise steps)
         public bool jump;                   // leap into it (flying knee, dropkick)
         public float spin;                  // degrees the hero turns through during the swing (spinning backfist)
+        public float turnIn;                // starts turned away this far and turns to face him during the swing (escape elbow)
+        public bool crack;                  // bone crack on landing (arm break)
         public float victimZ = 0.6f;        // where the rowdy ends up after it
         public float victimPitch;           // + doubled over, - rocked back
         public float damage = 6f;
@@ -38,6 +40,8 @@ namespace MadrasGethu
         public bool releaseAtEnd;           // let go when it's over (arm twist) instead of keeping hold
         public float injureArm;             // seconds he can't attack afterwards
         public float dazeOnRelease;         // ear clap: dizzy when you let go of him
+        public float dazeAfterRelease;      // escape strike: dazed straight away when it ends
+        public float doubleOverAfter;       // arm break: folded over holding his arm when it ends
         public ComboBeat Add(ComboBeat b) { beats.Add(b); return b; }
     }
 
@@ -411,8 +415,11 @@ namespace MadrasGethu
             // Facing: down the combo line, except while spinning into a backfist.
             float spin = 0f;
             foreach (var b in combo.beats)
-                if (b.spin != 0f && b.started && !b.landed)
-                    spin = b.spin * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((comboTime - (b.at - b.lead)) / b.lead));
+            {
+                float s = b.started ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((comboTime - (b.at - b.lead)) / b.lead)) : 0f;
+                if (b.spin != 0f && b.started && !b.landed) spin = b.spin * s;
+                if (b.turnIn != 0f && !b.landed) { spin = -b.turnIn * (1f - s); break; }
+            }
             transform.rotation = comboRotation * Quaternion.Euler(0f, -spin, 0f);
         }
 
@@ -496,6 +503,7 @@ namespace MadrasGethu
                 }
             }
             FX.HitSpark(contact, b.knockout != Vector3.zero);
+            if (b.crack) GameAudio.Play(Sfx.BoneCrack, contact, 1f);
             RegisterHits(1, rapid ? 2f : 5f);
             if (!string.IsNullOrEmpty(b.label) && GM != null && b.knockout == Vector3.zero)
                 GM.AddPopup(b.label, contact + Vector3.up * 0.6f, new Color(1f, 0.85f, 0.4f), 0.7f);
@@ -617,6 +625,8 @@ namespace MadrasGethu
                 {
                     victim.Visual.ClearCarry();
                     victim.ReleaseFromGrab(Flat(victim.transform.position - transform.position).normalized * 2f, knockDown: false);
+                    if (c.dazeAfterRelease > 0f) victim.Daze(c.dazeAfterRelease);
+                    if (c.doubleOverAfter > 0f) victim.DoubleOver(c.doubleOverAfter);
                     if (c.injureArm > 0f)
                     {
                         victim.InjureArm(c.injureArm);

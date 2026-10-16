@@ -386,6 +386,7 @@ namespace MadrasGethu
 
             if (GameInput.GrabPressed)
             {
+                if (TryGrabReversal()) return true;
                 if (TryStartTackle()) return true;
                 TryGrab();
                 return true;
@@ -407,6 +408,9 @@ namespace MadrasGethu
                 return true;
             }
 
+            // Dodged a charge, RMB: trip him as he runs past.
+            if (heavy && TryMatador()) return true;
+
             // Dodge -> attack: spin out of the dodge with a backfist (LMB) or a spinning heel kick (RMB).
             if (Time.time - lastDodgeEnd < 0.4f)
             {
@@ -421,14 +425,6 @@ namespace MadrasGethu
             if (light && running)
             {
                 StartAttack(runningAttack, null);
-                lightIndex = 0;
-                return true;
-            }
-
-            // Just parried him: RMB slips inside and digs a hook into his liver.
-            if (heavy && LiverShotTarget() is EnemyFighter liver)
-            {
-                StartAttack(liverShot, liver);
                 lightIndex = 0;
                 return true;
             }
@@ -744,6 +740,7 @@ namespace MadrasGethu
             }
 
             dodgeCooldown = dodgeDurationNow + 0.12f;
+            lastDodgeStart = Time.time;
             Visual.Play(pose, dodgeDurationNow, dodgeDurationNow);
         }
 
@@ -760,6 +757,7 @@ namespace MadrasGethu
             float speed = Mathf.PI * 0.5f * dodgeDistanceNow / dodgeDurationNow * Mathf.Cos(t * Mathf.PI * 0.5f);
             Motor.SetDesiredVelocity(dodgeDirection * speed, instant: true);
             if (GameInput.BlockPressed && TryCounter()) return;
+            if (GameInput.HeavyPressed && TryMatador()) return;
         }
 
         // ------------------------------------------------------------------ jump
@@ -849,13 +847,25 @@ namespace MadrasGethu
             }
 
             parryTarget = best;
-            lastParried = best;
-            lastParryTime = Time.time;
             parryPerfect = best.TimeToImpact <= perfectParryWindow;
             parryCounterStarted = false;
+            stolenWeapon = null;
 
             Vector3 toEnemy = Flat(best.transform.position - transform.position).normalized;
             Motor.FaceDirection(toEnemy, instant: true);
+            if (parryPerfect)
+            {
+                // Two punches landing together: catch both.
+                var second = SecondAttacker(best);
+                if (second != null)
+                {
+                    AddGethu(10f);
+                    StartDoubleCounter(best, second);
+                    return true;
+                }
+                // A weapon swing: take it off him (instead of knocking it to the ground).
+                if (best.HeldWeapon != null && HeldWeapon == null && MoveUnlocks.Has(MoveId.WeaponSteal)) stolenWeapon = best.TakeWeapon();
+            }
             best.Parried(parryPerfect, toEnemy);
             SetState(PlayerState.Parry);
             Visual.Play(FighterPose.Parry, 0.35f, 0.35f);
@@ -891,27 +901,14 @@ namespace MadrasGethu
             // Another rowdy swinging at the same time? Parry him too (Batman-style chains).
             if (stateTimer > 0.1f && GameInput.BlockPressed && TryCounter()) return;
 
-            // RMB straight out of the parry: slip and liver shot instead of the automatic counter.
-            if (GameInput.HeavyPressed && MoveUnlocks.Has(MoveId.LiverShot) && parryTarget != null && !parryTarget.IsDead)
+            // Perfect parry: time slows and your next button picks the counter (see PlayerCounters.cs).
+            if (parryPerfect && !parryCounterStarted)
             {
-                heavyBufferedUntil = 0f;
-                parryCounterStarted = true;
-                StartAttack(liverShot, parryTarget);
-                return;
+                if (parryTarget == null || parryTarget.IsDead) parryCounterStarted = true;
+                else if (UpdateCounterChoice(parryTarget)) { parryCounterStarted = true; return; }
+                else return;
             }
-
-            if (parryPerfect && !parryCounterStarted && stateTimer >= 0.2f)
-            {
-                parryCounterStarted = true;
-                if (parryTarget != null && !parryTarget.IsDead)
-                {
-                    float roll = Random.value;
-                    var move = MassMode || roll < 0.34f ? counterUppercut : roll < 0.67f ? counter : counterThrow;
-                    StartAttack(move, parryTarget);
-                    return;
-                }
-            }
-            if (stateTimer >= (parryPerfect ? 0.3f : 0.32f))
+            if (stateTimer >= (parryPerfect ? 0.36f : 0.32f))
                 SetState(PlayerState.Free);
         }
 
@@ -956,19 +953,7 @@ namespace MadrasGethu
             {
                 Vector3 toEnemy = Flat(target.transform.position - transform.position).normalized;
                 // He's facing away from us: grab him from behind.
-                grabFromBehind = Vector3.Dot(target.transform.forward, toEnemy) > 0.35f;
-                grabbed = target;
-                grabbed.EnterGrabbed(grabFromBehind);
-                grabPullStart = target.transform.position;
-                Motor.FaceDirection(toEnemy, instant: true);
-                SetState(PlayerState.Grab);
-                grabActionCooldown = GrabPullTime + 0.05f;
-                Visual.Play(FighterPose.Grab, 999f);
-                Visual.SetGrip(target, grabFromBehind);
-                GameAudio.Play(Sfx.Grab, target.Center + Vector3.up * 0.4f, 0.8f);
-                lightIndex = 0;
-                if (grabFromBehind && GM != null)
-                    GM.AddPopup("FROM BEHIND!", target.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.7f);
+                BeginGrab(target, Vector3.Dot(target.transform.forward, toEnemy) > 0.35f);
                 return;
             }
 
@@ -977,6 +962,25 @@ namespace MadrasGethu
 
             // Whiffed grab
             StartAttack(grabMiss, null);
+        }
+
+        /// <summary>Takes him by the collar (or from behind) and starts holding him.</summary>
+        void BeginGrab(EnemyFighter target, bool behind)
+        {
+            Vector3 toEnemy = Flat(target.transform.position - transform.position).normalized;
+            grabFromBehind = behind;
+            grabbed = target;
+            grabbed.EnterGrabbed(grabFromBehind);
+            grabPullStart = target.transform.position;
+            Motor.FaceDirection(toEnemy, instant: true);
+            SetState(PlayerState.Grab);
+            grabActionCooldown = GrabPullTime + 0.05f;
+            Visual.Play(FighterPose.Grab, 999f);
+            Visual.SetGrip(target, grabFromBehind);
+            GameAudio.Play(Sfx.Grab, target.Center + Vector3.up * 0.4f, 0.8f);
+            lightIndex = 0;
+            if (grabFromBehind && GM != null)
+                GM.AddPopup("FROM BEHIND!", target.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.7f);
         }
 
         Vector3 HoldPosition => transform.position + transform.forward * (grabFromBehind ? 0.5f : 0.6f);
@@ -1214,8 +1218,15 @@ namespace MadrasGethu
             Vector3 away = Flat(holder.transform.position - transform.position).normalized;
             if (away.sqrMagnitude < 0.01f) away = -transform.forward;
             holder.HeroBrokeFree(away);
-            Visual.Play(HeldFromBehind ? FighterPose.Backfist : FighterPose.Push, 0.35f, 0.45f);
             AddGethu(6f);
+            if (MoveUnlocks.Has(MoveId.EscapeStrike) && !holder.IsDead)
+            {
+                // Hit back on the way out.
+                if (GM != null) GM.AddPopup("BROKE FREE!", Center + Vector3.up, new Color(0.6f, 1f, 0.6f), 0.9f);
+                StartEscapeStrike(holder, HeldFromBehind);
+                return;
+            }
+            Visual.Play(HeldFromBehind ? FighterPose.Backfist : FighterPose.Push, 0.35f, 0.45f);
             if (GM != null) GM.AddPopup("BROKE FREE!", Center + Vector3.up, new Color(0.6f, 1f, 0.6f), 0.9f);
             SetState(PlayerState.Free);
         }
