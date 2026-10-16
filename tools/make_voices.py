@@ -11,6 +11,14 @@ Engines (all have free use; internet needed):
               non-commercial with attribution. Key: elevenlabs.io > Profile > API keys. Voices: tools/voices.json
   edge        Microsoft Edge voices: unlimited, no key, but flat ("computer-like").
 
+Offline (runs on your PC, no internet after the first download; run tools/setup_offline_voices.bat once):
+  indicf5     AI4Bharat IndicF5: copies the voice AND the acting of a short recording. Put a 5-10 second clip per
+              character in tools/voice_refs/ (maaran.wav + maaran.txt with exactly what's said in it; extra moods
+              like maaran_angry.wav are picked when a line's direction says "angry"). Most lifelike offline.
+  parler      AI4Bharat Indic Parler-TTS: no recordings needed, the voice is described in words (who + direction).
+              Voices can drift a little between lines; give each character a named speaker in PARLER_SPEAKERS.
+  An NVIDIA graphics card makes these take seconds per line; on CPU expect about a minute per line.
+
     python make_voices.py "E:\\UnityProjects\\MadrasGethu" --engine gemini --key YOUR_KEY
     (add --force to remake lines that already have a voice file, e.g. after changing engine)
 """
@@ -61,6 +69,26 @@ EDGE_VOICES = {
     "announcer": ("ta-IN-ValluvarNeural", "+12%", "+2Hz"), "selvi": ("ta-IN-PallaviNeural", "-6%", "-8Hz"),
     "kayal": ("ta-LK-SaranyaNeural", "+4%", "+2Hz"), "paati": ("ta-MY-KaniNeural", "-18%", "-14Hz"),
 }
+
+
+# Indic Parler-TTS: how each character sounds, in words (the line's direction is added after).
+PARLER_VOICES = {
+    "maaran":    "A man in his late twenties with a deep, low, slightly rough voice",
+    "kutty":     "A young man with a bright, lively, slightly high voice, talking quickly",
+    "ilango":    "A middle-aged man with a smooth, calm, authoritative voice",
+    "settu":     "A middle-aged man with a deep, gravelly, menacing voice, speaking slowly",
+    "pallu":     "A young man with a rough, loud, cocky voice",
+    "rowdy":     "A young man with a rough, loud voice",
+    "muniyandi": "An old man with a hoarse, gentle, shaky voice",
+    "boy":       "A young boy with a high, excited voice",
+    "announcer": "A man with a loud, booming announcer's voice",
+    "selvi":     "A middle-aged woman with a warm, tired, motherly voice",
+    "kayal":     "A young woman with a clear, bright, caring voice",
+    "paati":     "An old woman with a loud, cracked, grumpy voice",
+}
+# Optional: a named speaker from the Indic Parler-TTS model card keeps a character's voice the same on every
+# line (huggingface.co/ai4bharat/indic-parler-tts lists the speakers per language). Leave "" to describe only.
+PARLER_SPEAKERS = {name: "" for name in PARLER_VOICES}
 
 
 class OutOfQuota(Exception):
@@ -192,12 +220,78 @@ async def edge_line(line, path):
     await edge_tts.Communicate(line["tamil"].replace("...", "… "), voice, rate=rate, pitch=pitch).save(path)
 
 
+# ---------------------------------------------------------------------------------------------- offline: IndicF5
+
+# mood clip name -> words in a line's direction that call for it
+MOODS = {"angry": ["angr", "rage", "furious"], "sad": ["sad", "tears", "breaking", "hurt", "heavy"],
+         "happy": ["happ", "joy", "cheer", "overjoyed"], "scared": ["scared", "panic", "afraid"],
+         "shout": ["shout"], "whisper": ["whisper"], "laugh": ["laugh", "chuckl"], "tease": ["teas", "joking", "mock"],
+         "menacing": ["menac", "threat", "dangerous"], "soft": ["soft", "gentle", "quiet"]}
+
+
+def indicf5_line(line, state, path):
+    import numpy as np
+    import soundfile as sf
+    if "f5" not in state:
+        from transformers import AutoModel
+        print("    loading IndicF5 (the first time it downloads about 1.5 GB)...")
+        state["f5"] = AutoModel.from_pretrained("ai4bharat/IndicF5", trust_remote_code=True)
+    ref_dir = os.path.join(HERE, "voice_refs")
+    who = line["speaker"]
+    ref = None
+    how = line["direction"].lower()
+    for mood, words in MOODS.items():   # a mood clip if the direction asks for it (maaran_angry.wav for "angry")
+        if any(w in how for w in words) and os.path.exists(os.path.join(ref_dir, f"{who}_{mood}.wav")):
+            ref = os.path.join(ref_dir, f"{who}_{mood}")
+            break
+    if ref is None:
+        ref = os.path.join(ref_dir, who)
+    if not os.path.exists(ref + ".wav"):
+        raise RuntimeError(f"no reference voice: put {who}.wav and {who}.txt in tools/voice_refs")
+    with open(ref + ".txt", encoding="utf-8") as f:
+        ref_text = f.read().strip()
+    audio = state["f5"](line["tamil"], ref_audio_path=ref + ".wav", ref_text=ref_text)
+    audio = np.asarray(audio)
+    if audio.dtype == np.int16:
+        audio = audio.astype(np.float32) / 32768.0
+    sf.write(path, audio.astype(np.float32), samplerate=24000)
+
+
+# ---------------------------------------------------------------------------------------------- offline: Parler
+
+def parler_line(line, state, path):
+    import soundfile as sf
+    import torch
+    if "parler" not in state:
+        from parler_tts import ParlerTTSForConditionalGeneration
+        from transformers import AutoTokenizer
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        print(f"    loading Indic Parler-TTS on {'the graphics card' if device != 'cpu' else 'the CPU (slow)'}"
+              " (the first time it downloads about 3.5 GB)...")
+        model = ParlerTTSForConditionalGeneration.from_pretrained("ai4bharat/indic-parler-tts").to(device)
+        state["parler"] = (model, AutoTokenizer.from_pretrained("ai4bharat/indic-parler-tts"),
+                           AutoTokenizer.from_pretrained(model.config.text_encoder._name_or_path), device)
+    model, tok, desc_tok, device = state["parler"]
+    who = line["speaker"]
+    named = PARLER_SPEAKERS.get(who, "")
+    voice = (named + "'s voice. " if named else "") + PARLER_VOICES.get(who, "A man with a natural voice")
+    how = line["direction"] or "naturally"
+    phone = " It sounds like a phone call." if line["phone"] else " The recording is very clear and close up, with no background noise."
+    description = f"{voice} speaks Tamil, {how}, expressive and full of emotion.{phone}"
+    torch.manual_seed(sum(ord(c) for c in who))   # same seed per character keeps the voice steadier
+    d = desc_tok(description, return_tensors="pt").to(device)
+    p = tok(line["tamil"], return_tensors="pt").to(device)
+    gen = model.generate(input_ids=d.input_ids, attention_mask=d.attention_mask,
+                         prompt_input_ids=p.input_ids, prompt_attention_mask=p.attention_mask)
+    sf.write(path, gen.cpu().numpy().squeeze(), model.config.sampling_rate)
+
+
 # ---------------------------------------------------------------------------------------------- main
 
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("project", help="your Unity project folder (or Assets/MadrasGethu)")
-    ap.add_argument("--engine", choices=["gemini", "elevenlabs", "edge"], default="gemini")
+    ap.add_argument("--engine", choices=["gemini", "elevenlabs", "edge", "indicf5", "parler"], default="gemini")
     ap.add_argument("--key", help="API key (or set GEMINI_API_KEY / ELEVENLABS_API_KEY)")
     ap.add_argument("--force", action="store_true", help="remake lines that already have a voice file")
     ap.add_argument("--chapter", help="only this chapter file, e.g. ch01")
@@ -205,7 +299,7 @@ async def main():
     args = ap.parse_args()
 
     key = args.key or os.environ.get("GEMINI_API_KEY" if args.engine == "gemini" else "ELEVENLABS_API_KEY", "")
-    if args.engine != "edge" and not key:
+    if args.engine in ("gemini", "elevenlabs") and not key:
         sys.exit("This engine needs an API key: --key YOUR_KEY")
     voices = elevenlabs_voices() if args.engine == "elevenlabs" else None
     if args.engine == "edge":
@@ -246,6 +340,10 @@ async def main():
                     elif args.engine == "elevenlabs":
                         with open(base + ".mp3", "wb") as f:
                             f.write(elevenlabs_line(line, key, voices))
+                    elif args.engine == "indicf5":
+                        indicf5_line(line, state, base + ".wav")
+                    elif args.engine == "parler":
+                        parler_line(line, state, base + ".wav")
                     else:
                         await edge_line(line, base + ".mp3")
                     made += 1

@@ -100,6 +100,10 @@ The dialogue is in `Resources/Story/ch01.txt`: one line per row (speaker | gestu
 | **Gemini** (recommended) | free API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey); daily limit, so if it stops, run it again later and it carries on | acts out the directions, 30 voices |
 | **ElevenLabs** | free plan, 10,000 characters a month (Chapter 1 is about 2,300); non-commercial, credit ElevenLabs | the most natural; pick Tamil voices in its Voice Library and put their IDs in `tools/voices.json` |
 | Edge | unlimited, no key | flat, computer-like |
+| **IndicF5** (offline) | free, runs on your PC | copies the voice *and acting* of a 5-10 s clip you record per character (`tools/voice_refs`, see its README); the most lifelike offline option |
+| **Parler** (offline) | free, runs on your PC | AI4Bharat Indic Parler-TTS: voices described in words, no recordings; voices can drift a little between lines |
+
+**Offline setup (once):** install Python 3.10 or 3.11 and Git, run `tools/setup_offline_voices.bat`, make a free Hugging Face account, accept the terms on the [IndicF5](https://huggingface.co/ai4bharat/IndicF5) and [Indic Parler-TTS](https://huggingface.co/ai4bharat/indic-parler-tts) pages and paste a read token when asked. The first run downloads the models (a few GB); after that no internet is needed. With an NVIDIA graphics card a line takes seconds; on the CPU about a minute.
 
 Lines that already have a voice are skipped, so your own recordings are never overwritten; answer **y** to "Replace voices made before" when switching engine. Character voices and descriptions are at the top of `tools/make_voices.py`.
 
