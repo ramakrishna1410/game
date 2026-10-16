@@ -91,7 +91,9 @@ The story, cast and chapter plan are in **[docs/STORY.md](docs/STORY.md)**. Scen
 | F2 | subtitles: Tamil + English → Tamil + Tanglish → English → Tanglish (remembered) |
 | E | talk to someone when "E · பேசு" shows over them |
 
-The dialogue is in `Resources/Story/ch01.txt`: one line per row (speaker | gesture | Tamil | Tanglish | English), so wording can be fixed without touching code. Voice recordings go in `Resources/Voice/ch01/<scene>_<line>.ogg` (for example `1.3_shakedown_1.ogg`); a line with a recording waits for it to finish. Music for the auto ride: `Resources/Audio/Story/gaana`.
+The dialogue is in `Resources/Story/ch01.txt`: one line per row (speaker | gesture | Tamil | Tanglish | English), so wording can be fixed without touching code. Voice recordings go in `Resources/Voice/ch01/<scene>_<line>.ogg` (for example `1.3_shakedown_1.ogg`, also .mp3 or .wav); a line with a recording waits for it to finish. Off-screen lines (Settu on the phone) get a phone-line sound.
+
+**Placeholder Tamil voices (until real actors record):** with Python installed, double-click `tools/make_voices.bat` (from the downloaded ZIP), drag your Unity project folder into the window and press Enter. It uses Microsoft's free neural Tamil voices (internet needed) to make one MP3 per line, each character with their own voice, speed and pitch (edit `VOICES` in `tools/make_voices.py` to change them). Lines that already have a file are skipped, so your own recordings are never overwritten; run it again after editing the dialogue (or add `--force` to remake everything). Music for the auto ride: `Resources/Audio/Story/gaana`.
 
 **Tamil text test:** Tamil letters need shaping (vowel signs and joined letters), which not every Unity text system does. To check yours:
 1. Copy `Assets/MadrasGethu/Resources/Fonts` as well as `Scripts` and `Editor`.

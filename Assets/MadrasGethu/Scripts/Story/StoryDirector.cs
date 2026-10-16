@@ -47,13 +47,23 @@ namespace MadrasGethu
         protected bool manualShot;
         protected bool playerDied;
         AudioSource voice;
+        AudioLowPassFilter phoneLow;
+        AudioHighPassFilter phoneHigh;
 
         protected virtual void Awake()
         {
             Instance = this;
-            voice = gameObject.AddComponent<AudioSource>();
+            var voiceGo = new GameObject("Story Voice");
+            voiceGo.transform.SetParent(transform, false);
+            voice = voiceGo.AddComponent<AudioSource>();
             voice.spatialBlend = 0f;
             voice.playOnAwake = false;
+            // Off-screen lines (a phone call) sound thin, like a phone line.
+            phoneLow = voiceGo.AddComponent<AudioLowPassFilter>();
+            phoneLow.cutoffFrequency = 3200f;
+            phoneHigh = voiceGo.AddComponent<AudioHighPassFilter>();
+            phoneHigh.cutoffFrequency = 450f;
+            phoneLow.enabled = phoneHigh.enabled = false;
         }
 
         protected virtual void OnDestroy()
@@ -142,6 +152,7 @@ namespace MadrasGethu
                 var clip = VoiceClip(id, e.lineNumber);
                 if (clip != null)
                 {
+                    phoneLow.enabled = phoneHigh.enabled = e.offScreen;
                     voice.clip = clip;
                     voice.Play();
                     duration = clip.length + 0.35f;
@@ -177,7 +188,7 @@ namespace MadrasGethu
                 ui.Bark = e;
                 ui.BarkUntil = Time.unscaledTime + Mathf.Min(3.2f, ReadTime(e) * 0.75f);
                 var clip = VoiceClip(sceneId, e.lineNumber);
-                if (clip != null) { voice.clip = clip; voice.Play(); }
+                if (clip != null) { phoneLow.enabled = phoneHigh.enabled = false; voice.clip = clip; voice.Play(); }
                 return;
             }
         }
