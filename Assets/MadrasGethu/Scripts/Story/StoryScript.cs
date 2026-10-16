@@ -10,6 +10,7 @@ namespace MadrasGethu
         public bool offScreen;      // "settu~": heard, not seen (phone, voice)
         public string[] gestures;   // talk / point / wave / none ...
         public string tamil, tanglish, english;
+        public string direction;    // optional 6th column: how to say it (for voice actors / AI voices)
         public string marker;       // "@tray" -> "tray"
         public string markerArg;    // "@pause 1.5" -> "1.5"
         public int lineNumber;      // 1-based count of spoken lines in the scene (for voice files)
@@ -90,7 +91,8 @@ namespace MadrasGethu
                     gestures = cols[1].Trim().ToLowerInvariant().Split(','),
                     tamil = cols[2].Trim(),
                     tanglish = cols[3].Trim(),
-                    english = string.Join("|", cols, 4, cols.Length - 4).Trim(),
+                    english = cols[4].Trim(),
+                    direction = cols.Length > 5 ? cols[5].Trim() : null,
                     lineNumber = spoken,
                 });
             }

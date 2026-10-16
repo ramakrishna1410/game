@@ -2,7 +2,7 @@
 #
 # You can edit this file to change any line. Format:
 #   == scene_id                      starts a scene
-#   speaker | gesture | Tamil | Tanglish | English
+#   speaker | gesture | Tamil | Tanglish | English | direction (optional: how to say it, for voices)
 #   @marker                          the game does something here (camera, walking, a pause...)
 #   # comment
 #
@@ -12,101 +12,101 @@
 # Voice files (optional): Resources/Voice/ch01/<scene_id>_<line number>.ogg  (line numbers start at 1)
 
 == 1.1_auto
-kutty | talk,wave | டேய் மாறா! துபாய் ஷேக் மாதிரி வருவன்னு நெனச்சேன்... அதே பழைய சட்டை! | Dei Maaraa! Dubai sheikh maadhiri varuvannu nenachen... adhe pazhaya sattai! | Dei Maara! I thought you'd come back like a Dubai sheikh... same old shirt!
-maaran | none | சட்டை புதுசு தான் டா. ஆளு தான் பழசு. | Sattai pudhusu thaan da. Aalu thaan pazhasu. | The shirt's new. The man's the old one.
-kutty | talk | ஊரு மாறிடுச்சு மாறா. இப்போ ஹார்பர்ல மீன் கூட செட்டு கிட்ட பர்மிஷன் கேட்டு தான் நீந்துது. | Ooru maaridichu Maaraa. Ippo harbour-la meen kooda Settu kitta permission kettu thaan neendhudhu. | The town's changed. These days even the fish ask Settu's permission to swim in the harbour.
-maaran | none | செட்டு... இன்னும் இருக்கானா? | Settu... innum irukkaanaa? | Settu... he's still around?
+kutty | talk,wave | டேய் மாறா! துபாய் ஷேக் மாதிரி வருவன்னு நெனச்சேன்... அதே பழைய சட்டை! | Dei Maaraa! Dubai sheikh maadhiri varuvannu nenachen... adhe pazhaya sattai! | Dei Maara! I thought you'd come back like a Dubai sheikh... same old shirt! | overjoyed, laughing, teasing his old friend he hasn't seen in six years
+maaran | none | சட்டை புதுசு தான் டா. ஆளு தான் பழசு. | Sattai pudhusu thaan da. Aalu thaan pazhasu. | The shirt's new. The man's the old one. | dry, quiet, a tired half-smile
+kutty | talk | ஊரு மாறிடுச்சு மாறா. இப்போ ஹார்பர்ல மீன் கூட செட்டு கிட்ட பர்மிஷன் கேட்டு தான் நீந்துது. | Ooru maaridichu Maaraa. Ippo harbour-la meen kooda Settu kitta permission kettu thaan neendhudhu. | The town's changed. These days even the fish ask Settu's permission to swim in the harbour. | chatty and joking, then a little bitter
+maaran | none | செட்டு... இன்னும் இருக்கானா? | Settu... innum irukkaanaa? | Settu... he's still around? | quiet, suddenly serious, wary
 @billboard
-kutty | talk | இருக்கானா? அவன் தான் இப்போ கரையே. குமரன் அண்ணன் எம்.எல்.ஏ சீட்டுக்கு நிக்கிறாரு. கரைய செட்டு பாத்துக்குறான். | Irukkaanaa? Avan thaan ippo karaiye. Kumaran annan MLA seat-ukku nikkiraaru. Karaiya Settu paathukkuraan. | Still around? He IS the shore now. Kumaran Anna's standing for MLA. Settu runs the shore for him.
-kutty | talk | கயல் கல்யாணத்துக்கு தானே வந்த? ...வேற எதுக்கும் இல்லையே? | Kayal kalyaanathukku thaane vandha? ...Vera edhukkum illaiye? | You came for Kayal's wedding, right? ...Not for anything else?
-maaran | none | கல்யாணத்துக்கு தான். | Kalyaanathukku thaan. | For the wedding.
-kutty | none | ம்ம். ஆறு வருஷம் முன்னாடி போகும் போதும் இப்படி தான் ஒரே வார்த்தைல பதில் சொன்ன. | Mm. Aaru varusham munnaadi pogum podhum ippadi thaan ore vaarthai-la badhil sonna. | Mm. Six years ago when you left, you answered in one word too.
+kutty | talk | இருக்கானா? அவன் தான் இப்போ கரையே. குமரன் அண்ணன் எம்.எல்.ஏ சீட்டுக்கு நிக்கிறாரு. கரைய செட்டு பாத்துக்குறான். | Irukkaanaa? Avan thaan ippo karaiye. Kumaran annan MLA seat-ukku nikkiraaru. Karaiya Settu paathukkuraan. | Still around? He IS the shore now. Kumaran Anna's standing for MLA. Settu runs the shore for him. | half joking, half scared, lowering his voice
+kutty | talk | கயல் கல்யாணத்துக்கு தானே வந்த? ...வேற எதுக்கும் இல்லையே? | Kayal kalyaanathukku thaane vandha? ...Vera edhukkum illaiye? | You came for Kayal's wedding, right? ...Not for anything else? | careful, probing, he suspects something
+maaran | none | கல்யாணத்துக்கு தான். | Kalyaanathukku thaan. | For the wedding. | short, flat, avoiding the question
+kutty | none | ம்ம். ஆறு வருஷம் முன்னாடி போகும் போதும் இப்படி தான் ஒரே வார்த்தைல பதில் சொன்ன. | Mm. Aaru varusham munnaadi pogum podhum ippadi thaan ore vaarthai-la badhil sonna. | Mm. Six years ago when you left, you answered in one word too. | to himself, gently disappointed
 
 == 1.1_gate
 @step_out
-ilango | talk | வெல்கம் பேக், சாம்பியன். ஊருக்கு வந்த வேலைய மட்டும் பாரு, சரியா? | Welcome back, champion. Oorukku vandha velaiya mattum paaru, sariyaa? | Welcome back, champion. Just do what you came home to do. Clear?
-maaran | none | நான் சாம்பியன் இல்ல சார். | Naan champion illa saar. | I'm not a champion, sir.
-ilango | none | அது எனக்கு தெரியும். | Adhu enakku theriyum. | I know.
+ilango | talk | வெல்கம் பேக், சாம்பியன். ஊருக்கு வந்த வேலைய மட்டும் பாரு, சரியா? | Welcome back, champion. Oorukku vandha velaiya mattum paaru, sariyaa? | Welcome back, champion. Just do what you came home to do. Clear? | smooth and pleasant, a cop's polite warning with a hidden edge
+maaran | none | நான் சாம்பியன் இல்ல சார். | Naan champion illa saar. | I'm not a champion, sir. | flat, respectful but cold
+ilango | none | அது எனக்கு தெரியும். | Adhu enakku theriyum. | I know. | smiling, knowing, a little menacing
 @jeep_leaves
-kutty | point | இளங்கோ சார். இந்த ஸ்டேஷன்ல நல்ல போலீஸ் அவரு ஒருத்தர் தான்னு பேரு. | Ilango saar. Indha station-la nalla police avaru oruthar thaannu peru. | Inspector Ilango. They say he's the only honest cop at this station.
-kutty | talk | நான் ஆட்டோவ நிறுத்திட்டு வரேன். நீ அம்மா கடைக்கு போ. | Naan auto-va niruthittu varen. Nee amma kadaikku po. | Let me park the auto. You go on to Amma's shop.
+kutty | point | இளங்கோ சார். இந்த ஸ்டேஷன்ல நல்ல போலீஸ் அவரு ஒருத்தர் தான்னு பேரு. | Ilango saar. Indha station-la nalla police avaru oruthar thaannu peru. | Inspector Ilango. They say he's the only honest cop at this station. | impressed, admiring, gossiping
+kutty | talk | நான் ஆட்டோவ நிறுத்திட்டு வரேன். நீ அம்மா கடைக்கு போ. | Naan auto-va niruthittu varen. Nee amma kadaikku po. | Let me park the auto. You go on to Amma's shop. | cheerful, hurrying off
 
 # Optional chats on the walk (walk up and press E)
 == 1.2_muniyandi
-muniyandi | talk | வேலு பையனா? உங்க அப்பா மாதிரியே நடக்குற டா. | Velu paiyanaa? Unga appa maadhiriye nadakkura da. | Velu's boy? You walk just like your father.
+muniyandi | talk | வேலு பையனா? உங்க அப்பா மாதிரியே நடக்குற டா. | Velu paiyanaa? Unga appa maadhiriye nadakkura da. | Velu's boy? You walk just like your father. | old fisherman, warm, nostalgic, a bit hoarse
 
 == 1.2_paati
-paati | talk | இன்னைக்கு வஞ்சிரம் விலை கேட்டா தங்கம் விலை சொல்லுவாங்க. எல்லாம் அந்த ஏலம் பண்ற வேலை. | Innaikku vanjiram vilai kettaa thangam vilai solluvaanga. Ellaam andha yelam panra velai. | Ask the price of seer fish today and they quote you gold. It's all that auction's doing.
+paati | talk | இன்னைக்கு வஞ்சிரம் விலை கேட்டா தங்கம் விலை சொல்லுவாங்க. எல்லாம் அந்த ஏலம் பண்ற வேலை. | Innaikku vanjiram vilai kettaa thangam vilai solluvaanga. Ellaam andha yelam panra velai. | Ask the price of seer fish today and they quote you gold. It's all that auction's doing. | grumpy old fish-seller grandmother, complaining loudly
 
 == 1.2_boy
-boy | point | அண்ணா, நீ பாக்ஸரா? வாத்தியார் ஜிம் போட்டோல நீ இருக்க! | Annaa, nee boxer-aa? Vaathiyaar gym photo-la nee irukka! | Anna, are you a boxer? You're in the photo at Vaathiyaar's gym!
-maaran | none | இருந்தேன். | Irundhen. | I was.
+boy | point | அண்ணா, நீ பாக்ஸரா? வாத்தியார் ஜிம் போட்டோல நீ இருக்க! | Annaa, nee boxer-aa? Vaathiyaar gym photo-la nee irukka! | Anna, are you a boxer? You're in the photo at Vaathiyaar's gym! | excited little boy, amazed
+maaran | none | இருந்தேன். | Irundhen. | I was. | quiet, a little sad, one word
 
 == 1.3_shakedown
-pallu | talk | என்ன அம்மா, இந்த வாரம் மாமூல் எங்க? | Enna amma, indha vaaram maamool enga? | What, amma, where's this week's money?
-selvi | talk | போன வாரம் தானே குடுத்தேன் பா... வியாபாரமே இல்ல. | Pona vaaram thaane kuduthen paa... viyaabaarame illa. | I paid just last week... there's no business at all.
-pallu | point | அது எங்களுக்கு தெரியாது. செட்டு அண்ணன் சொன்னா சொன்னது தான். | Adhu engalukku theriyaadhu. Settu annan sonnaa sonnadhu thaan. | Not our problem. What Settu anna says, goes.
+pallu | talk | என்ன அம்மா, இந்த வாரம் மாமூல் எங்க? | Enna amma, indha vaaram maamool enga? | What, amma, where's this week's money? | bored, lazy, menacing street rowdy
+selvi | talk | போன வாரம் தானே குடுத்தேன் பா... வியாபாரமே இல்ல. | Pona vaaram thaane kuduthen paa... viyaabaarame illa. | I paid just last week... there's no business at all. | tired, pleading but firm, a struggling mother
+pallu | point | அது எங்களுக்கு தெரியாது. செட்டு அண்ணன் சொன்னா சொன்னது தான். | Adhu engalukku theriyaadhu. Settu annan sonnaa sonnadhu thaan. | Not our problem. What Settu anna says, goes. | rough, threatening, pointing at her
 @tray
-maaran | none | டேய்... அவங்க மேல இருந்து கைய எடுடா. | Dei... avanga mela irundhu kaiya edudaa. | Dei... take your hand off her.
+maaran | none | டேய்... அவங்க மேல இருந்து கைய எடுடா. | Dei... avanga mela irundhu kaiya edudaa. | Dei... take your hand off her. | low, calm, dangerous
 @turn
-pallu | none | நீ யாருடா புதுசா? | Nee yaaruda pudhusaa? | And who are you, new guy?
-maaran | none | இந்த கடை இட்லி சாப்பிட்டு வளர்ந்தவன் டா. | Indha kadai idli saappittu valarndhavan da. | I grew up on the idlis from this shop.
-selvi | none | மாறா... நீயா? எப்போ டா வந்த? | Maaraa... neeyaa? Eppo da vandha? | Maaraa... is that you? When did you come?
-maaran | none | இப்போ தான் மா. ஒரு நிமிஷம் இரு. | Ippo thaan maa. Oru nimisham iru. | Just now, ma. Give me a minute.
-pallu | point | அம்மா பையன் வந்துட்டான் டா! அடிங்க! | Amma paiyan vandhuttaan da! Adinga! | Mummy's boy is here! Hit him!
+pallu | none | நீ யாருடா புதுசா? | Nee yaaruda pudhusaa? | And who are you, new guy? | mocking, sizing him up
+maaran | none | இந்த கடை இட்லி சாப்பிட்டு வளர்ந்தவன் டா. | Indha kadai idli saappittu valarndhavan da. | I grew up on the idlis from this shop. | steady, proud, quietly fierce
+selvi | none | மாறா... நீயா? எப்போ டா வந்த? | Maaraa... neeyaa? Eppo da vandha? | Maaraa... is that you? When did you come? | shocked, emotional, voice breaking with joy
+maaran | none | இப்போ தான் மா. ஒரு நிமிஷம் இரு. | Ippo thaan maa. Oru nimisham iru. | Just now, ma. Give me a minute. | soft to his mother, eyes still on the rowdy
+pallu | point | அம்மா பையன் வந்துட்டான் டா! அடிங்க! | Amma paiyan vandhuttaan da! Adinga! | Mummy's boy is here! Hit him! | laughing, mocking, shouting to his gang
 
 # Shouts during the fight (shown small, they don't stop the game)
 == 1.4_barks
-selvi | none | மாறா, பாத்து டா! | Maaraa, paathu da! | Maaraa, careful!
-pallu | none | டேய், இவன் பாக்ஸர் டா! | Dei, ivan boxer da! | Dei, he's a boxer!
-rowdy | none | செட்டு அண்ணன் கிட்ட சொல்லுவோம்! | Settu annan kitta solluvom! | We'll tell Settu anna!
-selvi | none | மாறா, பின்னாடி! | Maaraa, pinnaadi! | Maaraa, behind you!
+selvi | none | மாறா, பாத்து டா! | Maaraa, paathu da! | Maaraa, careful! | worried mother, shouting
+pallu | none | டேய், இவன் பாக்ஸர் டா! | Dei, ivan boxer da! | Dei, he's a boxer! | panicking, shouting
+rowdy | none | செட்டு அண்ணன் கிட்ட சொல்லுவோம்! | Settu annan kitta solluvom! | We'll tell Settu anna! | angry, retreating, shouting a threat
+selvi | none | மாறா, பின்னாடி! | Maaraa, pinnaadi! | Maaraa, behind you! | urgent warning shout
 
 == 1.4_kadai_smashed
-selvi | none | என் டேபிள் டா அது! | En table da adhu! | That's my table!
+selvi | none | என் டேபிள் டா அது! | En table da adhu! | That's my table! | outraged, shouting
 
 == 1.4_kutty_arrives
-kutty | none | அடி மாறா! ஆறு வருஷ வட்டியோட அடி! | Adi Maaraa! Aaru varusha vattiyoda adi! | Hit him, Maara! Six years' interest!
+kutty | none | அடி மாறா! ஆறு வருஷ வட்டியோட அடி! | Adi Maaraa! Aaru varusha vattiyoda adi! | Hit him, Maara! Six years' interest! | cheering wildly, excited
 
 == 1.4_end
-pallu | none | செட்டு அண்ணன் கிட்ட சொல்றேன் டா! நீ செத்த! | Settu annan kitta solren da! Nee setha! | I'll tell Settu anna! You're dead!
-maaran | none | சொல்லு. இட்லி ரெடியா இருக்கும்னு சொல்லு. | Sollu. Idli ready-aa irukkumnu sollu. | Tell him. Tell him the idlis will be ready.
+pallu | none | செட்டு அண்ணன் கிட்ட சொல்றேன் டா! நீ செத்த! | Settu annan kitta solren da! Nee setha! | I'll tell Settu anna! You're dead! | on his knees, scared but spiteful, shouting as he backs away
+maaran | none | சொல்லு. இட்லி ரெடியா இருக்கும்னு சொல்லு. | Sollu. Idli ready-aa irukkumnu sollu. | Tell him. Tell him the idlis will be ready. | calm, dry, mocking
 @pallu_runs
 
 == 1.5_kitchen
-selvi | none | சாப்பிடு. | Saappidu. | Eat.
+selvi | none | சாப்பிடு. | Saappidu. | Eat. | one word, stern but loving, holding back tears
 @pause 1.5
-selvi | none | ஆறு வருஷம் டா. ஒரு போன் கூட இல்ல. | Aaru varusham da. Oru phone kooda illa. | Six years. Not even one phone call.
-maaran | none | பணம் அனுப்பினேனே மா. | Panam anuppinene maa. | I sent money, ma.
-selvi | none | பணமா டா கேட்டேன்? | Panamaa da ketten? | Was it money I asked for?
+selvi | none | ஆறு வருஷம் டா. ஒரு போன் கூட இல்ல. | Aaru varusham da. Oru phone kooda illa. | Six years. Not even one phone call. | hurt, quietly accusing
+maaran | none | பணம் அனுப்பினேனே மா. | Panam anuppinene maa. | I sent money, ma. | defensive, guilty, mumbling
+selvi | none | பணமா டா கேட்டேன்? | Panamaa da ketten? | Was it money I asked for? | voice breaking, hurt
 @kayal_enters
-kayal | point | வந்த முதல் நாளே சண்டையா? | Vandha mudhal naale sandaiyaa? | Fighting on the very first day?
-maaran | none | அவங்க தான் ஆரம்பிச்சாங்க. | Avanga thaan aarambichaanga. | They started it.
-kayal | talk | எப்பவுமே அவங்க தான் ஆரம்பிப்பாங்க. நீ தான் முடிப்ப. கை குடு. | Eppavume avanga thaan aarambippaanga. Nee thaan mudippa. Kai kudu. | They always start it. You always finish it. Give me your hand.
+kayal | point | வந்த முதல் நாளே சண்டையா? | Vandha mudhal naale sandaiyaa? | Fighting on the very first day? | surprised, scolding her brother
+maaran | none | அவங்க தான் ஆரம்பிச்சாங்க. | Avanga thaan aarambichaanga. | They started it. | sheepish, like a little boy
+kayal | talk | எப்பவுமே அவங்க தான் ஆரம்பிப்பாங்க. நீ தான் முடிப்ப. கை குடு. | Eppavume avanga thaan aarambippaanga. Nee thaan mudippa. Kai kudu. | They always start it. You always finish it. Give me your hand. | sighing, half annoyed, half loving
 @pause 1.2
-kayal | talk | அருண் இன்னைக்கு ராத்திரி சாப்பிட வர்றாரு. போர்ட் ப்ராஜெக்ட்ல இன்ஜினியர். ப்ளீஸ்... அவர் முன்னாடி யாரையும் அடிக்காத. | Arun innaikku raathiri saappida varraaru. Port project-la engineer. Please... avar munnaadi yaaraiyum adikkaadha. | Arun's coming for dinner tonight. He's an engineer on the port project. Please... don't hit anyone in front of him.
-maaran | none | போர்ட் ப்ராஜெக்ட்? | Port project? | The port project?
-kayal | none | அவரு நல்லவரு அண்ணா. | Avaru nallavaru annaa. | He's a good man, anna.
+kayal | talk | அருண் இன்னைக்கு ராத்திரி சாப்பிட வர்றாரு. போர்ட் ப்ராஜெக்ட்ல இன்ஜினியர். ப்ளீஸ்... அவர் முன்னாடி யாரையும் அடிக்காத. | Arun innaikku raathiri saappida varraaru. Port project-la engineer. Please... avar munnaadi yaaraiyum adikkaadha. | Arun's coming for dinner tonight. He's an engineer on the port project. Please... don't hit anyone in front of him. | nervous, pleading, a little embarrassed
+maaran | none | போர்ட் ப்ராஜெக்ட்? | Port project? | The port project? | suspicious, slow
+kayal | none | அவரு நல்லவரு அண்ணா. | Avaru nallavaru annaa. | He's a good man, anna. | quickly, defending him
 @photo
-selvi | none | அவரு கடைசி வரைக்கும் உன்ன பத்தி தான் பேசினாரு. | Avaru kadaisi varaikkum unna pathi thaan pesinaaru. | Right to the end, all he talked about was you.
+selvi | none | அவரு கடைசி வரைக்கும் உன்ன பத்தி தான் பேசினாரு. | Avaru kadaisi varaikkum unna pathi thaan pesinaaru. | Right to the end, all he talked about was you. | soft, sad, remembering her late husband
 
 == 1.6_call
 @phone_rings
-settu~ | none | வேலு பையன்... ரிங்குல விழத் தெரிஞ்சவனுக்கு, தெருவுல நிக்கத் தெரியுமா? | Velu paiyan... ring-ula vizha therinjavanukku, theruvula nikka theriyumaa? | Velu's boy... you knew how to fall in the ring. Do you know how to stand in the street?
+settu~ | none | வேலு பையன்... ரிங்குல விழத் தெரிஞ்சவனுக்கு, தெருவுல நிக்கத் தெரியுமா? | Velu paiyan... ring-ula vizha therinjavanukku, theruvula nikka theriyumaa? | Velu's boy... you knew how to fall in the ring. Do you know how to stand in the street? | slow, amused, mocking, menacing, on a phone
 @pause 1.2
-maaran | none | வந்து பாரு. | Vandhu paaru. | Come and see.
-settu~ | none | நான் வர மாட்டேன். நீ தான் வருவ. வெள்ளிக்கிழமை மீன் ஏலம். அங்க பாக்கலாம். அம்மாவுக்கு என் வணக்கம் சொல்லு. | Naan vara maatten. Nee thaan varuva. Vellikkizhamai meen yelam. Anga paakkalaam. Ammaavukku en vanakkam sollu. | I won't come. You will. Friday, the fish auction. See you there. Give your mother my regards.
+maaran | none | வந்து பாரு. | Vandhu paaru. | Come and see. | low, cold, controlled anger
+settu~ | none | நான் வர மாட்டேன். நீ தான் வருவ. வெள்ளிக்கிழமை மீன் ஏலம். அங்க பாக்கலாம். அம்மாவுக்கு என் வணக்கம் சொல்லு. | Naan vara maatten. Nee thaan varuva. Vellikkizhamai meen yelam. Anga paakkalaam. Ammaavukku en vanakkam sollu. | I won't come. You will. Friday, the fish auction. See you there. Give your mother my regards. | smug, slow, threatening politely, on a phone
 @hang_up
 
 == 1.7_jetty
 @kutty_walks
-kutty | talk | டீ. சக்கரை கம்மி. துபாய்ல டயபெட்டிஸ் வந்திருக்கும்னு நெனச்சேன். | Tea. Sakkarai kammi. Dubai-la diabetes vandhirukkumnu nenachen. | Tea. Less sugar. Figured Dubai gave you diabetes.
+kutty | talk | டீ. சக்கரை கம்மி. துபாய்ல டயபெட்டிஸ் வந்திருக்கும்னு நெனச்சேன். | Tea. Sakkarai kammi. Dubai-la diabetes vandhirukkumnu nenachen. | Tea. Less sugar. Figured Dubai gave you diabetes. | warm, joking, handing over tea
 @pause 2
-kutty | none | நீ ஏன் போன, எனக்கு இன்னும் தெரியாது டா. | Nee yen pona, enakku innum theriyaadhu da. | I still don't know why you left.
+kutty | none | நீ ஏன் போன, எனக்கு இன்னும் தெரியாது டா. | Nee yen pona, enakku innum theriyaadhu da. | I still don't know why you left. | gentle, serious, not looking at him
 @pause 1.8
-maaran | none | ஒரு நாள் சொல்றேன். | Oru naal solren. | One day I'll tell you.
-kutty | none | அதையும் ஆறு வருஷம் முன்னாடி சொன்ன. | Adhaiyum aaru varusham munnaadi sonna. | You said that six years ago too.
+maaran | none | ஒரு நாள் சொல்றேன். | Oru naal solren. | One day I'll tell you. | quiet, heavy
+kutty | none | அதையும் ஆறு வருஷம் முன்னாடி சொன்ன. | Adhaiyum aaru varusham munnaadi sonna. | You said that six years ago too. | gently teasing, sad smile
 @neon
-maaran | none | வாத்தியார் இன்னும் ஜிம் நடத்துறாரா? | Vaathiyaar innum gym nadathuraaraa? | Vaathiyaar still runs the gym?
-kutty | point | நடத்துறாரு. உன் போட்டோவ மட்டும் சுவத்துல இருந்து எடுக்கல. ஏன்னு கேட்டா, திட்டுவாரு. | Nadathuraaru. Un photo-va mattum suvathula irundhu edukkala. Yennu kettaa, thittuvaaru. | He does. Never took your photo off the wall. Ask him why and he'll curse you out.
+maaran | none | வாத்தியார் இன்னும் ஜிம் நடத்துறாரா? | Vaathiyaar innum gym nadathuraaraa? | Vaathiyaar still runs the gym? | thoughtful, nostalgic
+kutty | point | நடத்துறாரு. உன் போட்டோவ மட்டும் சுவத்துல இருந்து எடுக்கல. ஏன்னு கேட்டா, திட்டுவாரு. | Nadathuraaru. Un photo-va mattum suvathula irundhu edukkala. Yennu kettaa, thittuvaaru. | He does. Never took your photo off the wall. Ask him why and he'll curse you out. | affectionate, chuckling
 @stand

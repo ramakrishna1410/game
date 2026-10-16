@@ -1,0 +1,18 @@
+{
+  "_help": "ElevenLabs voice IDs per character. The defaults are ElevenLabs' built-in voices (they speak Tamil with v3 but can sound foreign). For better Tamil: elevenlabs.io > Voices > Voice Library, search 'Tamil', add a voice, open it and copy its ID here.",
+  "elevenlabs": {
+    "default":   "pNInz6obpgDQGcFmaJgB",
+    "maaran":    "pNInz6obpgDQGcFmaJgB",
+    "kutty":     "TxGEqnHWrfWFTfGW9XjX",
+    "ilango":    "ErXwobaYiN019PkySvjV",
+    "settu":     "VR6AewLTigWG4xSOukaG",
+    "pallu":     "yoZ06aMxZJJ28mfd3POQ",
+    "rowdy":     "yoZ06aMxZJJ28mfd3POQ",
+    "muniyandi": "VR6AewLTigWG4xSOukaG",
+    "boy":       "TxGEqnHWrfWFTfGW9XjX",
+    "announcer": "ErXwobaYiN019PkySvjV",
+    "selvi":     "21m00Tcm4TlvDq8ikWAM",
+    "kayal":     "EXAVITQu4vr4xnSDxMaL",
+    "paati":     "MF3mGyEYCl7XYWbV9V6O"
+  }
+}

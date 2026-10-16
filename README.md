@@ -93,7 +93,15 @@ The story, cast and chapter plan are in **[docs/STORY.md](docs/STORY.md)**. Scen
 
 The dialogue is in `Resources/Story/ch01.txt`: one line per row (speaker | gesture | Tamil | Tanglish | English), so wording can be fixed without touching code. Voice recordings go in `Resources/Voice/ch01/<scene>_<line>.ogg` (for example `1.3_shakedown_1.ogg`, also .mp3 or .wav); a line with a recording waits for it to finish. Off-screen lines (Settu on the phone) get a phone-line sound.
 
-**Placeholder Tamil voices (until real actors record):** with Python installed, double-click `tools/make_voices.bat` (from the downloaded ZIP), drag your Unity project folder into the window and press Enter. It uses Microsoft's free neural Tamil voices (internet needed) to make one MP3 per line, each character with their own voice, speed and pitch (edit `VOICES` in `tools/make_voices.py` to change them). Lines that already have a file are skipped, so your own recordings are never overwritten; run it again after editing the dialogue (or add `--force` to remake everything). Music for the auto ride: `Resources/Audio/Story/gaana`.
+**AI Tamil voices (until real actors record):** with Python installed, double-click `tools/make_voices.bat` (from the downloaded ZIP). Choose an engine, paste its key, drag your Unity project folder into the window and press Enter. It makes one voice file per line, and each line's *direction* column (angry, teasing, voice breaking...) tells the AI how to act it.
+
+| Engine | Free | Sounds |
+|---|---|---|
+| **Gemini** (recommended) | free API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey); daily limit, so if it stops, run it again later and it carries on | acts out the directions, 30 voices |
+| **ElevenLabs** | free plan, 10,000 characters a month (Chapter 1 is about 2,300); non-commercial, credit ElevenLabs | the most natural; pick Tamil voices in its Voice Library and put their IDs in `tools/voices.json` |
+| Edge | unlimited, no key | flat, computer-like |
+
+Lines that already have a voice are skipped, so your own recordings are never overwritten; answer **y** to "Replace voices made before" when switching engine. Character voices and descriptions are at the top of `tools/make_voices.py`.
 
 **Tamil text test:** Tamil letters need shaping (vowel signs and joined letters), which not every Unity text system does. To check yours:
 1. Copy `Assets/MadrasGethu/Resources/Fonts` as well as `Scripts` and `Editor`.
