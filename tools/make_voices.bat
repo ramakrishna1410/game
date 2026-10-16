@@ -30,5 +30,17 @@ set /p REDO="Replace voices made before (y/n)? "
 set FORCE=
 if /i "%REDO%"=="y" set FORCE=--force
 if "%ENGINE%"=="edge" pip install --quiet edge-tts
-python "%~dp0make_voices.py" %PROJECT% --engine %ENGINE% --key "%KEY%" %FORCE%
+rem The offline engines run in their own Python environments (made by setup_offline_voices.bat).
+set PY=python
+set VENV=
+if "%ENGINE%"=="parler" set VENV=.venv_parler
+if "%ENGINE%"=="indicf5" set VENV=.venv_f5
+if defined VENV set PY="%~dp0%VENV%\Scripts\python.exe"
+if defined VENV if not exist "%~dp0%VENV%\Scripts\python.exe" (
+  echo.
+  echo  The %ENGINE% engine isn't set up yet: run setup_offline_voices.bat first.
+  pause
+  exit /b
+)
+%PY% "%~dp0make_voices.py" %PROJECT% --engine %ENGINE% --key "%KEY%" %FORCE%
 pause

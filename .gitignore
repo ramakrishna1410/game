@@ -36,3 +36,6 @@ crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# offline voice engines (made by tools/setup_offline_voices.bat)
+tools/.venv_*/

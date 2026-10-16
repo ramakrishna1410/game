@@ -91,7 +91,7 @@ PARLER_VOICES = {
 PARLER_SPEAKERS = {name: "" for name in PARLER_VOICES}
 
 
-class OutOfQuota(Exception):
+class OutOfQuota(Exception):   # anything that means "stop the whole run" (quota, bad key, engine won't load)
     pass
 
 
@@ -329,28 +329,38 @@ async def main():
                 if existing and not args.force:
                     skipped += 1
                     continue
-                for old in existing:          # one file per line, or Unity can't tell which to play
-                    os.remove(old)
-                    if os.path.exists(old + ".meta"):
-                        os.remove(old + ".meta")
+                ext = ".mp3" if args.engine in ("elevenlabs", "edge") else ".wav"
+                temp = base + ".new" + ext     # the old voice stays until the new one is safely made
                 try:
                     if args.engine == "gemini":
-                        save_wav(gemini_line(line, key, state), base + ".wav")
+                        save_wav(gemini_line(line, key, state), temp)
                         time.sleep(1.5)        # be gentle with the free tier
                     elif args.engine == "elevenlabs":
-                        with open(base + ".mp3", "wb") as f:
+                        with open(temp, "wb") as f:
                             f.write(elevenlabs_line(line, key, voices))
                     elif args.engine == "indicf5":
-                        indicf5_line(line, state, base + ".wav")
+                        indicf5_line(line, state, temp)
                     elif args.engine == "parler":
-                        parler_line(line, state, base + ".wav")
+                        parler_line(line, state, temp)
                     else:
-                        await edge_line(line, base + ".mp3")
+                        await edge_line(line, temp)
+                    for old in existing:          # one file per line, or Unity can't tell which to play
+                        os.remove(old)
+                        if os.path.exists(old + ".meta"):
+                            os.remove(old + ".meta")
+                    os.replace(temp, base + ext)
                     made += 1
                     print(f"  {line['scene']}_{line['n']:<3} {line['speaker']:10s} {line['english']}")
                 except OutOfQuota:
                     raise
+                except ImportError as e:
+                    # The engine itself can't load: every line would fail the same way, so stop here.
+                    raise OutOfQuota(f"The {args.engine} engine couldn't load: {e}\n"
+                                     "Run tools/setup_offline_voices.bat again (it keeps each engine in its own "
+                                     "Python environment so their libraries can't clash).")
                 except Exception as e:
+                    if os.path.exists(temp):
+                        os.remove(temp)
                     failed += 1
                     print(f"  {line['scene']}_{line['n']}  FAILED: {e}")
     except OutOfQuota as e:
