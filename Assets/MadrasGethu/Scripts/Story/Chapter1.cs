@@ -33,7 +33,11 @@ namespace MadrasGethu
         EnemyFighter pallu;
         readonly List<EnemyFighter> fighters = new List<EnemyFighter>();
         GameObject tray;
-        bool autoDriving, rideCamera;
+        bool autoDriving, rideCamera, riding, kuttyDriving;
+        Vector3 autoLastPosition;
+        // Where Kutty (driving) and Maaran (on the passenger bench) sit in the auto, in its own space.
+        static readonly Vector3 DriverSeat = new Vector3(0f, 0f, 0.42f);
+        static readonly Vector3 PassengerSeat = new Vector3(0f, 0f, -0.62f);
         bool heavyUsed;
 
         protected override void Update()
@@ -41,7 +45,47 @@ namespace MadrasGethu
             base.Update();
             if (!inCutscene && GameInput.HeavyPressed) heavyUsed = true;
             if (rideCamera && auto != null)
-                cam.CutsceneShot(auto.position + new Vector3(-2.9f, 1.5f, 3.6f), auto.position + Vector3.up * 1.15f, 46f, false, 3f);
+                cam.CutsceneShot(auto.position + new Vector3(-3.3f, 1.55f, 2.4f), auto.position + new Vector3(0f, 1.2f, -0.1f), 46f, false, 8f);
+        }
+
+        void LateUpdate()
+        {
+            if (auto == null) return;
+            // The engine note rises with speed and settles to a tick-over when stopped.
+            float speed = Time.deltaTime > 0f ? (auto.position - autoLastPosition).magnitude / Time.deltaTime : 0f;
+            autoLastPosition = auto.position;
+            var engine = auto.GetComponent<AudioSource>();
+            if (engine != null) engine.pitch = Mathf.Lerp(engine.pitch, 0.75f + Mathf.Clamp01(speed / 3f) * 0.6f, Time.deltaTime * 3f);
+            if (riding || kuttyDriving) Seat(kutty, DriverSeat);
+            if (riding) Seat(hero, PassengerSeat);
+        }
+
+        // Sitting animation: feet on the auto floor. Without it they stand sunk into the tub, which
+        // from outside looks like sitting (waist-down hidden by the auto's sides).
+        void Seat(StoryActor who, Vector3 seat)
+        {
+            if (who == null) return;
+            bool sits = who.Visual != null && who.Visual.HasAnimatorParameter("Sitting");
+            Vector3 local = seat + Vector3.up * (sits ? 0.28f : -0.3f);
+            who.transform.SetPositionAndRotation(auto.TransformPoint(local), auto.rotation);
+        }
+
+        void BoardAuto()
+        {
+            riding = true;
+            foreach (var who in new[] { kutty, hero })
+            {
+                if (who.Motor != null) who.Motor.SetFrozen(true);
+                who.Hold("Sitting", true);
+                Show(who, true);
+            }
+        }
+
+        void LeaveAuto(StoryActor who, Vector3 stand, Vector3 look)
+        {
+            who.Hold("Sitting", false);
+            if (who.Motor != null) who.Motor.SetFrozen(false);
+            who.Place(stand, look);
         }
 
         protected override IEnumerator Run()
@@ -55,7 +99,8 @@ namespace MadrasGethu
             SetUpCast();
 
             BeginCutscene();
-            Show(hero, false);   // riding in the back of the auto
+            Ambience(true);
+            BoardAuto();
             yield return Card("காசிமேடு காலை", "CHAPTER 1  ·  KASIMEDU MORNING", "Kasimedu fishing harbour, North Chennai  ·  6:10 AM", 3.5f);
 
             // ---- 1.1 the auto ride
@@ -128,8 +173,6 @@ namespace MadrasGethu
             jeep = StoryProps.Jeep(root, new Vector3(4.6f, 0f, -9.3f), 180f);
             ilango = Npc("ilango", new Vector3(3.2f, 0.1f, -10.4f), AutoStop);
             kutty = Npc("kutty", AutoStop + new Vector3(0f, 0.1f, 0f), AutoStop + Vector3.forward);
-            Show(kutty, false);
-            if (kutty.Motor != null) kutty.Motor.SetFrozen(true);
             hero.Teleport(HeroStart);
 
             // People on the walk (E to talk)
@@ -178,11 +221,16 @@ namespace MadrasGethu
 
         IEnumerator ParkAuto()
         {
-            yield return Walk(kutty, AutoStop + new Vector3(-0.7f, 0.1f, 0.6f), 1.4f);
-            Show(kutty, false);
+            yield return Walk(kutty, AutoStop + new Vector3(-0.8f, 0.1f, 0.5f), 1.4f);
+            // Back in the driver's seat to park it.
             if (kutty.Motor != null) kutty.Motor.SetFrozen(true);
+            kutty.Hold("Sitting", true);
+            kuttyDriving = true;
             yield return Drive(auto, new Vector3(2.4f, 0f, -8f), 1.6f);
             yield return Drive(auto, AutoParked, 1.2f);
+            yield return new WaitForSeconds(1f);
+            var engine = auto.GetComponent<AudioSource>();
+            if (engine != null) engine.Stop();   // Kutty switches it off
         }
 
         // ------------------------------------------------------------------ markers
@@ -194,18 +242,16 @@ namespace MadrasGethu
                 case "billboard":
                     rideCamera = false;
                     // Low, looking up at Kumaran's banner on the arch as the auto comes under it.
-                    Shot(new Vector3(1.2f, 1.1f, -27.5f), new Vector3(-0.15f, 6.2f, -22f), 56f);
+                    Shot(new Vector3(1.4f, 1.2f, -31.5f), new Vector3(-0.15f, 6.4f, -22f), 50f);
                     yield return Wait(2.2f);
                     StartCoroutine(BackToRideCamera(4.5f));
                     break;
 
                 case "step_out":
                     rideCamera = false;
-                    hero.Place(HeroStart, ilango.transform.position);
-                    Show(hero, true);
-                    if (kutty.Motor != null) kutty.Motor.SetFrozen(false);
-                    kutty.Place(AutoStop + new Vector3(-0.9f, 0.1f, -0.9f), hero.transform.position);
-                    Show(kutty, true);
+                    riding = false;
+                    LeaveAuto(hero, HeroStart, ilango.transform.position);
+                    LeaveAuto(kutty, AutoStop + new Vector3(-0.9f, 0.1f, -0.9f), HeroStart);
                     Shot(new Vector3(-1.6f, 1.55f, -14.6f), new Vector3(1.6f, 1.3f, -10.8f), 42f);
                     yield return Walk(ilango, new Vector3(1.9f, 0.1f, -9.9f), 1.2f);
                     ilango.Face(hero);
@@ -478,8 +524,8 @@ namespace MadrasGethu
 
         IEnumerator KuttyArrives()
         {
-            if (kutty.Motor != null) kutty.Motor.SetFrozen(false);
-            kutty.Place(AutoParked + new Vector3(-1.1f, 0.1f, 0.4f), player.transform.position);
+            kuttyDriving = false;
+            LeaveAuto(kutty, AutoParked + new Vector3(-1.1f, 0.1f, 0.4f), player.transform.position);
             Show(kutty, true);
             kutty.WalkTo(new Vector3(1.6f, 0.1f, 1.6f), 2.2f);
             yield return new WaitForSeconds(1.2f);
@@ -500,6 +546,7 @@ namespace MadrasGethu
                 if (w != null && w.Holder == null) Destroy(w.gameObject);
             KasimeduArenaBuilder.PlaceWeapons();
             if (tray != null) Destroy(tray);
+            kuttyDriving = false;
             Show(kutty, false);
             if (kutty.Motor != null) kutty.Motor.SetFrozen(true);
             player.Heal(player.maxHealth);
@@ -555,6 +602,7 @@ namespace MadrasGethu
         IEnumerator Jetty()
         {
             KasimeduArenaBuilder.SetTimeOfDay(false);
+            Ambience(false);
             StoryProps.NeonSign(root);
             Show(selvi, false);
             hero.Place(new Vector3(6.25f, 0.1f, 4.5f), new Vector3(20f, 0f, 6f));

@@ -36,10 +36,17 @@ namespace MadrasGethu
             Color yellow = new Color(0.98f, 0.8f, 0.1f);
             Color black = new Color(0.07f, 0.07f, 0.07f);
             Color green = new Color(0.1f, 0.45f, 0.2f);
-            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 0.75f, -0.2f), new Vector3(1.3f, 0.9f, 1.6f), green, collider: false, name: "Body");
-            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 0.7f, 0.9f), new Vector3(0.8f, 0.8f, 0.7f), green, collider: false, name: "Nose");
-            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 1.75f, -0.1f), new Vector3(1.35f, 0.08f, 2.2f), yellow, collider: false, name: "Canopy");
-            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 1.4f, 1.15f), new Vector3(0.8f, 0.5f, 0.04f), new Color(0.4f, 0.55f, 0.6f), collider: false, name: "Windshield");
+            // Open-sided like a real auto, so you can see who's riding: a low tub, the driver's cowl in
+            // front, the passenger bench behind, and the canopy on four thin posts.
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 0.5f, -0.1f), new Vector3(1.3f, 0.45f, 2.2f), green, collider: false, name: "Tub");
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 0.75f, 1.05f), new Vector3(0.9f, 0.9f, 0.5f), green, collider: false, name: "Cowl");
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 1.35f, 1.08f), new Vector3(0.85f, 0.55f, 0.04f), new Color(0.4f, 0.55f, 0.6f), collider: false, name: "Windshield");
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 1.75f, -0.05f), new Vector3(1.35f, 0.08f, 2.3f), yellow, collider: false, name: "Canopy");
+            foreach (var p in new[] { new Vector3(-0.62f, 1.25f, 0.95f), new Vector3(0.62f, 1.25f, 0.95f), new Vector3(-0.62f, 1.25f, -1.12f), new Vector3(0.62f, 1.25f, -1.12f) })
+                Palette.Primitive(PrimitiveType.Cylinder, t, p, new Vector3(0.05f, 0.5f, 0.05f), black, collider: false, name: "Post");
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 1.25f, -1.18f), new Vector3(1.3f, 0.95f, 0.05f), black, collider: false, name: "Back Hood");
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 0.8f, -0.62f), new Vector3(1.2f, 0.12f, 0.5f), black, collider: false, name: "Bench");
+            Palette.Primitive(PrimitiveType.Cube, t, new Vector3(0f, 1.15f, 0.85f), new Vector3(0.7f, 0.04f, 0.04f), new Color(0.6f, 0.6f, 0.6f), collider: false, name: "Handlebar");
             Palette.Primitive(PrimitiveType.Cylinder, t, new Vector3(0f, 0.25f, 1.25f), new Vector3(0.45f, 0.06f, 0.45f), black, collider: false, name: "Front Wheel")
                 .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
             for (int s = -1; s <= 1; s += 2)
@@ -47,8 +54,17 @@ namespace MadrasGethu
                     .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
             // "Amman thunai / KUTTY" painted on the back hood
             var back = Picture(t, "auto_back", Vector3.zero, Vector3.back, new Vector2(1.3f, 0.65f));
-            back.transform.localPosition = new Vector3(0f, 1.42f, -1.0f);
+            back.transform.localPosition = new Vector3(0f, 1.3f, -1.21f);
             back.transform.localRotation = Quaternion.LookRotation(Vector3.forward);
+            // Two-stroke engine putter (made in code)
+            var engine = t.gameObject.AddComponent<AudioSource>();
+            engine.clip = StorySounds.AutoEngine();
+            engine.loop = true;
+            engine.spatialBlend = 0.6f;
+            engine.minDistance = 3f;
+            engine.maxDistance = 40f;
+            engine.volume = 0.55f;
+            engine.Play();
             return t;
         }
 

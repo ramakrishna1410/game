@@ -373,25 +373,27 @@ namespace MadrasGethu
 
         // ------------------------------------------------------------------ sound
 
-        /// <summary>A phone ringing (made in code: the two-tone Indian landline/mobile "tring tring").</summary>
-        protected void Ring(Vector3 at)
+        /// <summary>A phone ringing (made in code: the two-tone "tring tring").</summary>
+        protected void Ring(Vector3 at) => AudioSource.PlayClipAtPoint(StorySounds.Ring(), at, 0.9f);
+
+        /// <summary>
+        /// Harbour sound bed: your files in Resources/Audio/Ambience if there are any (GameAudio plays
+        /// those), otherwise waves on the jetty made in code, with crows in the morning.
+        /// </summary>
+        protected void Ambience(bool morning)
         {
-            if (ringClip == null)
+            if (Resources.LoadAll<AudioClip>("Audio/Ambience").Length > 0) return;
+            if (ambienceSource == null)
             {
-                const int rate = 22050;
-                var data = new float[rate * 2];
-                for (int i = 0; i < data.Length; i++)
-                {
-                    float t = i / (float)rate;
-                    bool on = (t % 1f) < 0.4f || ((t % 1f) > 0.5f && (t % 1f) < 0.9f);
-                    data[i] = on ? 0.18f * (Mathf.Sin(2f * Mathf.PI * 400f * t) + Mathf.Sin(2f * Mathf.PI * 450f * t)) * 0.5f : 0f;
-                }
-                ringClip = AudioClip.Create("Ring", data.Length, 1, rate, false);
-                ringClip.SetData(data, 0);
+                ambienceSource = gameObject.AddComponent<AudioSource>();
+                ambienceSource.spatialBlend = 0f;
+                ambienceSource.loop = true;
+                ambienceSource.volume = 0.55f;
             }
-            AudioSource.PlayClipAtPoint(ringClip, at, 0.8f);
+            ambienceSource.clip = StorySounds.Harbour(morning);
+            ambienceSource.Play();
         }
-        static AudioClip ringClip;
+        AudioSource ambienceSource;
 
         /// <summary>Plays Resources/Audio/Story/&lt;cue&gt; if that file exists (gaana for the auto ride...).</summary>
         protected void Music(string cue)
