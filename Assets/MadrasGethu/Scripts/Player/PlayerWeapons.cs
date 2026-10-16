@@ -27,7 +27,19 @@ namespace MadrasGethu
         float weaponGrabHitAt = -1f;
         EnemyFighter chainVictim;             // being pulled in by the chain (let go if the pull is cut short)
 
-        /// <summary>SetState hook: a chain pull cut short (you got hit) lets him go instead of leaving him held.</summary>
+        bool weaponFinisherActive;            // Silambam Finish: can't be interrupted
+
+        /// <summary>SetState hook when a weapon move ends or is cut short: tidy up its posture, twirl and chain pull.</summary>
+        void LeaveWeaponMove(PlayerState next)
+        {
+            if (weaponFinisherActive && cam != null) cam.EndCinematic(0.6f);
+            weaponFinisherActive = false;
+            Visual.ClearPosture();
+            if (HeldWeapon != null) HeldWeapon.Twirl(0f);
+            CancelChainPull(next);
+        }
+
+        /// <summary>A chain pull cut short (you got hit) lets him go instead of leaving him held.</summary>
         void CancelChainPull(PlayerState next)
         {
             if (chainVictim == null || next == PlayerState.Grab) { chainVictim = null; return; }
@@ -357,7 +369,11 @@ namespace MadrasGethu
             WrestleMove move = null;
             switch (w.type)
             {
-                case WeaponType.Lathi: if (MoveUnlocks.Has(MoveId.SilambamFinish)) move = SilambamFinish(); break;
+                case WeaponType.Lathi:
+                    if (!MoveUnlocks.Has(MoveId.SilambamFinish)) return false;
+                    if (!PayFinisher()) return true;
+                    StartSilambamFinish(target);
+                    return true;
                 case WeaponType.IronPipe: if (MoveUnlocks.Has(MoveId.PipeChoke)) { grabFromBehind = false; move = ChokeOut("PIPE CHOKE", MoveId.PipeChoke, GripKind.PipeChoke); } break;
                 case WeaponType.Plank: if (MoveUnlocks.Has(MoveId.PlankBreak)) move = BreakOverBack("PLANK BREAK", MoveId.PlankBreak); break;
                 case WeaponType.Chair: if (MoveUnlocks.Has(MoveId.PlankBreak)) move = BreakOverBack("CHAIR BREAK", MoveId.PlankBreak); break;
@@ -390,21 +406,127 @@ namespace MadrasGethu
             return true;
         }
 
-        // Silambam Finish: sweep his legs with the stick (he's off his feet), spin it, crack it down as he lands.
-        WrestleMove SilambamFinish()
+        // Silambam Finish: crouch and sweep his ankles with the stick (he goes down on his back, ragdoll),
+        // step up and twirl the lathi overhead, then crack it down on his chest. RMB as it comes down = PERFECT.
+        // He is never carried, so nothing floats: physics drops him and he stays down for the crack.
+        void StartSilambamFinish(EnemyFighter target)
         {
-            var sweep = Pose(With(S(QteKey.None, null, 0.3f, FighterPose.WeaponSwing), new Vector3(0f, 1.0f, 1.0f), -90f, 0.3f), -0.35f, 30f);
-            sweep.anim = true;
-            sweep.shot = CamShot.Side;
-            var air = Pose(With(S(QteKey.None, null, 0.16f, FighterPose.Grab), new Vector3(0f, 1.05f, 1.0f), -92f, 0f), -0.05f, -8f);
-            air.shot = CamShot.LowHero;
-            var crack = Pose(Impact(With(S(QteKey.Heavy, "CRACK", 0.25f, FighterPose.WeaponSmash), new Vector3(0f, 0.3f, 1.0f), -90f, 0f), 30f), -0.4f, 40f);
-            crack.anim = true;
-            crack.shot = CamShot.GroundImpact;
-            var after = Pose(S(QteKey.None, null, 0.35f, FighterPose.Grab), -0.1f, 10f);
-            after.shot = CamShot.Side;
-            return new WrestleMove { name = "SILAMBAM FINISH", id = MoveId.SilambamFinish, cost = 0f, noHands = true }
-                .Step(sweep).Step(air).Step(crack).Step(after);
+            var w = HeldWeapon;
+            Motor.FaceDirection(target.transform.position - transform.position, instant: true);
+            Vector3 fwd = Flat(transform.forward).normalized;
+            float t = 0f, sweepAt = Visual.PlayTimed(FighterPose.WeaponSwing, 0.3f, 0.3f);
+            float crackAt = -1f, endAt = -1f;
+            int phase = 0;
+            bool perfect = false, pressed = false;
+            Visual.SetPosture(-0.45f, 32f);   // low, the stick goes along the ground
+            GameAudio.Play(Sfx.Whoosh, Center, 0.7f, 0.9f);
+            if (GM != null)
+            {
+                GM.AddPopup("SILAMBAM FINISH", Center + Vector3.up * 1.3f, new Color(1f, 0.75f, 0.15f), 1.4f);
+                GM.SlowMo(0.35f, 0.4f);
+            }
+            if (cam != null) cam.FovKick(4f);
+            weaponFinisherActive = true;
+            Vector3 camSide = Vector3.Cross(Vector3.up, fwd);
+            if (cam != null && Vector3.Dot(cam.transform.position - transform.position, camSide) < 0f) camSide = -camSide;
+
+            weaponMoveUpdate = () =>
+            {
+                t += Time.deltaTime;
+                Motor.SetDesiredVelocity(Vector3.zero);
+                if (target == null) return true;
+                Vector3 body = target.Visual.RagdollCenter;
+                if (cam != null)
+                {
+                    // Side-on, low once he's down so the crack reads.
+                    Vector3 mid = (transform.position + new Vector3(body.x, transform.position.y, body.z)) * 0.5f;
+                    float h = phase >= 2 ? 0.8f : 1.2f;
+                    cam.SetCinematicFraming(mid + camSide * 2.7f + Vector3.up * h - fwd * 0.4f, mid + Vector3.up * (phase >= 2 ? 0.6f : 1.0f),
+                        45f, 0f, mid + Vector3.up * 0.8f, 1.6f);
+                }
+
+                if (phase == 0)
+                {
+                    if (t < sweepAt) return false;
+                    // The sweep: feet go out from under him and he lands flat on his back.
+                    phase = 1;
+                    Visual.ClearPosture();
+                    target.Tripped(fwd);
+                    target.PinDown(4f);
+                    GameAudio.Play(Sfx.Kick, target.transform.position + Vector3.up * 0.2f, 1f, 0.8f);
+                    FX.HitSpark(target.transform.position + Vector3.up * 0.15f, true);
+                    RegisterHits(1, 0f);
+                    if (GM != null) { GM.HitStop(0.06f); GM.Shake(0.2f); }
+                    return false;
+                }
+
+                if (phase == 1)
+                {
+                    // Step up beside his chest while he lands, then start the twirl and the overhead wind-up.
+                    Vector3 to = Flat(body - transform.position);
+                    if (to.magnitude > 1.05f && t < sweepAt + 0.6f)
+                    {
+                        Motor.SetDesiredVelocity(to.normalized * 3.2f);
+                        Motor.FaceDirection(to);
+                        return false;
+                    }
+                    if (t < sweepAt + 0.35f) return false;
+                    phase = 2;
+                    Motor.FaceDirection(to, instant: true);
+                    if (w != null) w.Twirl(900f);
+                    GameAudio.Play(Sfx.Whoosh, Center + Vector3.up * 0.6f, 0.5f, 1.2f);
+                    crackAt = t + Visual.PlayTimed(FighterPose.WeaponSmash, 1.1f, 0.5f);
+                    return false;
+                }
+
+                if (phase == 2)
+                {
+                    float left = crackAt - t;
+                    bool window = left <= 0.35f;
+                    Prompts.Add(new PromptItem { key = "RMB", label = window ? "CRACK!" : "get ready..." });
+                    if (!pressed && GameInput.HeavyPressed)
+                    {
+                        pressed = true;
+                        perfect = window;
+                        if (GM != null) GM.AddPopup(perfect ? "PERFECT!" : "EARLY", Center + Vector3.up * 1.1f, perfect ? new Color(0.5f, 1f, 0.5f) : Color.gray, 0.6f);
+                    }
+                    if (left < 0.4f && w != null) w.Twirl(0f);                          // stop spinning for the strike
+                    if (left < 0.3f) Visual.SetPosture(-0.4f * (1f - left / 0.3f), 40f * (1f - left / 0.3f));   // bend into it
+                    if (left > 0f) return false;
+
+                    // CRACK on his chest.
+                    phase = 3;
+                    endAt = t + 0.75f;
+                    float mult = MassMode ? massModeDamageMultiplier : 1f;
+                    target.ReceiveHit(new HitInfo
+                    {
+                        attacker = this, damage = (perfect ? 32f : 24f) * mult, direction = Vector3.down + fwd * 0.2f, knockback = 0.5f,
+                        heavy = true, unblockable = true, hitsDowned = true, sound = Sfx.Silent,
+                    });
+                    target.Visual.StartRagdoll(Vector3.down * 3.5f + fwd * 0.4f);   // already limp: the blow jolts the body
+                    target.Visual.RagdollHeadJolt(Vector3.up * 2f);
+                    GameAudio.Play(Sfx.PunchHeavy, body, 1f, 0.8f);
+                    GameAudio.Play(Sfx.BoneCrack, body, 0.9f);
+                    GameAudio.Play(Sfx.Cheer, body, 0.7f);
+                    FX.HitSpark(body + Vector3.up * 0.1f, true);
+                    FX.Dust(new Vector3(body.x, transform.position.y, body.z), 18);
+                    RegisterHits(1, 0f);
+                    NotifyMoveLanded("Silambam Finish");
+                    if (GM != null)
+                    {
+                        GM.HitStop(0.12f);
+                        GM.Shake(0.45f, 0.3f);
+                        GM.AddPopup(perfect ? "CRACK! FLAWLESS" : "CRACK!", body + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.3f), 1.2f);
+                    }
+                    if (cam != null) cam.ZoomPunch(7f);
+                    return false;
+                }
+
+                // Hold the strike a moment over him, then straighten up.
+                if (t >= endAt - 0.4f) Visual.ClearPosture();
+                return t >= endAt;
+            };
+            SetState(PlayerState.WeaponMove);
         }
 
         // Plank / chair break: bend him over, then smash it across his back. It snaps; he goes down on his face.

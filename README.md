@@ -205,8 +205,8 @@ Each weapon fights its own way. The **Q** finishers cost one Gethu bar.
 
 | Weapon | LMB | RMB | Q |
 |---|---|---|---|
-| **Lathi** (Silambam) | Strike x3: the third is **Silambam Strikes** | tap: thrust to the gut, then **Lathi Overhead** · hold: **Silambam Sutru** (360° spin, hits everyone around, unblockable) | **Silambam Finish**: sweep his legs, crack him as he lands |
-| **Iron Pipe** | Swing, then **Pipe Crusher** | tap: **Knee Breaker** (he drops to one knee) · hold and release: **Golf Swing** (more damage if he's dazed) | **Pipe Choke** from behind |
+| **Lathi** (Silambam) | Strike x3: the third is **Silambam Strikes** | tap: thrust to the gut, then **Lathi Overhead** · hold: **Silambam Sutru** (360° spin, hits everyone around, unblockable) | **Silambam Finish**: sweep him onto his back, twirl, crack him on the ground (RMB as it comes down = PERFECT) |
+| **Iron Pipe** | Swing, then **Pipe Crusher** | tap: **Knee Breaker** (he drops to one knee) · hold and release: **Golf Swing** (more damage if he's dazed) | **Pipe Choke**: pipe across his throat in both hands, tap LMB, he sinks to his knees |
 | **Plank** | **Plank Sweep** (wide, hits several) | **Plank Smash** (it splinters) | **Plank Break** across his back |
 | **Bottle** | **Bottle Smash** (dazes; it breaks) | same | **Bottle Finisher**: collar and bottle |
 | **Brick** | **Brick Punch** | throw it: **Brick Headshot** dazes | **Brick Drop** on a rowdy lying on the ground |

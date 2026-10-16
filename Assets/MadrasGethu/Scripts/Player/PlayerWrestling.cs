@@ -764,6 +764,8 @@ namespace MadrasGethu
             qteActive = false;
 
             if (!move.carry) victim.PinDown(3f);   // he stays down until the elbow lands
+            // Pipe choke: the pipe comes out of the fist and lies across his throat, a hand on each end.
+            if (move.grip == GripKind.PipeChoke && HeldWeapon != null) HeldWeapon.HoldBetween(Visual.LeftHand, Visual.RightHand);
             Motor.SetFrozen(true);
             Visual.SetGrip(null, false);
             SetState(PlayerState.Wrestle);
@@ -913,7 +915,7 @@ namespace MadrasGethu
             float vLean = Mathf.Lerp(stepVLeanFrom, st.victimLean ?? stepVLeanFrom, e);
             float vDrop = Mathf.Lerp(stepVDropFrom, st.victimDrop ?? stepVDropFrom, e);
             if (wrestleMove.victimClaws && !st.letGo && vDrop > -0.45f)
-                wrestleVictim.Visual.SetGrapple(this, GripKind.ClawArm, vDrop, vLean);   // hands on your arm, fighting it
+                wrestleVictim.Visual.SetGrapple(this, wrestleMove.grip == GripKind.PipeChoke ? GripKind.ClawPipe : GripKind.ClawArm, vDrop, vLean);   // hands on your arm (or the pipe), fighting it
             else if (wrestleMove.victimClaws)
             {
                 wrestleVictim.Visual.SetGrip(null, false);   // too weak: the hands drop
@@ -1199,6 +1201,7 @@ namespace MadrasGethu
             Visual.ReleaseGripSlowly(0.45f);   // let go and straighten up gradually after the slam
             Visual.ClearPosture();
             Visual.ClearCarry();
+            if (HeldWeapon != null) HeldWeapon.HoldBetween(null, null);
             lightBufferedUntil = heavyBufferedUntil = 0f;
             if (cam != null) cam.EndCinematic(0.6f);
 

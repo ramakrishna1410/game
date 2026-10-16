@@ -10,6 +10,7 @@ namespace MadrasGethu
     /// breaks, and can be thrown. Bottles shatter on the first hit; bricks are mostly for throwing.
     /// Placeholder shapes are built in code; swap in real models later via the 'model' override.
     /// </summary>
+    [DefaultExecutionOrder(200)]   // after the animator, IK and hit reactions have placed the hands
     public class Weapon : MonoBehaviour
     {
         public static readonly List<Weapon> All = new List<Weapon>();
@@ -41,6 +42,9 @@ namespace MadrasGethu
         Fighter thrower;
         float flightTime;
         Transform visual;
+        float centre = 0.2f;          // distance from the grip to the middle of the weapon
+        Transform twoHandA, twoHandB; // held across between two hands (pipe choke)
+        float twirlSpeed, twirlAngle; // spun round the fist (silambam twirl)
 
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
@@ -64,10 +68,10 @@ namespace MadrasGethu
             switch (type)
             {
                 case WeaponType.Lathi:
-                    displayName = "Lathi"; damage = 13f; reach = 2.3f; durability = 8; throwDamage = 10f;
+                    displayName = "Lathi"; damage = 13f; reach = 2.3f; durability = 8; throwDamage = 10f; centre = 0.55f;
                     color = new Color(0.55f, 0.4f, 0.2f); break;
                 case WeaponType.IronPipe:
-                    displayName = "Iron Pipe"; damage = 17f; reach = 2.0f; durability = 10; throwDamage = 16f;
+                    displayName = "Iron Pipe"; damage = 17f; reach = 2.0f; durability = 10; throwDamage = 16f; centre = 0.4f;
                     color = new Color(0.45f, 0.45f, 0.48f); break;
                 case WeaponType.Plank:
                     displayName = "Wooden Plank"; damage = 14f; reach = 2.1f; durability = 4; throwDamage = 12f;
@@ -154,6 +158,16 @@ namespace MadrasGethu
             flying = false;
             Transform hand = holder.Visual != null ? holder.Visual.RightHand : holder.transform;
             transform.SetParent(hand, false);
+            ApplyGrip();
+        }
+
+        /// <summary>Puts it back in the fist (after a two-handed hold or a twirl).</summary>
+        void ApplyGrip()
+        {
+            var holder = Holder;
+            if (holder == null) return;
+            Transform hand = transform.parent != null ? transform.parent : holder.transform;
+            if (visual != null) { visual.localPosition = Vector3.zero; visual.localRotation = Quaternion.identity; }
             if (holder.Visual != null && holder.Visual.IsPlaceholder)
             {
                 transform.localPosition = new Vector3(0f, -0.62f, 0f);
@@ -168,9 +182,48 @@ namespace MadrasGethu
             transform.localScale = new Vector3(1f / Mathf.Max(0.01f, hand.lossyScale.x), 1f / Mathf.Max(0.01f, hand.lossyScale.y), 1f / Mathf.Max(0.01f, hand.lossyScale.z));
         }
 
+        /// <summary>Held across between two hands (pipe across his throat). Null, null puts it back in the fist.</summary>
+        public void HoldBetween(Transform a, Transform b)
+        {
+            twoHandA = a;
+            twoHandB = b;
+            if (a == null || b == null) ApplyGrip();
+        }
+
+        /// <summary>Spins it round the fist, degrees per second (0 stops and puts it back in the grip).</summary>
+        public void Twirl(float degreesPerSecond)
+        {
+            twirlSpeed = degreesPerSecond;
+            if (degreesPerSecond == 0f) { twirlAngle = 0f; ApplyGrip(); }
+        }
+
+        void LateUpdate()
+        {
+            if (Holder == null || visual == null) return;
+            if (twoHandA != null && twoHandB != null)
+            {
+                Vector3 a = twoHandA.position, b = twoHandB.position;
+                Vector3 along = b - a;
+                if (along.sqrMagnitude < 0.0001f) return;
+                transform.rotation = Quaternion.LookRotation(along.normalized, Vector3.up);
+                transform.position = (a + b) * 0.5f - transform.forward * centre;   // middle of the pipe between the fists
+                return;
+            }
+            if (twirlSpeed != 0f)
+            {
+                // Centred on the fist, spinning like a propeller.
+                twirlAngle += twirlSpeed * Time.deltaTime;
+                visual.localRotation = Quaternion.AngleAxis(twirlAngle, Vector3.up);
+                visual.localPosition = visual.localRotation * new Vector3(0f, 0f, -centre);
+            }
+        }
+
         /// <summary>Let go: it falls to the street next to the holder.</summary>
         public void Drop()
         {
+            twoHandA = twoHandB = null;
+            twirlSpeed = 0f;
+            if (visual != null) { visual.localPosition = Vector3.zero; visual.localRotation = Quaternion.identity; }
             var at = transform.position;
             Holder = null;
             transform.SetParent(null, true);

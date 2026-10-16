@@ -330,7 +330,7 @@ namespace MadrasGethu
         {
             if (s != PlayerState.Grab) codeFirst = '\0';   // a half-entered combo code doesn't carry over
             if (attackCrouched) { attackCrouched = false; Visual.ClearPosture(); }
-            if (State == PlayerState.WeaponMove) CancelChainPull(s);
+            if (State == PlayerState.WeaponMove) LeaveWeaponMove(s);
             State = s;
             stateTimer = 0f;
             charging = false;
@@ -816,6 +816,7 @@ namespace MadrasGethu
         bool Invulnerable =>
             (State == PlayerState.Dodge && stateTimer < dodgeInvulnerableUntil) ||
             State == PlayerState.Finisher ||
+            (State == PlayerState.WeaponMove && weaponFinisherActive) ||
             State == PlayerState.Wrestle ||
             State == PlayerState.Combo ||
             State == PlayerState.Mount ||

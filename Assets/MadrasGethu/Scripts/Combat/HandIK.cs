@@ -17,6 +17,7 @@ namespace MadrasGethu
         Ankles,     // giant swing: both hands round his lower legs
         Wrist,      // arm twist: his right wrist and elbow
         PipeChoke,  // pipe choke from behind: both hands either side of his neck, the pipe across his throat
+        ClawPipe,   // being pipe-choked: both hands on the pipe either side of his own throat
     }
 
     /// <summary>
@@ -374,6 +375,22 @@ namespace MadrasGethu
                     heroLeftHand = Vector3.Lerp(elbowC, handC, 0.35f);
                     heroRightHand = Vector3.Lerp(elbowC, handC, 0.8f);
                     head = handC;
+                    return;
+                }
+                case GripKind.ClawPipe:
+                {
+                    // 'who' holds the pipe in both fists across our throat: grab it just inside his fists.
+                    Vector3 l = who.transform.position + Vector3.up * 1.4f - who.transform.right * 0.28f, r = l + who.transform.right * 0.56f;
+                    if (anim != null && anim.isHuman)
+                    {
+                        var lh = anim.GetBoneTransform(HumanBodyBones.LeftHand);
+                        var rh = anim.GetBoneTransform(HumanBodyBones.RightHand);
+                        if (lh != null) l = lh.position;
+                        if (rh != null) r = rh.position;
+                    }
+                    heroLeftHand = Vector3.Lerp(l, r, 0.3f);
+                    heroRightHand = Vector3.Lerp(l, r, 0.7f);
+                    head = (l + r) * 0.5f;
                     return;
                 }
                 case GripKind.Choke:

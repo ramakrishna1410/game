@@ -677,6 +677,19 @@ namespace MadrasGethu
             }
         }
 
+        public Transform LeftHand
+        {
+            get
+            {
+                if (animator != null && animator.isHuman)
+                {
+                    var hand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+                    if (hand != null) return hand;
+                }
+                return armL != null ? armL : transform;
+            }
+        }
+
         public bool IsPlaceholder => animator == null;
 
         // ------------------------------------------------------------------ animation
