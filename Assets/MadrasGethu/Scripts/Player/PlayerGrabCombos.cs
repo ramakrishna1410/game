@@ -18,6 +18,7 @@ namespace MadrasGethu
         public float spin;                  // degrees the hero turns through during the swing (spinning backfist)
         public float turnIn;                // starts turned away this far and turns to face him during the swing (escape elbow)
         public bool crack;                  // bone crack on landing (arm break)
+        public bool breakWeapon;            // the weapon in hand shatters on this blow (bottle finisher)
         public float victimZ = 0.6f;        // where the rowdy ends up after it
         public float victimPitch;           // + doubled over, - rocked back
         public float damage = 6f;
@@ -468,6 +469,11 @@ namespace MadrasGethu
             Vector3 right = comboRotation * Vector3.right;
             float mult = MassMode ? massModeDamageMultiplier : 1f;
             Vector3 contact = victim.Center + Vector3.up * 0.25f;
+            if (b.breakWeapon && HeldWeapon != null)
+            {
+                HeldWeapon.Break();
+                HeldWeapon = null;
+            }
 
             if (b.knockout != Vector3.zero)
             {

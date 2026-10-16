@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace MadrasGethu
 {
-    public enum WeaponType { Lathi, IronPipe, Plank, Bottle, Brick }
+    public enum WeaponType { Lathi, IronPipe, Plank, Bottle, Brick, Chair, Chain, Fish, Tyre }
 
     /// <summary>
     /// A street weapon: lies on the ground until someone picks it up, is swung in fights, wears out and
@@ -30,7 +30,10 @@ namespace MadrasGethu
         public static Vector3 HandEuler = new Vector3(-90f, 0f, 0f);
 
         public Fighter Holder { get; private set; }
-        public bool OnGround => Holder == null && !flying;
+        public bool OnGround => Holder == null && !flying && !stuck;
+        /// <summary>Rowdies don't go for the tyre (it's a trap, not a weapon).</summary>
+        public bool EnemyUsable => type != WeaponType.Tyre;
+        bool stuck;   // tyre round someone's shoulders
         public int HitsLeft { get; private set; }
 
         bool flying;
@@ -75,6 +78,18 @@ namespace MadrasGethu
                 case WeaponType.Brick:
                     displayName = "Brick"; damage = 15f; reach = 1.5f; durability = 2; throwDamage = 16f;
                     color = new Color(0.6f, 0.25f, 0.18f); break;
+                case WeaponType.Chair:
+                    displayName = "Plastic Chair"; damage = 12f; reach = 1.9f; durability = 2; throwDamage = 12f;
+                    color = new Color(0.85f, 0.2f, 0.18f); break;
+                case WeaponType.Chain:
+                    displayName = "Cycle Chain"; damage = 10f; reach = 3.2f; durability = 12; throwDamage = 8f;
+                    color = new Color(0.62f, 0.62f, 0.66f); break;
+                case WeaponType.Fish:
+                    displayName = "Vanjaram Fish"; damage = 12f; reach = 1.9f; durability = 6; throwDamage = 10f;
+                    color = new Color(0.55f, 0.66f, 0.74f); break;
+                case WeaponType.Tyre:
+                    displayName = "Tyre"; damage = 6f; reach = 1.8f; durability = 1; throwDamage = 10f;
+                    color = new Color(0.1f, 0.1f, 0.1f); break;
             }
             HitsLeft = durability;
         }
@@ -98,6 +113,29 @@ namespace MadrasGethu
                     Part(PrimitiveType.Cylinder, new Vector3(0f, 0f, 0.02f), new Vector3(0.035f, 0.06f, 0.035f), Quaternion.Euler(90f, 0f, 0f)); break;
                 case WeaponType.Brick:
                     Part(PrimitiveType.Cube, new Vector3(0f, 0f, 0.08f), new Vector3(0.1f, 0.07f, 0.21f), Quaternion.identity); break;
+                case WeaponType.Chair:
+                    // Held by the back rest; the seat and legs stick out past the fist.
+                    Part(PrimitiveType.Cube, new Vector3(0f, 0f, 0.42f), new Vector3(0.42f, 0.04f, 0.42f), Quaternion.identity);
+                    Part(PrimitiveType.Cube, new Vector3(0f, 0.2f, 0.2f), new Vector3(0.42f, 0.4f, 0.03f), Quaternion.identity);
+                    for (int i = 0; i < 4; i++)
+                        Part(PrimitiveType.Cube, new Vector3(i % 2 == 0 ? -0.18f : 0.18f, -0.2f, i < 2 ? 0.25f : 0.6f), new Vector3(0.03f, 0.4f, 0.03f), Quaternion.identity);
+                    break;
+                case WeaponType.Chain:
+                    for (int i = 0; i < 9; i++)
+                        Part(PrimitiveType.Cube, new Vector3(Mathf.Sin(i * 1.1f) * 0.03f, 0f, 0.08f + i * 0.09f), new Vector3(0.025f, 0.025f, 0.08f), Quaternion.Euler(0f, 0f, i * 45f));
+                    break;
+                case WeaponType.Fish:
+                    Part(PrimitiveType.Sphere, new Vector3(0f, 0f, 0.38f), new Vector3(0.14f, 0.2f, 0.62f), Quaternion.identity);
+                    Part(PrimitiveType.Cube, new Vector3(0f, 0f, 0.03f), new Vector3(0.02f, 0.18f, 0.1f), Quaternion.identity);
+                    break;
+                case WeaponType.Tyre:
+                    for (int i = 0; i < 14; i++)
+                    {
+                        float a = i * Mathf.PI * 2f / 14f;
+                        Part(PrimitiveType.Cube, new Vector3(Mathf.Cos(a) * 0.36f, Mathf.Sin(a) * 0.36f, 0.3f), new Vector3(0.18f, 0.12f, 0.16f),
+                            Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg));
+                    }
+                    break;
             }
         }
 
@@ -153,6 +191,33 @@ namespace MadrasGethu
             if (HitsLeft > 0) return false;
             Shatter();
             return true;
+        }
+
+        /// <summary>Breaks it on purpose (plank snapped, chair smashed, bottle broken on a head).</summary>
+        public void Break() => Shatter();
+
+        /// <summary>Tyre trap: the tyre sits round his shoulders (flat, round his chest) until Unstick.</summary>
+        public void StickTo(Transform body, float height)
+        {
+            Holder = null;
+            stuck = true;
+            flying = false;
+            transform.SetParent(body, false);
+            transform.localScale = Vector3.one;
+            transform.localPosition = new Vector3(0f, height, 0f);
+            transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            if (visual != null) visual.localPosition = new Vector3(0f, 0f, -0.3f);   // ring centred on him
+        }
+
+        public void Unstick()
+        {
+            if (!stuck) return;
+            stuck = false;
+            if (visual != null) visual.localPosition = Vector3.zero;
+            var at = transform.position;
+            transform.SetParent(null, true);
+            transform.localScale = Vector3.one;
+            LayOnGround(at + Random.insideUnitSphere * 0.4f);
         }
 
         void Shatter()
@@ -225,6 +290,13 @@ namespace MadrasGethu
                     knockback = 3f, heavy = type == WeaponType.Brick || type == WeaponType.IronPipe,
                 });
                 FX.HitSpark(transform.position, true);
+                // A brick to the head: he's left seeing stars.
+                if (type == WeaponType.Brick && f is EnemyFighter dazed && !dazed.IsDead && !dazed.IsDowned)
+                {
+                    dazed.Daze(2.5f);
+                    if (thrower is PlayerFighter p) p.NotifyMoveLanded("Brick Headshot");
+                    if (GameManager.Instance != null) GameManager.Instance.AddPopup("HEADSHOT!", f.Center + Vector3.up, new Color(1f, 0.8f, 0.2f), 1f);
+                }
                 Shatter();
                 return;
             }
@@ -238,13 +310,13 @@ namespace MadrasGethu
             }
         }
 
-        public static Weapon FindNearbyOnGround(Vector3 position, float maxDistance)
+        public static Weapon FindNearbyOnGround(Vector3 position, float maxDistance, bool forEnemy = false)
         {
             Weapon best = null;
             float bestDist = maxDistance;
             foreach (var w in All)
             {
-                if (w == null || !w.OnGround) continue;
+                if (w == null || !w.OnGround || (forEnemy && !w.EnemyUsable)) continue;
                 Vector3 d = w.transform.position - position;
                 d.y = 0f;
                 float dist = d.magnitude;

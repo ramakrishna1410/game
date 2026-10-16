@@ -86,6 +86,13 @@ namespace MadrasGethu
         public float weight = 1f;         // enemies: how often this move is picked
         public float hitStop = 0.05f;
         public float shake = 0.1f;
+        // Weapon moves
+        public FighterPose reaction = FighterPose.Idle;   // the hit reaction to use (Idle = from the pose)
+        public float spin;                // degrees the attacker turns through during the windup (Silambam spin)
+        public bool crouch;               // down on one knee for it (brick drop)
+        public bool breakWeapon;          // the weapon breaks on him (plank smash, chair smash)
+        [NonSerialized] public AttackData next;                 // follow-up that starts by itself (thrust -> overhead)
+        [NonSerialized] public Action<EnemyFighter> onHit;      // extra effect on the first rowdy it lands on
 
         public AttackData(string name, FighterPose pose, float damage)
         {
@@ -114,7 +121,7 @@ namespace MadrasGethu
                 unblockable = unblockable,
                 hitsDowned = hitsDowned,
                 dazes = dazes,
-                pose = pose,
+                pose = reaction != FighterPose.Idle ? reaction : pose,
             };
         }
     }

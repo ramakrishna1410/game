@@ -16,6 +16,7 @@ namespace MadrasGethu
         ClawArm,    // being choked: both hands pulling at the choking forearm
         Ankles,     // giant swing: both hands round his lower legs
         Wrist,      // arm twist: his right wrist and elbow
+        PipeChoke,  // pipe choke from behind: both hands either side of his neck, the pipe across his throat
     }
 
     /// <summary>
@@ -380,6 +381,10 @@ namespace MadrasGethu
                     // shoulder), the left hand presses the back of his head forward.
                     heroRightHand = neck - hero.right * 0.13f + hero.forward * 0.1f;
                     heroLeftHand = head - hero.forward * 0.1f + Vector3.up * 0.03f;
+                    return;
+                case GripKind.PipeChoke:
+                    heroRightHand = neck + hero.right * 0.28f + hero.forward * 0.12f;
+                    heroLeftHand = neck - hero.right * 0.28f + hero.forward * 0.12f;
                     return;
             }
 

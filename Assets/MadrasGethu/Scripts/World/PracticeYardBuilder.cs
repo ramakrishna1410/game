@@ -148,7 +148,7 @@ namespace MadrasGethu
             Palette.Primitive(PrimitiveType.Cube, root, new Vector3(0f, 0.25f, -9.6f), new Vector3(3f, 0.5f, 0.5f), new Color(0.4f, 0.28f, 0.16f), name: "Bench");
 
             // Weapon rack
-            Palette.Primitive(PrimitiveType.Cube, root, new Vector3(-5f, 0.05f, -9.3f), new Vector3(5.5f, 0.1f, 1.2f), new Color(0.3f, 0.22f, 0.14f), collider: false, name: "Weapon Mat");
+            Palette.Primitive(PrimitiveType.Cube, root, new Vector3(-5f, 0.05f, -8.7f), new Vector3(5.5f, 0.1f, 2.6f), new Color(0.3f, 0.22f, 0.14f), collider: false, name: "Weapon Mat");
         }
 
         static void BuildLights(Transform root)
@@ -189,6 +189,11 @@ namespace MadrasGethu
             Weapon.Create(WeaponType.Bottle, new Vector3(-4.1f, 0f, -9.4f));
             Weapon.Create(WeaponType.Bottle, new Vector3(-3.4f, 0f, -9.1f));
             Weapon.Create(WeaponType.Brick, new Vector3(-2.6f, 0f, -9.3f));
+            // Second row: the street stuff.
+            Weapon.Create(WeaponType.Chair, new Vector3(-7.0f, 0f, -7.9f));
+            Weapon.Create(WeaponType.Chain, new Vector3(-5.6f, 0f, -7.9f));
+            Weapon.Create(WeaponType.Fish, new Vector3(-4.3f, 0f, -7.9f));
+            Weapon.Create(WeaponType.Tyre, new Vector3(-3.0f, 0f, -7.9f));
         }
     }
 }

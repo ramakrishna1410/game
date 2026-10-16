@@ -484,6 +484,31 @@ namespace MadrasGethu
             { "Auto Smash", "grab at the auto, Q" },
             { "Kadal Throw", "grab at the jetty edge, Q" },
             { "Ice Box Slam", "grab at the ice box, Q" },
+            { "WEAPONS", "" },
+            { "Silambam Strikes", "lathi, LMB x3" },
+            { "Lathi Overhead", "lathi, tap RMB" },
+            { "Silambam Sutru", "lathi, hold RMB" },
+            { "Silambam Finish", "lathi, Q" },
+            { "Pipe Crusher", "pipe, LMB LMB" },
+            { "Knee Breaker", "pipe, tap RMB" },
+            { "Golf Swing", "pipe, hold + release RMB" },
+            { "Pipe Choke", "pipe, Q" },
+            { "Plank Sweep", "plank, LMB" },
+            { "Plank Smash", "plank, RMB" },
+            { "Plank Break", "plank, Q" },
+            { "Bottle Smash", "bottle, LMB / RMB" },
+            { "Bottle Finisher", "bottle, Q" },
+            { "Brick Punch", "brick, LMB" },
+            { "Brick Headshot", "brick, RMB (throw)" },
+            { "Brick Drop", "brick, Q on him down" },
+            { "Chair Smash", "chair, RMB" },
+            { "Chair Break", "chair, Q" },
+            { "Chain Whip", "chain, LMB" },
+            { "Chain Wrap", "chain, RMB" },
+            { "Meen Adi", "fish, LMB / RMB" },
+            { "Tyre Trap", "tyre, LMB near him" },
+            { "Weapon Block", "lathi/pipe/plank, F" },
+            { "Weapon Grab Strike", "armed, E, LMB" },
         };
 
         /// <summary>Practice yard: a checklist of every move (ticks when it lands), damage numbers and the yard keys.</summary>
@@ -527,8 +552,8 @@ namespace MadrasGethu
             var hintStyle = new GUIStyle(rowStyle) { alignment = TextAnchor.UpperRight };
             // Long list: two columns so it fits on the screen.
             int perColumn = Mathf.Max(8, Mathf.FloorToInt((Screen.height - cy - 30 * S) / lh) - 1);
-            int columns = rows > perColumn ? 2 : 1;
-            int rowsPerColumn = columns == 2 ? Mathf.CeilToInt(rows / 2f) : rows;
+            int columns = Mathf.Clamp(Mathf.CeilToInt(rows / (float)perColumn), 1, 3);
+            int rowsPerColumn = Mathf.CeilToInt(rows / (float)columns);
             Bar(new Rect(cx - 8 * S, cy - 8 * S, columns * cw + (columns - 1) * gap + 16 * S, (rowsPerColumn + 1) * lh + 16 * S), 1f, new Color(0f, 0f, 0f, 0.4f));
             Shadowed(new Rect(cx, cy, cw, lh), $"MOVES LANDED  {done} / {total}", new GUIStyle(rowStyle) { fontStyle = FontStyle.Bold }, Gold);
             for (int i = 0; i < rows; i++)
@@ -597,12 +622,38 @@ namespace MadrasGethu
                 "hold, W+Q (no wall) .. Thai Clinch    hold, D+Q (full) .. Giant Swing",
                 "at the jetty edge, Q .. Kadal Throw    at an ice box, Q .. Ice Box Slam",
                 "combos: NALLA > SEMMA > MASS > THALAIVAA",
+                "",
+                "WEAPONS (E picks up / grabs him one-handed / throws)",
+                "LATHI ... LMB x3 Silambam Strikes · tap RMB thrust + overhead",
+                "          hold RMB Silambam Sutru (spin) · Q Silambam Finish",
+                "PIPE .... LMB LMB Pipe Crusher · tap RMB Knee Breaker",
+                "          hold RMB, release: Golf Swing (worse if he's dazed) · Q Pipe Choke",
+                "PLANK ... LMB Sweep · RMB Smash (splinters) · Q Plank Break",
+                "BOTTLE .. LMB/RMB smash (dazes) · Q Bottle Finisher",
+                "BRICK ... LMB Brick Punch · RMB throw (headshot) · Q on a downed rowdy: Brick Drop",
+                "CHAIR ... LMB swing · RMB smash · Q Chair Break",
+                "CHAIN ... LMB whip (long) · RMB wrap him and pull him into your grab",
+                "FISH .... LMB/RMB Meen Adi          TYRE .... LMB/RMB drop it over him",
+                "armed: F with lathi/pipe/plank blocks even orange swings · E then LMB hits him",
             };
             float w = 760 * S, lh = 22 * S;
-            var r = new Rect(30 * S, Screen.height - (lines.Length * lh + 40 * S), w, lines.Length * lh + 20 * S);
-            Bar(r, 1f, Panel);
-            for (int i = 0; i < lines.Length; i++)
-                Shadowed(new Rect(r.x + 14 * S, r.y + 10 * S + i * lh, w, lh), lines[i], small, i == 0 ? Gold : Color.white);
+            // Too tall for the screen: split into two panels side by side at a blank line.
+            int split = lines.Length;
+            if (lines.Length * lh + 60 * S > Screen.height)
+            {
+                split = lines.Length / 2;
+                while (split < lines.Length && lines[split] != "") split++;
+            }
+            for (int part = 0; part < 2; part++)
+            {
+                int from = part == 0 ? 0 : split + 1, to = part == 0 ? split : lines.Length;
+                if (to <= from) continue;
+                float x = 30 * S + part * (w + 16 * S);
+                var r = new Rect(x, Screen.height - ((to - from) * lh + 40 * S), w, (to - from) * lh + 20 * S);
+                Bar(r, 1f, Panel);
+                for (int i = from; i < to; i++)
+                    Shadowed(new Rect(r.x + 14 * S, r.y + 10 * S + (i - from) * lh, w, lh), lines[i], small, i == 0 ? Gold : Color.white);
+            }
         }
 
         // ------------------------------------------------------------------ drawing helpers

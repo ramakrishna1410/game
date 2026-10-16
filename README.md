@@ -103,7 +103,7 @@ Keyboard and mouse for now (gamepad prompts come later).
 | Grab → combos / throw / shove / drag fast | E → LMB/RMB clicks / E / F / Shift |
 | **Gethu**: wrestling finisher while grabbing, prop finisher near a prop, elbow drop on a downed rowdy, spear while sprinting, or Gethu Mode when full | Q |
 | Quick-time prompts during a wrestling finisher | the key shown (Left click, Right click or Space) |
-| Pick up a weapon (stand on it) / throw the weapon you hold | E |
+| Pick up a weapon (stand on it) / with a weapon: grab the rowdy in front one-handed, or throw it | E |
 | Break free when a rowdy grabs you | tap E fast |
 | Spare a begging rowdy (hit him to finish him) | E |
 | Show/hide controls | H |
@@ -198,6 +198,26 @@ Hold **Shift** while dragging someone to hurry him along (to a tea kadai or the 
 Each costs one Gethu bar (the Powerbomb and Giant Swing cost the full meter). Near a tea kadai, fish crates or the auto, **Q** lifts him and smashes him into it.
 
 During every lift Maaran's hands stay locked on the rowdy (IK) and his body crouches, drives up, arches or follows him down; the rowdy goes limp (ragdoll) on landing. **E** while holding swings him round by the collar and throws him. Every **PERFECT** adds damage and a little Gethu; all PERFECT = **FLAWLESS**.
+
+### Weapons (pick one up with E)
+
+Each weapon fights its own way. The **Q** finishers cost one Gethu bar.
+
+| Weapon | LMB | RMB | Q |
+|---|---|---|---|
+| **Lathi** (Silambam) | Strike x3: the third is **Silambam Strikes** | tap: thrust to the gut, then **Lathi Overhead** · hold: **Silambam Sutru** (360° spin, hits everyone around, unblockable) | **Silambam Finish**: sweep his legs, crack him as he lands |
+| **Iron Pipe** | Swing, then **Pipe Crusher** | tap: **Knee Breaker** (he drops to one knee) · hold and release: **Golf Swing** (more damage if he's dazed) | **Pipe Choke** from behind |
+| **Plank** | **Plank Sweep** (wide, hits several) | **Plank Smash** (it splinters) | **Plank Break** across his back |
+| **Bottle** | **Bottle Smash** (dazes; it breaks) | same | **Bottle Finisher**: collar and bottle |
+| **Brick** | **Brick Punch** | throw it: **Brick Headshot** dazes | **Brick Drop** on a rowdy lying on the ground |
+| **Plastic Chair** | Swing | **Chair Smash** (it breaks) | **Chair Break** across his back |
+| **Cycle Chain** | **Chain Whip** (long reach) | **Chain Wrap**: round his neck and pull him into your grab | none |
+| **Fish** | **Meen Adi** slap | big Meen Adi (spins him off his feet) | none |
+| **Tyre** | **Tyre Trap**: drop it over his shoulders, arms pinned, dazed for 4 s | same | none |
+
+Also with a weapon in hand:
+- **F** with a lathi, pipe or plank is a **Weapon Block**: it stops even orange (unblockable) swings, but not a charge.
+- **E** on a rowdy in front grabs him one-handed. LMB / RMB then hits him with the weapon (**Weapon Grab Strike**).
 
 **Enemy warning colours:** 🔵 the blue **F** box means parry; **orange** means unblockable, so dodge (C); **yellow** means a grab, so dodge, or tap E to break free if he catches you.
 

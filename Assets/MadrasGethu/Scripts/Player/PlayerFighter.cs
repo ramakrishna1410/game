@@ -9,7 +9,7 @@ namespace MadrasGethu
     /// </summary>
     public partial class PlayerFighter : Fighter
     {
-        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle, Combo, Mount, HeadClash }
+        public enum PlayerState { Free, Attack, Dodge, Block, Grab, Stagger, Down, Finisher, Dead, Jump, Parry, Held, Wrestle, Combo, Mount, HeadClash, WeaponCharge, WeaponMove }
 
         /// <summary>One button prompt for the HUD: a key cap (or mouse button) and what it does.</summary>
         public struct PromptItem
@@ -309,6 +309,8 @@ namespace MadrasGethu
                 case PlayerState.Combo: UpdateGrabCombo(); break;
                 case PlayerState.Mount: UpdateMount(); break;
                 case PlayerState.HeadClash: UpdateHeadClash(); break;
+                case PlayerState.WeaponCharge: UpdateWeaponCharge(); break;
+                case PlayerState.WeaponMove: UpdateWeaponMove(); break;
                 case PlayerState.Stagger:
                     if (stateTimer >= 0.4f) SetState(PlayerState.Free);
                     break;
@@ -327,6 +329,8 @@ namespace MadrasGethu
         void SetState(PlayerState s)
         {
             if (s != PlayerState.Grab) codeFirst = '\0';   // a half-entered combo code doesn't carry over
+            if (attackCrouched) { attackCrouched = false; Visual.ClearPosture(); }
+            if (State == PlayerState.WeaponMove) CancelChainPull(s);
             State = s;
             stateTimer = 0f;
             charging = false;
@@ -400,10 +404,10 @@ namespace MadrasGethu
             heavyBufferedUntil = 0f;
             lightBufferedUntil = 0f;
 
-            // Weapon in hand: swing (light) or overhead smash (heavy) instead of boxing combos.
+            // Weapon in hand: its own moveset (see PlayerWeapons.cs) instead of boxing combos.
             if (HeldWeapon != null)
             {
-                StartAttack(HeldWeapon.MakeAttack(heavy), null);
+                StartWeaponAttack(light, heavy);
                 lightIndex = 0;
                 return true;
             }
@@ -506,6 +510,7 @@ namespace MadrasGethu
             lungeDirection = transform.forward;
             // The animation is timed so the fist/foot connects exactly when the hit is applied (strikeAt).
             strikeAt = Visual.PlayTimed(attack.pose, attack.startup, attack.recovery);
+            if (attack.crouch) { Visual.SetPosture(-0.5f, 35f); attackCrouched = true; }
             if (attack.damage > 0f) GameAudio.Play(Sfx.Whoosh, Center + transform.forward * 0.4f, attack.heavy ? 0.6f : 0.4f, attack.heavy ? 0.85f : 1.1f);
             lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(strikeAt, 0.05f));
             if (attack.announce && GM != null)
@@ -574,12 +579,23 @@ namespace MadrasGethu
                 if (Time.deltaTime > 0f) Motor.SetDesiredVelocity(lungeDirection * (step / Time.deltaTime), instant: true);
             }
 
+            // Spinning moves (Silambam Sutru): turn through the wind-up.
+            if (!struck && currentAttack.spin != 0f && strikeAt > 0f)
+                Motor.FaceDirection(Quaternion.Euler(0f, currentAttack.spin * Time.deltaTime / strikeAt, 0f) * transform.forward, true);
+
             if (!struck && stateTimer >= strikeAt)
             {
                 struck = true;
                 if (attackTarget != null && !attackTarget.IsDead)
                     Motor.FaceDirection(attackTarget.transform.position - transform.position, instant: true);
                 if (currentAttack.damage > 0f) PerformStrike();
+            }
+
+            // Two-part moves (lathi thrust -> overhead): the second follows on its own.
+            if (struck && currentAttack.next != null && stateTimer >= strikeAt + 0.1f)
+            {
+                StartAttack(currentAttack.next, attackTarget != null && !attackTarget.IsDead ? attackTarget : null);
+                return;
             }
 
             float total = strikeAt + currentAttack.recovery;
@@ -642,6 +658,8 @@ namespace MadrasGethu
             }
             if (result.hits > 0)
             {
+                currentAttack.onHit?.Invoke(result.firstHit as EnemyFighter);
+                if (currentAttack.breakWeapon && HeldWeapon != null) { HeldWeapon.Break(); HeldWeapon = null; }
                 OnStreetMoveLanded(currentAttack, result.firstHit);
                 NotifyMoveLanded(currentAttack.name);
                 RegisterHits(result.hits, currentAttack.gethuGain * result.hits);
@@ -927,9 +945,17 @@ namespace MadrasGethu
                 }
             }
 
-            // Armed: E throws the weapon at the nearest rowdy in front.
+            // Armed: E grabs him one-handed if he's right in front (not with the tyre), else throws the weapon.
             if (HeldWeapon != null)
             {
+                var front = HeldWeapon.type == WeaponType.Tyre ? null
+                    : CombatUtil.FindTarget(this, MoveInputWorld().sqrMagnitude > 0.01f ? MoveInputWorld() : transform.forward, 1.8f) as EnemyFighter;
+                if (front != null && front.CanBeGrabbed)
+                {
+                    Vector3 toFront = Flat(front.transform.position - transform.position).normalized;
+                    BeginGrab(front, Vector3.Dot(front.transform.forward, toFront) > 0.35f);
+                    return;
+                }
                 ThrowWeapon();
                 return;
             }
@@ -1091,7 +1117,8 @@ namespace MadrasGethu
             }
 
             // Clicks while holding him: grab strike combos (see PlayerGrabCombos.cs).
-            if (pendingGrabStrike < 0f) UpdateGrabComboInput();
+            if (HeldWeapon != null) UpdateWeaponGrabStrike();
+            else if (pendingGrabStrike < 0f) UpdateGrabComboInput();
         }
 
         // Strike while holding someone: the hit waits for the animation's contact frame.
@@ -1404,8 +1431,9 @@ namespace MadrasGethu
             if (invincible) { Visual.Flinch(0.5f); return HitResult.Hit; }
 
             bool facing = Vector3.Dot(transform.forward, -hit.direction) > 0.2f;
-            if (State == PlayerState.Block && facing && !hit.unblockable)
+            if (State == PlayerState.Block && facing && (!hit.unblockable || WeaponBlocks(hit)))
             {
+                if (HeldWeapon != null && WeaponBlocks(hit)) NotifyMoveLanded("Weapon Block");
                 // Guard holds: slide back a little, his arm bounces off.
                 Motor.AddLunge(hit.direction, hit.heavy ? 0.6f : 0.35f);
                 AddGethu(2f);

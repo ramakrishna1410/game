@@ -169,7 +169,8 @@ namespace MadrasGethu
         bool CanReplaceDummy =>
             Player == null || (Player.Grabbed == null && Player.State != PlayerFighter.PlayerState.Wrestle && Player.State != PlayerFighter.PlayerState.Finisher
                                && Player.State != PlayerFighter.PlayerState.Combo && Player.State != PlayerFighter.PlayerState.Mount
-                               && Player.State != PlayerFighter.PlayerState.HeadClash);
+                               && Player.State != PlayerFighter.PlayerState.HeadClash && Player.State != PlayerFighter.PlayerState.WeaponMove
+                               && Player.State != PlayerFighter.PlayerState.WeaponCharge);
 
         /// <summary>Knocked out of the yard, into the sea, or far off: true when he should go back on his mark.</summary>
         bool Lost(EnemyFighter d, Vector3 home, ref float respawnAt)

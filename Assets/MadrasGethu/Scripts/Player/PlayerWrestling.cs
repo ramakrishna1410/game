@@ -74,6 +74,8 @@ namespace MadrasGethu
         public float startVictimYaw;    // he starts turned this far from the move's facing (turned round during the first step)
         public bool victimClaws;        // choke: his hands claw at your forearm while he still fights it
         public bool keepProp;           // the prop survives the finisher (ice box: lid slams, box stays)
+        public bool noHands;            // weapon finishers: the hands hold the weapon, not him (posture only)
+        public bool breakWeapon;        // the weapon in hand snaps on the final impact (plank / chair break)
         public Vector3? releasePush;    // hero-local push when he's let go limp (default: away from the hero, down)
         public readonly List<WrestleStep> steps = new List<WrestleStep>();
 
@@ -421,11 +423,11 @@ namespace MadrasGethu
 
         // Choke-out: spin him round, forearm across his throat from behind. Each squeeze (LMB) he struggles less
         // and sinks lower, down onto his knees; then he goes limp and you let him fall on his face.
-        WrestleMove ChokeOut()
+        WrestleMove ChokeOut(string name, MoveId id, GripKind grip)
         {
             var m = new WrestleMove
             {
-                name = "CHOKE-OUT", id = MoveId.ChokeOut, cost = GethuBar, grip = GripKind.Choke,
+                name = name, id = id, cost = GethuBar, grip = grip,
                 victimFacesAway = true, startVictimYaw = grabFromBehind ? 0f : 180f,
                 releasePush = new Vector3(0f, -1f, 0.9f),   // slumps forward, away from you
                 victimClaws = true,
@@ -584,7 +586,7 @@ namespace MadrasGethu
             if (keys.y > 0.5f && MoveUnlocks.Has(MoveId.ThaiClinch)) return ThaiClinch();
             if (keys.y < -0.5f && MoveUnlocks.Has(MoveId.SpinDrop)) return SpinDrop();
             if (keys.x > 0.5f && MoveUnlocks.Has(MoveId.GiantSwing)) return GiantSwing();
-            if (keys.x < -0.5f && MoveUnlocks.Has(MoveId.ChokeOut)) return ChokeOut();
+            if (keys.x < -0.5f && MoveUnlocks.Has(MoveId.ChokeOut)) return ChokeOut("CHOKE-OUT", MoveId.ChokeOut, GripKind.Choke);
             return MoveUnlocks.Has(MoveId.BodySlam) ? BodySlam() : null;
         }
 
@@ -622,7 +624,7 @@ namespace MadrasGethu
         /// <summary>Q when not holding anyone: elbow drop on a downed rowdy, or a spear while sprinting.</summary>
         bool TryStartFreeFinisher()
         {
-            if (HeldWeapon != null) return false;
+            if (HeldWeapon != null) return TryWeaponFinisher();
 
             var downed = DownedNearby(lyingOnly: true);
             if (downed != null && MoveUnlocks.Has(MoveId.ElbowDrop))
@@ -897,7 +899,8 @@ namespace MadrasGethu
             // Hands stay on his body and the hero's own body crouches, drives up and follows him down.
             float drop = Mathf.Lerp(stepDropFrom, st.drop ?? stepDropFrom, e);
             float lean = Mathf.Lerp(stepLeanFrom, st.lean ?? stepLeanFrom, e);
-            if (st.letGo) Visual.ReleaseGripSlowly(0.15f);
+            if (wrestleMove.noHands) Visual.SetPosture(drop, lean);
+            else if (st.letGo) Visual.ReleaseGripSlowly(0.15f);
             else Visual.SetGrapple(wrestleVictim, wrestleMove.grip, drop, lean);
             if (!wrestleMove.carry) return;
 
@@ -1117,6 +1120,7 @@ namespace MadrasGethu
             });
             RegisterHits(1, 0f);
             NotifyMoveLanded(move.name);
+            if (move.breakWeapon && HeldWeapon != null) { HeldWeapon.Break(); HeldWeapon = null; }
 
             if (move.prop != null && move.keepProp)
             {
@@ -1195,6 +1199,7 @@ namespace MadrasGethu
             wrestleVictim = null;
             qteActive = false;
             Visual.ReleaseGripSlowly(0.45f);   // let go and straighten up gradually after the slam
+            Visual.ClearPosture();
             Visual.ClearCarry();
             lightBufferedUntil = heavyBufferedUntil = 0f;
             if (cam != null) cam.EndCinematic(0.6f);

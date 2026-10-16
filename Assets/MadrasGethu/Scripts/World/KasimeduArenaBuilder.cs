@@ -399,6 +399,10 @@ namespace MadrasGethu
             Weapon.Create(WeaponType.Brick, new Vector3(-1.5f, 0f, -20f));
             Weapon.Create(WeaponType.IronPipe, new Vector3(2.5f, 0f, 18f));
             Weapon.Create(WeaponType.Lathi, new Vector3(-3f, 0f, 24f));
+            Weapon.Create(WeaponType.Chair, new Vector3(-4.4f, 0f, 2.2f));       // the tea kadai's plastic chair
+            Weapon.Create(WeaponType.Fish, new Vector3(5.0f, 0f, -4.2f));         // off the fish crates
+            Weapon.Create(WeaponType.Chain, new Vector3(-6.2f, 0f, 14f));
+            Weapon.Create(WeaponType.Tyre, new Vector3(4.8f, 0f, 6f));
         }
 
         // ------------------------------------------------------------------ invisible walls

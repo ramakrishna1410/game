@@ -150,7 +150,8 @@ namespace MadrasGethu
 
         void Update()
         {
-            Visual.SetAnimatorBool("Held", state == AIState.Grabbed);
+            UpdateTyreTrap();
+            Visual.SetAnimatorBool("Held", state == AIState.Grabbed || trappedTyre != null);
             Visual.SetAnimatorBool("Holding", state == AIState.HoldingHero);
             Visual.SetAnimatorBool("Begging", state == AIState.Begging);
             // Kneeling or doubled over (low kick, liver shot) plays its own pose instead of the dizzy sway.
@@ -795,7 +796,7 @@ namespace MadrasGethu
             if (!Profile.picksUpWeapons || HeldWeapon != null || Time.time < nextWeaponCheck) return false;
             nextWeaponCheck = Time.time + Random.Range(3f, 6f);
             if (Random.value > 0.4f) return false;
-            var w = Weapon.FindNearbyOnGround(transform.position, 8f);
+            var w = Weapon.FindNearbyOnGround(transform.position, 8f, forEnemy: true);
             if (w == null || reservedWeapons.Contains(w)) return false;
             reservedWeapons.Add(w);
             seekTarget = w;
@@ -1207,6 +1208,31 @@ namespace MadrasGethu
             if (state != AIState.Dazed) return;
             ownReactionUntil = Time.time + seconds;
             Visual.Play(FighterPose.Kneel, seconds);
+        }
+
+        Weapon trappedTyre;
+        float tyreTrapUntil;
+
+        /// <summary>Tyre dropped over his shoulders: arms pinned to his sides, dazed until he wriggles out.</summary>
+        public void TyreTrap(float seconds, Weapon tyre)
+        {
+            if (tyre == null) return;
+            if (IsDead || IsDowned || state == AIState.Grabbed) { tyre.Drop(); return; }
+            if (trappedTyre != null) trappedTyre.Unstick();
+            Daze(seconds);
+            if (state != AIState.Dazed) { tyre.Drop(); return; }
+            ownReactionUntil = Time.time + seconds;
+            trappedTyre = tyre;
+            tyreTrapUntil = Time.time + seconds;
+            tyre.StickTo(transform, 1.25f);
+        }
+
+        void UpdateTyreTrap()
+        {
+            if (trappedTyre == null) return;
+            if (Time.time < tyreTrapUntil && state == AIState.Dazed && !IsDead) return;
+            trappedTyre.Unstick();
+            trappedTyre = null;
         }
 
         /// <summary>Liver shot: folds over holding his side, can't fight back for a few seconds.</summary>

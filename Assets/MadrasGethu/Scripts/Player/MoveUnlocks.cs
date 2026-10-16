@@ -20,6 +20,8 @@ namespace MadrasGethu
         GiantSwing, ChokeOut, ThaiClinch, KadalThrow, IceBoxSlam,
         // Counters
         KaiOdaippu, CounterThrow, CounterFinisher, WeaponSteal, GrabReversal, EscapeStrike, Matador, DoubleCounter,
+        // Weapons
+        SilambamSutru, SilambamFinish, GolfSwing, PipeChoke, PlankBreak, BottleFinisher, BrickDrop, ChainWrap, TyreTrap, WeaponBlock,
     }
 
     /// <summary>
