@@ -57,6 +57,8 @@ namespace MadrasGethu
         public bool unblockable;
         public bool hitsDowned;     // can hit enemies lying on the ground (stomps, finishers)
         public bool dazes;          // leaves the target standing but dazed (open to grabs and finishers)
+        public FighterPose pose;    // the blow that landed (Idle = unknown): picks the hit reaction and the sound
+        public Sfx sound;           // impact sound (Auto = from the blow, Silent = the move plays its own)
     }
 
     /// <summary>One move in a combo string. Times are in seconds.</summary>
@@ -112,6 +114,7 @@ namespace MadrasGethu
                 unblockable = unblockable,
                 hitsDowned = hitsDowned,
                 dazes = dazes,
+                pose = pose,
             };
         }
     }

@@ -39,6 +39,8 @@ namespace MadrasGethu
             }
             string line = lines[Random.Range(0, lines.Length)];
             GameManager.Instance.AddPopup(line, who.Center + Vector3.up * 1.3f, new Color(1f, 1f, 1f, 0.95f), 0.65f);
+            // Recorded voice lines, if you've added any (Resources/Audio/Shout, Resources/Audio/Grunt).
+            GameAudio.Play(type == ShoutType.Hurt || type == ShoutType.Beg ? Sfx.Grunt : Sfx.Shout, who.Center + Vector3.up * 0.6f, 0.9f);
         }
     }
 }

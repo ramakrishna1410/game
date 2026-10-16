@@ -1030,6 +1030,7 @@ namespace MadrasGethu
                     if (outward.sqrMagnitude > 0.01f) dir = outward.normalized;
                 }
                 Visual.SetGrip(null, false);
+                GameAudio.Play(Sfx.Whoosh, victim.Center, 0.8f, 0.8f);
                 victim.Launch(this, dir, wrestleMove.launchKind);
                 if (wrestleMove.launchKind == EnemyFighter.LaunchKind.Bowl || wrestleMove.sweep) NotifyMoveLanded(wrestleMove.name);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = wrestleMove.throwDamage, direction = dir, hitsDowned = true });
@@ -1068,6 +1069,7 @@ namespace MadrasGethu
             if (st.keepHold && move.carry)
             {
                 // First slam of a double slam: he hits the ground but you don't let go.
+                GameAudio.Play(move.prop != null && move.prop.lid != null ? Sfx.LidSlam : Sfx.Slam, victim.Center, 0.8f);
                 if (move.prop != null && move.keepProp)
                     FX.Burst(move.prop.SlamPoint, 10, 2.5f, 0.05f, new Color(0.8f, 0.92f, 1f), new Color(0.5f, 0.7f, 1f), 0.5f, -9f);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = damage, direction = dir, unblockable = true, hitsDowned = true });
@@ -1085,6 +1087,10 @@ namespace MadrasGethu
             }
 
             wrestleReleased = true;
+            // The landing: a heavy slam, a crack of bone on the big ones, the lid on the ice box.
+            GameAudio.Play(move.prop != null && move.prop.lid != null ? Sfx.LidSlam : Sfx.Slam, impactPoint + Vector3.up * 0.4f, 1f);
+            if (st.damage >= 25f || move.shockwave) GameAudio.Play(Sfx.BoneCrack, victim.Center, 0.9f);
+            if (GM != null && st.damage >= 25f) GameAudio.Play(Sfx.Cheer, impactPoint, 0.8f);
             if (move.carry && victim.Visual.CanRagdoll)
             {
                 // He goes limp from exactly the pose he hit the ground in, and physics takes it from there.
@@ -1105,7 +1111,7 @@ namespace MadrasGethu
             victim.ReceiveHit(new HitInfo
             {
                 attacker = this, damage = damage, direction = dir, knockback = 1f,
-                heavy = true, unblockable = true, hitsDowned = true,
+                heavy = true, unblockable = true, hitsDowned = true, sound = Sfx.Silent,
             });
             RegisterHits(1, 0f);
             NotifyMoveLanded(move.name);

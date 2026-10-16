@@ -91,6 +91,7 @@ namespace MadrasGethu
         {
             if (IsBroken) return;
             IsBroken = true;
+            GameAudio.Play(Sfx.Smash, SlamPoint, 1f);
             if (intactVisual != null) intactVisual.SetActive(false);
 
             for (int i = 0; i < 24; i++)

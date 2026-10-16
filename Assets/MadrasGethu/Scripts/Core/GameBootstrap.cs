@@ -50,6 +50,7 @@ namespace MadrasGethu
             }
 
             var cam = SetupCamera();
+            GameAudio.StartMusic();
 
             var gmGo = new GameObject("Game Manager");
             var gm = gmGo.AddComponent<GameManager>();

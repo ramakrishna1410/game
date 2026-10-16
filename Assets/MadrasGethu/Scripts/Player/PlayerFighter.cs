@@ -510,6 +510,7 @@ namespace MadrasGethu
             lungeDirection = transform.forward;
             // The animation is timed so the fist/foot connects exactly when the hit is applied (strikeAt).
             strikeAt = Visual.PlayTimed(attack.pose, attack.startup, attack.recovery);
+            if (attack.damage > 0f) GameAudio.Play(Sfx.Whoosh, Center + transform.forward * 0.4f, attack.heavy ? 0.6f : 0.4f, attack.heavy ? 0.85f : 1.1f);
             lungeSpeed = Mathf.Min(16f, lungeRemaining / Mathf.Max(strikeAt, 0.05f));
             if (attack.announce && GM != null)
                 GM.AddPopup(attack.name.ToUpper(), Center + Vector3.up * 1.1f, new Color(1f, 0.85f, 0.35f), 0.75f);
@@ -674,6 +675,7 @@ namespace MadrasGethu
             if (ComboGrade > gradeBefore && GM != null)
             {
                 GM.AddPopup(ComboGradeName, Center + Vector3.up * 1.4f, new Color(1f, 0.75f, 0.15f), 1.3f + 0.15f * ComboGrade);
+                GameAudio.Play(Sfx.Cheer, Center, 0.6f + 0.1f * ComboGrade);
                 if (ComboGrade >= 3) GM.SlowMo(0.5f, 0.25f);
             }
         }
@@ -863,6 +865,7 @@ namespace MadrasGethu
             FX.Burst(contact, parryPerfect ? 22 : 10, parryPerfect ? 7f : 4f, 0.06f,
                 new Color(0.7f, 0.9f, 1f), new Color(2.5f, 3f, 4f), 0.3f, 0f);
             AddGethu(parryPerfect ? 10f : 4f);
+            GameAudio.Play(Sfx.Parry, contact, parryPerfect ? 1f : 0.7f, parryPerfect ? 1f : 1.15f);
 
             if (GM != null)
             {
@@ -962,6 +965,7 @@ namespace MadrasGethu
                 grabActionCooldown = GrabPullTime + 0.05f;
                 Visual.Play(FighterPose.Grab, 999f);
                 Visual.SetGrip(target, grabFromBehind);
+                GameAudio.Play(Sfx.Grab, target.Center + Vector3.up * 0.4f, 0.8f);
                 lightIndex = 0;
                 if (grabFromBehind && GM != null)
                     GM.AddPopup("FROM BEHIND!", target.Center + Vector3.up, new Color(1f, 0.85f, 0.4f), 0.7f);
@@ -1338,6 +1342,8 @@ namespace MadrasGethu
             string title = finisherTitle;
 
             NotifyMoveLanded(title);
+            GameAudio.Play(Sfx.Slam, finisherEndPoint + Vector3.up, 1f);
+            GameAudio.Play(Sfx.BoneCrack, finisherEndPoint + Vector3.up, 0.8f);
             if (victim != null && !victim.IsDead)
             {
                 victim.ReleaseFromGrab(dir * 4f + Vector3.up * 3f, knockDown: true);
@@ -1395,6 +1401,7 @@ namespace MadrasGethu
                 Visual.Flinch(0.4f);
                 if (hit.attacker is EnemyFighter attacker) attacker.Recoil(hit.direction * -1f);
                 FX.BlockSpark(Center + Vector3.up * 0.35f + transform.forward * 0.4f);
+                GameAudio.Play(Sfx.Block, Center + Vector3.up * 0.35f, 0.8f);
                 if (GM != null) { GM.HitStop(0.05f); GM.Shake(0.08f); }
                 return HitResult.Blocked;
             }

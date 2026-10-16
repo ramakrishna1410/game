@@ -68,16 +68,28 @@ namespace MadrasGethu
             if (Immortal)
             {
                 Health = Mathf.Max(1f, Health - amount);
+                ImpactFeedback(amount, hit);
                 Damaged?.Invoke(this, hit, result);
                 return;
             }
             Health = Mathf.Max(0f, Health - amount);
+            ImpactFeedback(amount, hit);
             Damaged?.Invoke(this, hit, result);
             if (Health <= 0f)
             {
                 OnDeath(hit);
                 Died?.Invoke(this);
             }
+        }
+
+        /// <summary>The thud of the blow and the body's reaction to it (head snapped aside, folded over...).</summary>
+        void ImpactFeedback(float amount, HitInfo hit)
+        {
+            if (amount <= 0f) return;
+            if (hit.sound != Sfx.Silent)
+                GameAudio.Play(GameAudio.ImpactFor(hit), Center + Vector3.up * 0.3f, Mathf.Clamp(0.55f + amount / 30f, 0.5f, 1f));
+            if (Visual != null) Visual.HitReact(hit.direction, hit.pose, Mathf.Clamp(amount / 12f, 0.4f, 1.5f));
+            if (team == Team.Enemy && UnityEngine.Random.value < 0.3f) GameAudio.Play(Sfx.Grunt, Center + Vector3.up * 0.6f, 0.8f);
         }
 
         public void Heal(float amount)

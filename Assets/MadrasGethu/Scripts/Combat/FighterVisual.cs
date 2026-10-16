@@ -39,6 +39,7 @@ namespace MadrasGethu
         Material[] originalMaterials;
         Renderer[] modelRenderers;
         HandIK handIK;
+        HitReaction hitReaction;
         Ragdoll ragdoll;
         Transform ownerRoot;   // the fighter's root (CharacterController); the body is detached from it while ragdolled
         float tumbleTimer;
@@ -95,7 +96,10 @@ namespace MadrasGethu
                     Destroy(col);
                 modelRenderers = model.GetComponentsInChildren<Renderer>();
                 if (animator != null && animator.isHuman)
+                {
                     handIK = animator.gameObject.AddComponent<HandIK>();
+                    hitReaction = animator.gameObject.AddComponent<HitReaction>();
+                }
                 tintBlock = new MaterialPropertyBlock();
                 CacheAnimatorParams();
                 SetLayerRecursively(model, gameObject.layer);
@@ -398,6 +402,12 @@ namespace MadrasGethu
             if (handIK != null) handIK.FreeRightHand(seconds);
         }
 
+        /// <summary>Procedural reaction to a blow (head snapped aside, folded over); not while limp.</summary>
+        public void HitReact(Vector3 direction, FighterPose pose, float strength)
+        {
+            if (hitReaction != null && hitReaction.enabled && !IsRagdoll) hitReaction.React(direction, pose, strength);
+        }
+
         /// <summary>Bent at the waist / crouched with the feet planted, no hands on anyone (call every frame while it changes).</summary>
         public void SetPosture(float drop, float lean)
         {
@@ -547,6 +557,7 @@ namespace MadrasGethu
                 body.localPosition = Vector3.zero;
                 ragdoll.RestorePose();
                 if (handIK != null) { handIK.SetGrip(null, false); handIK.ClearPosture(); }
+                if (hitReaction != null) hitReaction.enabled = false;   // physics owns the bones now
                 // Detach from the character root, so the root can follow the body without dragging the bones.
                 transform.SetParent(null, true);
             }
@@ -565,6 +576,7 @@ namespace MadrasGethu
         /// </summary>
         public bool EndRagdoll()
         {
+            if (hitReaction != null) hitReaction.enabled = true;
             if (ragdoll == null || !ragdoll.Active) return true;
             bool faceUp = ragdoll.FaceUp;
             ragdoll.GetUpPlacement(out var position, out var rotation);

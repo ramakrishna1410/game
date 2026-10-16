@@ -469,7 +469,8 @@ namespace MadrasGethu
                 Vector3 impulse = right * b.knockout.x + Vector3.up * b.knockout.y + fwd * b.knockout.z;
                 victim.Visual.ClearCarry();
                 victim.ReleaseFromGrab(impulse, knockDown: true);
-                victim.ReceiveHit(new HitInfo { attacker = this, damage = b.damage * mult, direction = fwd, unblockable = true, hitsDowned = true, heavy = true });
+                GameAudio.Play(Sfx.BoneCrack, contact, 0.8f);
+                victim.ReceiveHit(new HitInfo { attacker = this, damage = b.damage * mult, direction = fwd, unblockable = true, hitsDowned = true, heavy = true, pose = b.pose });
                 NotifyMoveLanded(rapidUsed ? "Machine Gun Kuthu" : combo.name);
                 if (GM != null)
                 {
@@ -482,7 +483,7 @@ namespace MadrasGethu
             }
             else
             {
-                victim.ReceiveHit(new HitInfo { attacker = this, damage = Mathf.Min(b.damage * mult, Mathf.Max(0f, victim.Health - 1f)), direction = fwd, unblockable = true, hitsDowned = true });
+                victim.ReceiveHit(new HitInfo { attacker = this, damage = Mathf.Min(b.damage * mult, Mathf.Max(0f, victim.Health - 1f)), direction = fwd, unblockable = true, hitsDowned = true, pose = b.pose });
                 victim.Visual.Flinch(1f);
                 comboVictimZTarget = b.victimZ;
                 comboVictimPitchTarget = b.victimPitch;

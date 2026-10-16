@@ -76,7 +76,9 @@ namespace MadrasGethu
             // Order matters: parents first (joints connect to the part already created for the parent bone).
             var hipsPart = AddPart(hips, null, 12f);
             AddBox(hipsPart, hips, (chest.position - hips.position) * 0.35f, new Vector3(hipWidth * 1.9f, torso * 0.28f, hipWidth * 1.2f));
+            hips.gameObject.AddComponent<RagdollThud>().owner = this;
             var chestPart = AddPart(chest, hipsPart, 12f);
+            chest.gameObject.AddComponent<RagdollThud>().owner = this;
             AddBox(chestPart, chest, (head.position - chest.position) * 0.35f, new Vector3(hipWidth * 2.2f, torso * 0.42f, hipWidth * 1.3f));
             SetLimits(chestPart, -20f, 20f, 20f, 15f);
             var headPart = AddPart(head, chestPart, 5f);
@@ -361,6 +363,23 @@ namespace MadrasGethu
             hips.rotation = Quaternion.Slerp(savedHipsRot, hips.rotation, t);
             for (int i = 0; i < blendBones.Length; i++)
                 blendBones[i].localRotation = Quaternion.Slerp(savedLocal[i], blendBones[i].localRotation, t);
+        }
+    }
+
+    /// <summary>The thud of a limp body hitting the road (or a wall).</summary>
+    public class RagdollThud : MonoBehaviour
+    {
+        public Ragdoll owner;
+        static float lastThud;
+
+        void OnCollisionEnter(Collision c)
+        {
+            if (owner == null || !owner.Active) return;
+            float speed = c.relativeVelocity.magnitude;
+            if (speed < 2.2f || Time.time - lastThud < 0.12f) return;
+            lastThud = Time.time;
+            Vector3 p = c.contactCount > 0 ? c.GetContact(0).point : transform.position;
+            GameAudio.Play(Sfx.BodyFall, p, Mathf.Clamp(speed / 6f, 0.4f, 1f));
         }
     }
 }

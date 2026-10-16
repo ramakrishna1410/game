@@ -67,6 +67,12 @@ The left panel lists every move with its input; each one ticks green the first t
 
 Use **Madras Gethu → Open Practice Yard Scene** later, or **Open Kasimedu Arena Scene** to go back to the waves.
 
+## Sound
+
+Every hit, block, parry, grab, swing, fall, slam, bone crack, prop smash, bottle, ice box lid and splash has a sound. Until you add recordings the game uses placeholder sounds made in code. Drop your own files into `Assets/MadrasGethu/Resources/Audio/<Name>/` (several per folder for variety) and they're used automatically. Music and harbour ambience go in `Audio/Music` and `Audio/Ambience`. See **[docs/AUDIO.md](docs/AUDIO.md)** for the folder names and what to search for on Freesound / Kenney.
+
+Blows also get **hit reactions** on top of the animation: a hook snaps his head to the side, a straight punch snaps it back, an uppercut throws it up, a body shot folds him over.
+
 ## Ragdolls and hit timing
 
 With real (Mixamo) characters:

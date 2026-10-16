@@ -158,6 +158,7 @@ namespace MadrasGethu
         void Shatter()
         {
             Color c = type == WeaponType.Bottle ? new Color(0.5f, 0.9f, 0.6f) : color;
+            GameAudio.Play(type == WeaponType.Bottle ? Sfx.Glass : Sfx.Smash, transform.position, 1f);
             FX.Burst(transform.position, type == WeaponType.Bottle ? 16 : 10, 4f, 0.05f, c,
                 type == WeaponType.Bottle ? c * 0.6f : Color.black, 0.5f, -9f);
             if (GameManager.Instance != null)

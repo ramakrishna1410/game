@@ -206,6 +206,7 @@ namespace MadrasGethu
                 float dmg = 20f * (MassMode ? massModeDamageMultiplier : 1f);
                 victim.ReceiveHit(new HitInfo { attacker = this, damage = dmg, direction = transform.forward, heavy = true, unblockable = true, hitsDowned = true });
                 victim.Visual.RagdollHeadJolt(Vector3.down * 3f);
+                GameAudio.Play(Sfx.BoneCrack, head, 0.9f);
                 FX.HitSpark(head, true);
                 FX.Dust(head, 10);
                 RegisterHits(1, 10f);
@@ -397,6 +398,7 @@ namespace MadrasGethu
                 if (!v.IsDead) v.ReleaseFromGrab(-clashDir * 3f + Vector3.up * 2f, knockDown: true);
                 if (!o.IsDead) o.ReleaseFromGrab(clashDir * 3f + Vector3.up * 2f, knockDown: true);
                 FX.HitSpark(contact, true);
+                GameAudio.Play(Sfx.BoneCrack, contact, 1f);
                 FX.Burst(contact, 18, 5f, 0.06f, new Color(1f, 0.95f, 0.5f), new Color(3f, 2.6f, 1f), 0.5f, 0f);
                 RegisterHits(2, 14f);
                 NotifyMoveLanded("Mutta Mothal");
@@ -464,6 +466,7 @@ namespace MadrasGethu
             p.y = wrestleOrigin.y - 1.25f;
             FX.Burst(p, 40, 6.5f, 0.09f, new Color(0.75f, 0.9f, 1f), new Color(0.6f, 0.8f, 1f), 0.9f, -12f);
             FX.Burst(p, 20, 3f, 0.16f, Color.white, Color.white * 0.6f, 1.2f, -6f);
+            GameAudio.Play(Sfx.Splash, p, 1f);
             wrestleReleased = true;
             Visual.ReleaseGripSlowly(0.3f);
             victim.Visual.ClearCarry();

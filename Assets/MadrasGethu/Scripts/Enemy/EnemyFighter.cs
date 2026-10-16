@@ -276,6 +276,7 @@ namespace MadrasGethu
                     {
                         strikeAnimStarted = true;
                         Visual.PlayTimed(currentAttack.pose, Mathf.Max(0.05f, stateTimer), currentAttack.recovery);
+                        GameAudio.Play(Sfx.Whoosh, Center + transform.forward * 0.4f, 0.45f, 0.95f);
                     }
                     if (stateTimer <= 0f) ReleaseAttack(dist, dirToPlayer, player);
                     break;
@@ -926,6 +927,7 @@ namespace MadrasGethu
             {
                 Motor.FaceDirection(-hit.direction, true);
                 Visual.Play(FighterPose.Block, 0.4f);
+                GameAudio.Play(Sfx.Block, Center + Vector3.up * 0.35f, 0.8f);
                 Motor.AddImpulse(hit.direction * hit.knockback * 0.5f);
                 if (GameManager.Instance != null)
                     GameManager.Instance.AddPopup("BLOCKED", Center + Vector3.up * 0.8f, new Color(0.7f, 0.85f, 1f), 0.7f);
